@@ -3286,15 +3286,18 @@ const MANUAL_VALUE_TYPES = new Set(['Investment','Asset','Loan']);
 function renderAccountsList() {
   const list = document.getElementById('cfg-acct-list');
   if (!list) return;
-  // Rescue the editor from inside the list before we wipe it
-  if (document.getElementById('acct-editor')?.parentElement === list) restoreEditorHome();
+  // Rescue the editor from inside the list before we wipe it (it may be
+  // nested inside a type-group body, so check containment, not parentage).
+  if (list.contains(document.getElementById('acct-editor'))) restoreEditorHome();
+  // Remember which type-groups are open so a re-render doesn't collapse them.
+  const expanded = new Set(
+    [...list.querySelectorAll('.acct-group:not(.collapsed)')].map(g => g.dataset.type)
+  );
   const active = S.accounts.filter(a => !a.archived);
   if (!active.length) {
     list.innerHTML = `<div style="padding:18px 16px;color:var(--ink3);font-size:13px;text-align:center">No accounts yet. Add one to start tracking balances.</div>`;
     return;
   }
-  const assets = active.filter(a => !a.isLiability);
-  const liabs  = active.filter(a =>  a.isLiability);
   const row = a => {
     const bal = accountBalance(a);
     const isManual = MANUAL_VALUE_TYPES.has(a.type);
@@ -3317,9 +3320,32 @@ function renderAccountsList() {
       <div class="acct-row-bal ${a.isLiability?'liab':''}">₹${fmt(Math.round(bal))}</div>
     </div>`;
   };
+  // Within each section, accounts are grouped by type into collapsible
+  // groups so the list stays short as it grows — tap a group to expand.
+  const groupsFor = arr => {
+    const groups = {};
+    arr.forEach(a => { (groups[a.type] = groups[a.type] || []).push(a); });
+    return Object.entries(groups)
+      .map(([type, accts]) => ({ type, accts, total: accts.reduce((s,a) => s + accountBalance(a), 0) }))
+      .sort((x,y) => y.total - x.total)
+      .map(g => {
+        const isLiab = g.accts[0].isLiability;
+        const label = ACCOUNT_GROUP_LABELS[g.type] || g.type;
+        const items = [...g.accts].sort((x,y) => accountBalance(y) - accountBalance(x)).map(row).join('');
+        return `<div class="acct-group${expanded.has(g.type) ? '' : ' collapsed'}" data-type="${escapeHtml(g.type)}">
+          <div class="acct-group-head" onclick="toggleAcctGroup(this)">
+            <div class="acct-group-label">${escapeHtml(label)}<span class="acct-group-count">${g.accts.length}</span></div>
+            <div class="acct-group-total ${isLiab?'liab':''}">₹${fmt(Math.round(g.total))}<span class="acct-group-chevron">▾</span></div>
+          </div>
+          <div class="acct-group-body">${items}</div>
+        </div>`;
+      }).join('');
+  };
   let html = '';
-  if (assets.length) html += `<div class="acct-section-head">Assets</div>` + assets.map(row).join('');
-  if (liabs.length)  html += `<div class="acct-section-head">Liabilities</div>` + liabs.map(row).join('');
+  const assets = active.filter(a => !a.isLiability);
+  const liabs  = active.filter(a =>  a.isLiability);
+  if (assets.length) html += `<div class="acct-section-head">Assets</div>` + groupsFor(assets);
+  if (liabs.length)  html += `<div class="acct-section-head">Liabilities</div>` + groupsFor(liabs);
   list.innerHTML = html;
 }
 
@@ -3343,7 +3369,11 @@ function openAccountEditor(id) {
   // home spot inside the cfg-card when adding a new account).
   if (a) {
     const row = document.getElementById('acct-row-' + a.id);
-    if (row) row.insertAdjacentElement('afterend', ed);
+    if (row) {
+      // Expand the row's type-group so the editor isn't hidden inside it.
+      row.closest('.acct-group')?.classList.remove('collapsed');
+      row.insertAdjacentElement('afterend', ed);
+    }
   } else {
     restoreEditorHome();
   }
