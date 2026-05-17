@@ -1543,9 +1543,17 @@ select.modal-input option { background: white; }
         <div class="modal-label">Source</div>
         <select class="modal-input" id="edit-source"></select>
       </div>
-      <div class="modal-field">
+      <div class="modal-field edit-only-acct">
         <div class="modal-label">Account</div>
         <select class="modal-input" id="edit-account"></select>
+      </div>
+      <div class="modal-field edit-only-transfer" style="display:none">
+        <div class="modal-label">From Account</div>
+        <select class="modal-input" id="edit-from"></select>
+      </div>
+      <div class="modal-field edit-only-transfer" style="display:none">
+        <div class="modal-label">To Account</div>
+        <select class="modal-input" id="edit-to"></select>
       </div>
       <div class="modal-field">
         <div class="modal-label">Date</div>
@@ -2023,8 +2031,9 @@ function buildSelects() {
   const editAcct = document.getElementById('edit-account');
   if (editAcct) editAcct.innerHTML = accountOptionsHTML('— None —');
 
-  // Transfer selects need their own placeholder (— Select —) since both are required
-  ['t-from','t-to','edit-from','edit-to'].forEach(id => {
+  // Transfer form selects need their own placeholder (— Select —); the edit
+  // modal's edit-from/edit-to are populated on open by openEditTransferModal.
+  ['t-from','t-to'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = accountOptionsHTML('— Select —');
   });
@@ -2417,9 +2426,12 @@ function hl(text, q) {
 function setModalKind(kind) {
   const modal = document.getElementById('edit-modal');
   modal.dataset.kind = kind;
-  document.getElementById('edit-modal-title').textContent = kind === 'income' ? 'Edit Income' : 'Edit Expense';
-  document.querySelectorAll('.edit-only-expense').forEach(el => el.style.display = kind === 'expense' ? '' : 'none');
-  document.querySelectorAll('.edit-only-income') .forEach(el => el.style.display = kind === 'income'  ? '' : 'none');
+  const titles = { expense: 'Edit Expense', income: 'Edit Income', transfer: 'Edit Transfer' };
+  document.getElementById('edit-modal-title').textContent = titles[kind] || 'Edit Entry';
+  document.querySelectorAll('.edit-only-expense') .forEach(el => el.style.display = kind === 'expense'  ? '' : 'none');
+  document.querySelectorAll('.edit-only-income')  .forEach(el => el.style.display = kind === 'income'   ? '' : 'none');
+  document.querySelectorAll('.edit-only-transfer').forEach(el => el.style.display = kind === 'transfer' ? '' : 'none');
+  document.querySelectorAll('.edit-only-acct')    .forEach(el => el.style.display = kind === 'transfer' ? 'none' : '');
 }
 
 function fillAccountSelect(selId, currentVal) {
@@ -2464,6 +2476,19 @@ function openEditIncomeModal(id) {
   document.getElementById('edit-modal').classList.add('show');
 }
 
+function openEditTransferModal(id) {
+  const t = S.transfers.find(x => x.id === id);
+  if (!t) return;
+  setModalKind('transfer');
+  document.getElementById('edit-from').innerHTML = accountOptionsHTML('— Select —', t.fromAccount != null ? Number(t.fromAccount) : '');
+  document.getElementById('edit-to').innerHTML   = accountOptionsHTML('— Select —', t.toAccount   != null ? Number(t.toAccount)   : '');
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-amount').value = formatIndianNumber(t.amount);
+  document.getElementById('edit-date').value = t.date;
+  document.getElementById('edit-desc').value = t.desc || '';
+  document.getElementById('edit-modal').classList.add('show');
+}
+
 function closeEditModal() {
   document.getElementById('edit-modal').classList.remove('show');
 }
@@ -2484,6 +2509,45 @@ async function saveEdit() {
   const date = document.getElementById('edit-date').value;
   const acctRaw = document.getElementById('edit-account').value;
   const account = acctRaw ? Number(acctRaw) : null;
+
+  if (kind === 'transfer') {
+    const idx = S.transfers.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    const fromRaw = document.getElementById('edit-from').value;
+    const toRaw   = document.getElementById('edit-to').value;
+    const amount  = parseAmount(document.getElementById('edit-amount').value);
+    if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
+    if (!fromRaw || !toRaw)     return toast('Pick both accounts', 'err');
+    if (fromRaw === toRaw)      return toast('From and To must be different', 'err');
+    const updated = {
+      ...S.transfers[idx],
+      amount,
+      fromAccount: Number(fromRaw),
+      toAccount:   Number(toRaw),
+      date,
+      desc: document.getElementById('edit-desc').value.trim(),
+      month: date.slice(0,7)
+    };
+    S.transfers[idx] = updated;
+    saveLocal();
+    closeEditModal();
+    renderLog();
+    if (S.sbUrl && S.sbKey) {
+      try {
+        await fetch(`${S.sbUrl}/rest/v1/transfers?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            amount: updated.amount, date: updated.date,
+            from_account: updated.fromAccount, to_account: updated.toAccount,
+            description: updated.desc, month: updated.month
+          })
+        });
+      } catch(e) {}
+    }
+    toast('✓ Transfer updated', 'ok');
+    return;
+  }
 
   if (kind === 'income') {
     const idx = S.income.findIndex(x => x.id === id);
@@ -2781,6 +2845,7 @@ function renderTransferCard(t, q) {
         </div>
         ${t.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(t.addedBy, q)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditTransferModal(${t.id})">✏ Edit</button>
           <button class="btn-del-entry" onclick="deleteTransfer(${t.id})">🗑 Delete</button>
         </div>
       </div>
