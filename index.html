@@ -688,6 +688,7 @@ select.finput option { background: white; color: var(--ink); }
 .bar-val { font-size: 12px; color: var(--ink2); width: 56px; text-align: right; flex-shrink: 0; font-weight: 500; }
 
 /* Monthly trend */
+#d-trend { max-height: 360px; overflow-y: auto; }
 .trend-row {
   display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.15fr 1fr;
   gap: 4px; align-items: center; padding: 9px 14px;
@@ -696,7 +697,12 @@ select.finput option { background: white; color: var(--ink); }
 }
 .trend-row:last-child { border-bottom: none; }
 .trend-row span:not(.trend-month) { text-align: right; }
-.trend-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink3); font-weight: 700; }
+.trend-head {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--ink3); font-weight: 700;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.trend-row.current { background: var(--amber-bg); }
 .trend-month { font-weight: 600; color: var(--ink); }
 .trend-in { color: var(--green); }
 .trend-out { color: var(--ink2); }
@@ -2776,7 +2782,7 @@ function renderLog() {
 
   // Show/hide period-filter banner (inherited from a Summary breakdown tap)
   const periodBanner = document.getElementById('log-period-banner');
-  if (S.logPeriod !== 'all' && S.logPeriod !== 'year') {
+  if (S.logPeriod !== 'all') {
     document.getElementById('log-period-banner-text').textContent =
       `Showing: ${PERIOD_LABELS[S.logPeriod] || S.logPeriod}`;
     periodBanner.style.display = 'flex';
@@ -2815,7 +2821,7 @@ function renderLog() {
     items = items.filter(x => x._kind === 'expense' &&
       (S.logType === 'Saveable' ? x.saving === 'Yes' : x.type === S.logType));
   }
-  if (S.logPeriod !== 'all' && S.logPeriod !== 'year') {
+  if (S.logPeriod !== 'all') {
     items = items.filter(x => inPeriod(x.date, S.logPeriod));
   }
   if (S.logSearch) {
@@ -2954,17 +2960,24 @@ function setPeriod(p, el) {
   renderDash();
 }
 
+// Indian financial year: April–March. The FY is identified by the
+// calendar year in which its April falls.
+function fyStartYear(d) { return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; }
+// FY quarter index 0–3: Q1 Apr–Jun, Q2 Jul–Sep, Q3 Oct–Dec, Q4 Jan–Mar.
+function fyQuarter(d) { return Math.floor(((d.getMonth() - 3 + 12) % 12) / 3); }
+
 function inPeriod(dateStr, period = S.dashPeriod) {
-  if (period === 'all' || period === 'year') return true;
+  if (period === 'all') return true;
   if (!dateStr) return false;
   const now = new Date();
   const d = new Date(dateStr + 'T00:00:00');
+  if (period === 'year')    return fyStartYear(d) === fyStartYear(now);
   if (period === 'month')   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   if (period === 'lastmonth') {
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
   }
-  if (period === 'quarter') return Math.floor(d.getMonth()/3) === Math.floor(now.getMonth()/3) && d.getFullYear() === now.getFullYear();
+  if (period === 'quarter') return fyQuarter(d) === fyQuarter(now) && fyStartYear(d) === fyStartYear(now);
   return true;
 }
 
@@ -3166,27 +3179,30 @@ function renderDash() {
         </div>`).join('')
     : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No data for this period</div>';
 
-  // ── Monthly trend (last 6 months, always) ──
+  // ── Monthly trend (all 12 months of the current financial year) ──
   const ccIds = new Set(S.accounts.filter(a => a.type === 'Credit Card').map(a => a.id));
   const tNow = new Date();
+  const fyY = fyStartYear(tNow);
+  const curKey = tNow.getFullYear() + '-' + String(tNow.getMonth()+1).padStart(2,'0');
   const trend = [];
-  for (let k = 5; k >= 0; k--) {
-    const d = new Date(tNow.getFullYear(), tNow.getMonth() - k, 1);
+  for (let k = 0; k < 12; k++) {
+    const d = new Date(fyY, 3 + k, 1); // April (FY start) through March
     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
     const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key).reduce((s,i)=>s+Number(i.amount),0);
     const mExp  = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
     const mCard = S.entries.filter(e => (e.date||'').slice(0,7) === key && ccIds.has(e.account)).reduce((s,e)=>s+Number(e.amount),0);
-    trend.push({ label, inc:mInc, exp:mExp, net:mInc-mExp, card:mCard });
+    trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp, card:mCard });
   }
   document.getElementById('d-trend').innerHTML =
     `<div class="trend-row trend-head"><span class="trend-month">Month</span><span>In</span><span>Out</span><span>Net</span><span>Cards</span></div>` +
     trend.map(t => {
+      const cur = t.key === curKey ? ' current' : '';
       if (t.inc === 0 && t.exp === 0) {
-        return `<div class="trend-row empty"><span class="trend-month">${t.label}</span><span>—</span><span>—</span><span>—</span><span>—</span></div>`;
+        return `<div class="trend-row empty${cur}"><span class="trend-month">${t.label}</span><span>—</span><span>—</span><span>—</span><span>—</span></div>`;
       }
       const nc = t.net >= 0 ? 'pos' : 'neg';
-      return `<div class="trend-row"><span class="trend-month">${t.label}</span>`
+      return `<div class="trend-row${cur}"><span class="trend-month">${t.label}</span>`
         + `<span class="trend-in">₹${fmtShort(t.inc)}</span>`
         + `<span class="trend-out">₹${fmtShort(t.exp)}</span>`
         + `<span class="trend-net ${nc}">${t.net>=0?'+':'−'}₹${fmtShort(Math.abs(t.net))}</span>`
