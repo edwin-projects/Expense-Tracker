@@ -2213,54 +2213,35 @@ const ACCOUNT_GROUP_LABELS = {
 
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
-// How many times each account is referenced across all logged
-// transactions — drives "most used first" ordering in the pickers.
-function accountUseCounts() {
-  const use = {};
-  const bump = id => { if (id != null) use[id] = (use[id] || 0) + 1; };
-  S.entries.forEach(e => bump(e.account));
-  S.income.forEach(i => bump(i.account));
-  S.transfers.forEach(t => { bump(t.fromAccount); bump(t.toAccount); });
-  return use;
-}
-
+// Account picker: grouped by category (type). Within each category the
+// logged-in person's own accounts are listed first, then alphabetical.
 function accountOptionsHTML(placeholder, currentVal) {
   const optEl = a =>
     `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')})</option>`;
-  const use = accountUseCounts();
-  const byUse = arr => [...arr].sort((a,b) =>
-    (use[b.id] || 0) - (use[a.id] || 0) || a.name.localeCompare(b.name));
-  const byType = arr => {
-    const groups = {};
-    arr.forEach(a => { const t = a.type || 'Other'; (groups[t] = groups[t] || []).push(a); });
-    const types = [
-      ...ACCOUNT_TYPE_ORDER.filter(t => groups[t]),
-      ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
-    ];
-    return types.map(t =>
-      `<optgroup label="${escapeHtml(t)}">` + byUse(groups[t]).map(optEl).join('') + `</optgroup>`
-    ).join('');
-  };
-  const all  = S.accounts.filter(a => !a.archived);
-  // The logged-in person's own accounts come first, ordered most-used first.
-  const mine = currentUser ? all.filter(a => (a.owner || 'Joint') === currentUser) : [];
-  const rest = all.filter(a => !mine.includes(a));
-  let body = '';
-  if (mine.length) {
-    body += `<optgroup label="${escapeHtml(currentUser + "’s Accounts")}">` + byUse(mine).map(optEl).join('') + `</optgroup>`;
-  }
-  body += byType(rest);
+  const groups = {};
+  S.accounts.filter(a => !a.archived).forEach(a => {
+    const t = a.type || 'Other';
+    (groups[t] = groups[t] || []).push(a);
+  });
+  const types = [
+    ...ACCOUNT_TYPE_ORDER.filter(t => groups[t]),
+    ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
+  ];
+  const rank = a => ((a.owner || 'Joint') === currentUser ? 0 : 1);
+  const body = types.map(t => {
+    const sorted = [...groups[t]].sort((a,b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    return `<optgroup label="${escapeHtml(ACCOUNT_GROUP_LABELS[t] || t)}">` + sorted.map(optEl).join('') + `</optgroup>`;
+  }).join('');
   return `<option value="">${placeholder}</option>` + body;
 }
 
-// The logged-in person's most-used account — pre-selected on the
+// The logged-in person's first account — pre-selected on the
 // Add Expense / Add Income forms.
 function defaultAccountId() {
-  const mine = S.accounts.filter(a => !a.archived && (a.owner || 'Joint') === currentUser);
-  if (!mine.length) return '';
-  const use = accountUseCounts();
-  mine.sort((a,b) => (use[b.id] || 0) - (use[a.id] || 0) || a.name.localeCompare(b.name));
-  return String(mine[0].id);
+  const mine = S.accounts
+    .filter(a => !a.archived && (a.owner || 'Joint') === currentUser)
+    .sort((a,b) => a.name.localeCompare(b.name));
+  return mine.length ? String(mine[0].id) : '';
 }
 
 function buildSelects() {
