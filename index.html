@@ -1233,13 +1233,6 @@ select.modal-input option { background: white; }
         <span class="flabel">Description</span>
         <input class="finput" id="i-desc" type="text" placeholder="Brief note…">
       </div>
-      <div class="frow">
-        <span class="flabel">One-off</span>
-        <label class="flag-toggle">
-          <input type="checkbox" id="i-oneoff">
-          Exclude from the monthly trend
-        </label>
-      </div>
     </div>
 
     <button class="btn-submit" style="background:var(--green)" onclick="submitIncome()">Save Income</button>
@@ -1700,9 +1693,6 @@ select.modal-input option { background: white; }
         <div class="modal-label">Description</div>
         <input class="modal-input" id="edit-desc" type="text" placeholder="Brief note…">
       </div>
-      <div class="modal-field edit-only-income" style="display:none">
-        <label class="flag-toggle"><input type="checkbox" id="edit-oneoff"> One-off — exclude from the monthly trend</label>
-      </div>
       <div class="modal-field edit-only-expense">
         <div class="modal-label">Expense For</div>
         <div class="modal-pills">
@@ -2012,8 +2002,7 @@ async function syncNow() {
       id: r.id, date: r.date, amount: Number(r.amount),
       source: r.source, receivedBy: r.received_by,
       account: r.account != null ? Number(r.account) : null,
-      desc: r.description, month: r.month, addedBy: r.added_by,
-      oneOff: !!r.one_off
+      desc: r.description, month: r.month, addedBy: r.added_by
     })), ...localOnly];
   }
   if (xferRows && Array.isArray(xferRows)) {
@@ -2416,16 +2405,14 @@ async function submitIncome() {
     id: newId(),
     date, amount, source, receivedBy, account, desc,
     month: date.slice(0,7),
-    addedBy: currentUser,
-    oneOff: document.getElementById('i-oneoff').checked
+    addedBy: currentUser
   };
   S.income.unshift(entry);
   queueOp('income', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
     account: entry.account, description: entry.desc,
-    month: entry.month, added_by: entry.addedBy,
-    one_off: entry.oneOff
+    month: entry.month, added_by: entry.addedBy
   });
   saveLocal();
   await pushChanges('✓ Income saved');
@@ -2438,7 +2425,6 @@ function resetIncomeForm() {
   document.getElementById('i-desc').value = '';
   document.getElementById('i-account').value = defaultAccountId();
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('i-oneoff').checked = false;
   document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === (currentUser || 'Edwin')));
 }
 
@@ -2683,7 +2669,6 @@ function openEditIncomeModal(id) {
   document.getElementById('edit-amount').value = formatIndianNumber(i.amount);
   document.getElementById('edit-date').value = i.date;
   document.getElementById('edit-desc').value = i.desc || '';
-  document.getElementById('edit-oneoff').checked = !!i.oneOff;
   document.querySelectorAll('.modal-pill[data-mg="received"]').forEach(p => {
     p.classList.toggle('active', p.dataset.mv === i.receivedBy);
   });
@@ -2768,15 +2753,14 @@ async function saveEdit() {
       desc: document.getElementById('edit-desc').value.trim(),
       receivedBy: getModalPill('received'),
       account,
-      month: date.slice(0,7),
-      oneOff: document.getElementById('edit-oneoff').checked
+      month: date.slice(0,7)
     };
     S.income[idx] = updated;
     queueOp('income', 'PATCH', id, {
       amount: updated.amount, source: updated.source,
       date: updated.date, description: updated.desc,
       received_by: updated.receivedBy, account: updated.account,
-      month: updated.month, one_off: updated.oneOff
+      month: updated.month
     });
     saveLocal();
     closeEditModal();
@@ -2862,8 +2846,7 @@ async function repeatIncome(id) {
     id: clone.id, date: clone.date, amount: clone.amount,
     source: clone.source, received_by: clone.receivedBy,
     account: clone.account, description: clone.desc,
-    month: clone.month, added_by: clone.addedBy,
-    one_off: !!clone.oneOff
+    month: clone.month, added_by: clone.addedBy
   });
   saveLocal();
   renderLog();
@@ -3058,7 +3041,6 @@ function renderIncomeCard(i, q) {
           <div class="echip income">+ Income</div>
           <div class="echip paid">By: ${hl(i.receivedBy, q)}</div>
           ${an ? `<div class="echip acct">⊞ ${hl(an, q)}</div>` : ''}
-          ${i.oneOff ? `<div class="echip">One-off</div>` : ''}
         </div>
         ${i.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(i.addedBy, q)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -3195,12 +3177,8 @@ function cardSplitHTML(groups) {
 
 function renderDash() {
   // ── Cash Flow (period-aware) ──
-  // One-off income (windfalls tied to a long-term holding) is kept out of
-  // the monthly cash-flow view entirely — income total, count, Net, spend
-  // bar and the Earned By split. It still shows in the Log and still feeds
-  // the balance of whatever account it's tagged to.
   const es = filteredEntries();
-  const inc = filteredIncome().filter(i => !i.oneOff);
+  const inc = filteredIncome();
   const incTotal = inc.reduce((s,i) => s + Number(i.amount), 0);
   const expTotal = es.reduce((s,e) => s + Number(e.amount), 0);
   const net = incTotal - expTotal;
@@ -3379,7 +3357,7 @@ function renderDash() {
     const d = new Date(fyY, 3 + k, 1); // April (FY start) through March
     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
-    const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key && !i.oneOff).reduce((s,i)=>s+Number(i.amount),0);
+    const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key).reduce((s,i)=>s+Number(i.amount),0);
     const mExp  = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
     const mCard = S.entries.filter(e => (e.date||'').slice(0,7) === key && ccIds.has(e.account)).reduce((s,e)=>s+Number(e.amount),0);
     trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp, card:mCard });
@@ -3890,8 +3868,7 @@ async function importBackup(input) {
       id: x.id, date: x.date, amount: x.amount,
       source: x.source, received_by: x.receivedBy,
       account: x.account ?? null, description: x.desc,
-      month: x.month, added_by: x.addedBy,
-      one_off: !!x.oneOff
+      month: x.month, added_by: x.addedBy
     })));
   }
   // Accounts
