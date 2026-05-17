@@ -572,6 +572,17 @@ select.finput option { background: white; color: var(--ink); }
   background: var(--green-bg); color: var(--green); font-family: 'Outfit', sans-serif;
   font-size: 12px; font-weight: 600; cursor: pointer;
 }
+.pin-set-row { display: flex; align-items: center; gap: 8px; }
+.pin-set-row input {
+  flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--border2);
+  border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 15px;
+  letter-spacing: 4px; text-align: center; background: var(--surface);
+}
+.pin-set-row button {
+  flex-shrink: 0; padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--ink);
+  background: var(--ink); color: white; font-family: 'Outfit', sans-serif;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
 .acct-editor {
   display: none; padding: 14px 16px; background: var(--bg2); border-top: 1px solid var(--border);
 }
@@ -1021,7 +1032,7 @@ select.modal-input option { background: white; }
       <button class="who-btn active" data-who="Edwin" onclick="selectWho(this)">Edwin</button>
       <button class="who-btn" data-who="Divya" onclick="selectWho(this)">Divya</button>
     </div>
-    <div class="setup-label">Enter Family PIN</div>
+    <div class="setup-label" id="pin-entry-label">Enter your PIN</div>
     <div class="pin-dots" id="pin-dots">
       <div class="pin-dot"></div>
       <div class="pin-dot"></div>
@@ -1416,6 +1427,28 @@ select.modal-input option { background: white; }
       </div>
     </div>
 
+    <!-- Login PINs -->
+    <div class="sec-label">App PINs</div>
+    <div class="cfg-card collapsible collapsed">
+      <div class="cfg-head" onclick="toggleCfgCard(this)">
+        <span>Login PINs</span>
+        <span class="cfg-chevron">▾</span>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;color:var(--ink3);line-height:1.4">A separate 4-digit PIN for each person, asked at login. Stored on this device.</div>
+        <div class="pin-set-row">
+          <span class="flabel">Edwin's PIN</span>
+          <input id="pin-set-Edwin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
+          <button onclick="savePin('Edwin')">Save</button>
+        </div>
+        <div class="pin-set-row">
+          <span class="flabel">Divya's PIN</span>
+          <input id="pin-set-Divya" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
+          <button onclick="savePin('Divya')">Save</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Categories -->
     <div class="sec-label">Expense Categories</div>
     <div class="cfg-card collapsible collapsed">
@@ -1745,7 +1778,6 @@ const DEFAULTS = {
 //   GRANT SELECT, INSERT, UPDATE, DELETE ON public.income    TO anon, authenticated, service_role;
 //   GRANT SELECT, INSERT, UPDATE, DELETE ON public.transfers TO anon, authenticated, service_role;
 
-const FAMILY_PIN = "1234"; // ← Change this to your preferred PIN
 const LS_KEY = 'de_finance_v2';
 
 // ══════════════════════════════════════════════════
@@ -1773,7 +1805,6 @@ let S = {
 };
 let currentUser = '';
 let pinBuffer = '';
-let isSettingPin = false;
 let pendingPin = '';
 
 function loadLocal() {
@@ -1792,6 +1823,14 @@ function loadLocal() {
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
+  // Per-person login PINs. Seed from the old single family PIN so nobody
+  // is locked out after the upgrade — each person can change theirs in Config.
+  if (!S.pins || typeof S.pins !== 'object') S.pins = {};
+  const legacyPin = localStorage.getItem('de_pin');
+  if (legacyPin && !S.pins.Edwin && !S.pins.Divya) {
+    S.pins.Edwin = legacyPin;
+    S.pins.Divya = legacyPin;
+  }
 }
 
 // Collision-resistant id: ms timestamp with a random sub-millisecond suffix.
@@ -1987,21 +2026,25 @@ function saveSupabase() {
 
 function showPinStep() {
   document.getElementById('setup-step-pin').style.display = 'block';
-  // Check if PIN is already set
-  const storedPin = localStorage.getItem('de_pin');
-  if (!storedPin) {
-    document.getElementById('pin-step-label').textContent = 'Set your family PIN (4 digits)';
-    isSettingPin = true;
-  } else {
-    document.getElementById('pin-step-label').textContent = 'Who are you?';
-    isSettingPin = false;
-  }
+  document.getElementById('pin-step-label').textContent = 'Who are you?';
+  document.getElementById('pin-hint').textContent = '';
+  pinBuffer = '';
+  pendingPin = '';
+  const who = getWho();
+  document.getElementById('pin-entry-label').textContent = S.pins[who] ? `Enter ${who}'s PIN` : `Set ${who}'s PIN`;
   renderPinDots();
 }
 
 function selectWho(btn) {
   document.querySelectorAll('.who-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  // Switching person restarts PIN entry so digits aren't checked against the wrong PIN.
+  pinBuffer = '';
+  pendingPin = '';
+  const who = btn.dataset.who;
+  document.getElementById('pin-entry-label').textContent = S.pins[who] ? `Enter ${who}'s PIN` : `Set ${who}'s PIN`;
+  document.getElementById('pin-hint').textContent = '';
+  renderPinDots();
 }
 
 function getWho() {
@@ -2027,33 +2070,36 @@ function renderPinDots() {
 }
 
 function checkPin() {
-  const stored = localStorage.getItem('de_pin');
-  if (isSettingPin) {
+  const who = getWho();
+  const stored = S.pins[who];
+  if (!stored) {
+    // No PIN yet for this person — set one (enter, then confirm).
     if (!pendingPin) {
       pendingPin = pinBuffer;
       pinBuffer = '';
-      document.getElementById('pin-step-label').textContent = 'Confirm PIN';
+      document.getElementById('pin-entry-label').textContent = `Confirm ${who}'s PIN`;
       document.getElementById('pin-hint').textContent = 'Enter again to confirm';
       renderPinDots();
       return;
-    } else {
-      if (pinBuffer === pendingPin) {
-        localStorage.setItem('de_pin', pinBuffer);
-        enterApp();
-      } else {
-        document.getElementById('pin-hint').textContent = "PINs don't match. Try again.";
-        pinBuffer = ''; pendingPin = '';
-        renderPinDots();
-      }
     }
-  } else {
-    if (pinBuffer === stored) {
+    if (pinBuffer === pendingPin) {
+      S.pins[who] = pinBuffer;
+      saveLocal();
       enterApp();
     } else {
-      document.getElementById('pin-hint').textContent = 'Wrong PIN. Try again.';
-      pinBuffer = '';
+      document.getElementById('pin-hint').textContent = "PINs don't match. Try again.";
+      document.getElementById('pin-entry-label').textContent = `Set ${who}'s PIN`;
+      pinBuffer = ''; pendingPin = '';
       renderPinDots();
     }
+    return;
+  }
+  if (pinBuffer === stored) {
+    enterApp();
+  } else {
+    document.getElementById('pin-hint').textContent = `Wrong PIN for ${who}. Try again.`;
+    pinBuffer = '';
+    renderPinDots();
   }
 }
 
@@ -2064,6 +2110,9 @@ function enterApp() {
   document.getElementById('user-pill').textContent = currentUser;
   buildSelects();
   setDefaultDate();
+  // Default the people pills to whoever just logged in.
+  resetForm();
+  resetIncomeForm();
   syncNow();
 }
 
@@ -2284,8 +2333,9 @@ function resetForm() {
   document.getElementById('f-desc').value = '';
   const acct = document.getElementById('f-account'); if (acct) acct.value = '';
   setDefaultDate();
-  document.querySelectorAll('.pill[data-g="for"]').forEach(p => p.classList.toggle('active', p.dataset.v === 'Both'));
-  document.querySelectorAll('.pill[data-g="paid"]').forEach(p => p.classList.toggle('active', p.dataset.v === 'Edwin'));
+  const me = currentUser || 'Edwin';
+  document.querySelectorAll('.pill[data-g="for"]').forEach(p => p.classList.toggle('active', p.dataset.v === me));
+  document.querySelectorAll('.pill[data-g="paid"]').forEach(p => p.classList.toggle('active', p.dataset.v === me));
   document.querySelectorAll('.pill[data-g="saving"]').forEach(p => p.classList.toggle('active', p.dataset.v === 'No'));
 }
 
@@ -2330,7 +2380,7 @@ function resetIncomeForm() {
   document.getElementById('i-account').value = '';
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('i-oneoff').checked = false;
-  document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === 'Edwin'));
+  document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === (currentUser || 'Edwin')));
 }
 
 async function deleteIncome(id) {
@@ -3098,7 +3148,12 @@ function renderDash() {
   const netEl = document.getElementById('d-cf-net');
   netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.abs(net));
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('d-cf-net-sub').textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
+  document.getElementById('d-cf-net-sub').textContent =
+    incTotal > 0
+      ? (net >= 0
+          ? `Surplus · ${Math.round(net / incTotal * 100)}% of income saved`
+          : `Deficit · spent ${Math.round(expTotal / incTotal * 100)}% of income`)
+      : (net >= 0 ? 'Surplus for this period' : 'Deficit for this period');
   const netCard = document.getElementById('d-cf-net-card');
   netCard.style.background  = net >= 0 ? 'var(--green-bg)' : '#fff0f0';
   netCard.style.borderColor = net >= 0 ? '#a0d4b8' : '#ffb3b3';
@@ -3285,6 +3340,21 @@ function renderCfg() {
   const hasSb = !!(S.sbUrl && S.sbKey);
   document.getElementById('cfg-sb-status').textContent = hasSb ? 'Connected ✓' : 'Not connected';
   document.getElementById('cfg-sb-status').style.color = hasSb ? 'var(--green)' : 'var(--red)';
+  ['Edwin','Divya'].forEach(w => {
+    const inp = document.getElementById('pin-set-' + w);
+    if (inp) inp.placeholder = S.pins[w] ? '•••• (set — enter to change)' : 'Not set';
+  });
+}
+
+function savePin(who) {
+  const inp = document.getElementById('pin-set-' + who);
+  const val = (inp.value || '').trim();
+  if (!/^\d{4}$/.test(val)) return toast('Enter a 4-digit PIN', 'err');
+  S.pins[who] = val;
+  saveLocal();
+  inp.value = '';
+  renderCfg();
+  toast(`✓ ${who}'s PIN updated`, 'ok');
 }
 
 function renderCfgList(key, items) {
@@ -3423,7 +3493,7 @@ function openAccountEditor(id) {
   document.getElementById('acct-edit-id').value = a ? a.id : '';
   document.getElementById('acct-name').value         = a ? a.name : '';
   document.getElementById('acct-type').value         = a ? a.type : 'Bank';
-  document.getElementById('acct-owner').value        = a ? (a.owner || 'Joint') : 'Joint';
+  document.getElementById('acct-owner').value        = a ? (a.owner || 'Joint') : (currentUser || 'Joint');
   document.getElementById('acct-opening').value      = a ? formatIndianNumber(a.openingBalance) : '';
   document.getElementById('acct-opening-date').value = a ? (a.openingDate || '') : new Date().toISOString().split('T')[0];
   document.getElementById('acct-current').value      = a && a.currentValue != null ? formatIndianNumber(a.currentValue) : '';
