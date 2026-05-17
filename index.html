@@ -3195,8 +3195,12 @@ function cardSplitHTML(groups) {
 
 function renderDash() {
   // ── Cash Flow (period-aware) ──
+  // One-off income (windfalls tied to a long-term holding) is kept out of
+  // the monthly cash-flow view entirely — income total, count, Net, spend
+  // bar and the Earned By split. It still shows in the Log and still feeds
+  // the balance of whatever account it's tagged to.
   const es = filteredEntries();
-  const inc = filteredIncome();
+  const inc = filteredIncome().filter(i => !i.oneOff);
   const incTotal = inc.reduce((s,i) => s + Number(i.amount), 0);
   const expTotal = es.reduce((s,e) => s + Number(e.amount), 0);
   const net = incTotal - expTotal;
