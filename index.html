@@ -687,6 +687,24 @@ select.finput option { background: white; color: var(--ink); }
 .bar-fill { height: 100%; background: var(--amber); border-radius: 4px; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
 .bar-val { font-size: 12px; color: var(--ink2); width: 56px; text-align: right; flex-shrink: 0; font-weight: 500; }
 
+/* Monthly trend */
+.trend-row {
+  display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.15fr 1fr;
+  gap: 4px; align-items: center; padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.trend-row:last-child { border-bottom: none; }
+.trend-row span:not(.trend-month) { text-align: right; }
+.trend-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink3); font-weight: 700; }
+.trend-month { font-weight: 600; color: var(--ink); }
+.trend-in { color: var(--green); }
+.trend-out { color: var(--ink2); }
+.trend-net.pos { color: var(--green); font-weight: 600; }
+.trend-net.neg { color: var(--red); font-weight: 600; }
+.trend-card { color: var(--ink2); }
+.trend-row.empty span { color: var(--ink3); }
+
 /* Split rows */
 .split-item {
   display: flex;
@@ -1349,6 +1367,9 @@ select.modal-input option { background: white; }
     <div class="fcard" style="padding:16px">
       <div id="d-bars"></div>
     </div>
+
+    <div class="sec-label">Monthly Trend</div>
+    <div class="fcard" id="d-trend"></div>
     <div style="height:10px"></div>
   </div>
 
@@ -3144,6 +3165,33 @@ function renderDash() {
           <div class="bar-val" style="width:90px;text-align:right">₹${Math.round(v/1000)}k <span style="color:var(--ink3);font-size:11px">(${total ? Math.round(v/total*100) : 0}%)</span></div>
         </div>`).join('')
     : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No data for this period</div>';
+
+  // ── Monthly trend (last 6 months, always) ──
+  const ccIds = new Set(S.accounts.filter(a => a.type === 'Credit Card').map(a => a.id));
+  const tNow = new Date();
+  const trend = [];
+  for (let k = 5; k >= 0; k--) {
+    const d = new Date(tNow.getFullYear(), tNow.getMonth() - k, 1);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
+    const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key).reduce((s,i)=>s+Number(i.amount),0);
+    const mExp  = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
+    const mCard = S.entries.filter(e => (e.date||'').slice(0,7) === key && ccIds.has(e.account)).reduce((s,e)=>s+Number(e.amount),0);
+    trend.push({ label, inc:mInc, exp:mExp, net:mInc-mExp, card:mCard });
+  }
+  document.getElementById('d-trend').innerHTML =
+    `<div class="trend-row trend-head"><span class="trend-month">Month</span><span>In</span><span>Out</span><span>Net</span><span>Cards</span></div>` +
+    trend.map(t => {
+      if (t.inc === 0 && t.exp === 0) {
+        return `<div class="trend-row empty"><span class="trend-month">${t.label}</span><span>—</span><span>—</span><span>—</span><span>—</span></div>`;
+      }
+      const nc = t.net >= 0 ? 'pos' : 'neg';
+      return `<div class="trend-row"><span class="trend-month">${t.label}</span>`
+        + `<span class="trend-in">₹${fmtShort(t.inc)}</span>`
+        + `<span class="trend-out">₹${fmtShort(t.exp)}</span>`
+        + `<span class="trend-net ${nc}">${t.net>=0?'+':'−'}₹${fmtShort(Math.abs(t.net))}</span>`
+        + `<span class="trend-card">₹${fmtShort(t.card)}</span></div>`;
+    }).join('');
 }
 
 // ══════════════════════════════════════════════════
@@ -3579,6 +3627,15 @@ function dl(blob, name) {
 //  HELPERS
 // ══════════════════════════════════════════════════
 function fmt(n) { return Number(n).toLocaleString('en-IN'); }
+
+// Compact amount for dense layouts: 52212 → 52k, 248000 → 2.48L.
+function fmtShort(n) {
+  const a = Math.abs(n);
+  if (a >= 10000000) return (n/10000000).toFixed(2).replace(/\.?0+$/,'') + 'Cr';
+  if (a >= 100000)   return (n/100000).toFixed(2).replace(/\.?0+$/,'') + 'L';
+  if (a >= 1000)     return Math.round(n/1000) + 'k';
+  return String(Math.round(n));
+}
 
 // Live amount-input helpers — show Indian (lakh) commas while typing.
 function formatIndianNumber(str) {
