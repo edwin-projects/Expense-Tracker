@@ -979,7 +979,7 @@ select.modal-input option { background: white; }
       1. Go to <strong>supabase.com</strong> → New project (free)<br>
       2. Settings → API → copy <strong>Project URL</strong> and <strong>anon public key</strong><br>
       3. Run the SQL below in Supabase SQL Editor once:<br><br>
-      <code>create table expenses (id bigint primary key, date text, amount numeric, category text, type text, freq text, for_whom text, paid_by text, saving text, desc text, month text, added_by text, created_at timestamptz default now());</code>
+      <code>create table expenses (id bigint primary key, date text, amount numeric, category text, type text, freq text, for_whom text, paid_by text, saving text, description text, month text, added_by text, created_at timestamptz default now());</code>
     </div>
   </div>
 
@@ -1710,6 +1710,7 @@ let S = {
   logAccountFilter: null,
   logPeriod: 'all',
   logReturnAnchor: null,
+  pendingOps: [],
   dashOwner: 'All'
 };
 let currentUser = '';
@@ -1732,6 +1733,17 @@ function loadLocal() {
   if (!Array.isArray(S.income)) S.income = [];
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
+  if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
+}
+
+// Collision-resistant id: ms timestamp with a random sub-millisecond suffix.
+function newId() {
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g,
+    c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
 
 function saveLocal() {
@@ -1762,8 +1774,59 @@ async function sbFetch(path, opts={}) {
   } catch(e) { return null; }
 }
 
+// ── Offline-safe write queue ─────────────────────────────────────────
+// Every create/edit/delete is recorded as an op and replayed against
+// Supabase. If a write fails (offline), the op stays queued and is
+// retried on the next sync / when the device comes back online — so
+// offline edits aren't lost and offline deletes don't reappear.
+function queueOp(table, method, id, body) {
+  S.pendingOps.push({ table, method, id, body: body || null });
+}
+
+async function sendOp(op) {
+  const headers = {
+    apikey: S.sbKey, Authorization: 'Bearer ' + S.sbKey,
+    'Content-Type': 'application/json', Prefer: 'return=minimal'
+  };
+  const base = S.sbUrl + '/rest/v1/' + op.table;
+  try {
+    let res;
+    if (op.method === 'POST')        res = await fetch(base, { method:'POST', headers, body: JSON.stringify(op.body) });
+    else if (op.method === 'PATCH')  res = await fetch(base + '?id=eq.' + op.id, { method:'PATCH', headers, body: JSON.stringify(op.body) });
+    else if (op.method === 'DELETE') res = await fetch(base + '?id=eq.' + op.id, { method:'DELETE', headers });
+    else return false;
+    // A duplicate-insert (409) means the row already landed — treat as done.
+    return res.ok || (op.method === 'POST' && res.status === 409);
+  } catch(e) { return false; }
+}
+
+// Replay queued ops in order; stop at the first failure to preserve order.
+async function flushPendingOps() {
+  if (!S.sbUrl || !S.sbKey) return;
+  while (S.pendingOps.length) {
+    const ok = await sendOp(S.pendingOps[0]);
+    if (!ok) return;
+    S.pendingOps.shift();
+    saveLocal();
+  }
+}
+
+// Called after a local mutation: flush the queue and report sync state.
+async function pushChanges(okMsg) {
+  setSyncState('syncing');
+  await flushPendingOps();
+  if (S.pendingOps.length) {
+    setSyncState('offline');
+    toast('Saved on device — will sync when back online', '');
+  } else {
+    setSyncState('online');
+    if (okMsg) toast(okMsg, 'ok');
+  }
+}
+
 async function syncNow() {
   setSyncState('syncing');
+  await flushPendingOps();
   const [rows, acctRows, incRows, xferRows] = await Promise.all([
     sbFetch('expenses?select=*&order=date.desc'),
     sbFetch('accounts?select=*&order=created_at.asc'),
@@ -2004,9 +2067,9 @@ function accountOptionsHTML(placeholder, currentVal) {
     ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
   ];
   const body = types.map(t =>
-    `<optgroup label="${t}">` +
+    `<optgroup label="${escapeHtml(t)}">` +
     groups[t].map(a =>
-      `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${a.name} (${a.owner || 'Joint'})</option>`
+      `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')})</option>`
     ).join('') +
     `</optgroup>`
   ).join('');
@@ -2132,40 +2195,24 @@ async function submitExpense() {
   if (!date) return toast('Select a date', 'err');
 
   const entry = {
-    id: Date.now(),
+    id: newId(),
     date, amount, category, type, freq,
     forWhom, paidBy, saving, desc, account,
     month: date.slice(0,7),
     addedBy: currentUser
   };
 
-  // Save locally first
   S.entries.unshift(entry);
-  saveLocal();
-
-  // Push to Supabase
-  setSyncState('syncing');
-  const ok = await sbFetch('expenses', {
-    method: 'POST',
-    prefer: 'return=minimal',
-    body: JSON.stringify({
-      id: entry.id, date: entry.date, amount: entry.amount,
-      category: entry.category, type: entry.type, freq: entry.freq,
-      for_whom: entry.forWhom, paid_by: entry.paidBy,
-      saving: entry.saving, description: entry.desc,
-      month: entry.month, added_by: entry.addedBy,
-      account: entry.account
-    })
+  queueOp('expenses', 'POST', entry.id, {
+    id: entry.id, date: entry.date, amount: entry.amount,
+    category: entry.category, type: entry.type, freq: entry.freq,
+    for_whom: entry.forWhom, paid_by: entry.paidBy,
+    saving: entry.saving, description: entry.desc,
+    month: entry.month, added_by: entry.addedBy,
+    account: entry.account
   });
-
-  if (ok) {
-    setSyncState('online');
-    toast('✓ Saved & synced', 'ok');
-  } else {
-    setSyncState('offline');
-    toast('Saved locally (offline)', '');
-  }
-
+  saveLocal();
+  await pushChanges('✓ Saved');
   resetForm();
 }
 
@@ -2197,27 +2244,20 @@ async function submitIncome() {
   if (!receivedBy) return toast('Pick who received it', 'err');
 
   const entry = {
-    id: Date.now(),
+    id: newId(),
     date, amount, source, receivedBy, account, desc,
     month: date.slice(0,7),
     addedBy: currentUser
   };
   S.income.unshift(entry);
-  saveLocal();
-
-  setSyncState('syncing');
-  const ok = await sbFetch('income', {
-    method: 'POST',
-    prefer: 'return=minimal',
-    body: JSON.stringify({
-      id: entry.id, date: entry.date, amount: entry.amount,
-      source: entry.source, received_by: entry.receivedBy,
-      account: entry.account, description: entry.desc,
-      month: entry.month, added_by: entry.addedBy
-    })
+  queueOp('income', 'POST', entry.id, {
+    id: entry.id, date: entry.date, amount: entry.amount,
+    source: entry.source, received_by: entry.receivedBy,
+    account: entry.account, description: entry.desc,
+    month: entry.month, added_by: entry.addedBy
   });
-  if (ok) { setSyncState('online'); toast('✓ Income saved & synced', 'ok'); }
-  else    { setSyncState('offline'); toast('Saved locally (offline)', ''); }
+  saveLocal();
+  await pushChanges('✓ Income saved');
   resetIncomeForm();
 }
 
@@ -2233,18 +2273,11 @@ function resetIncomeForm() {
 async function deleteIncome(id) {
   if (!confirm('Delete this income entry?')) return;
   S.income = S.income.filter(i => i.id !== id);
+  queueOp('income', 'DELETE', id);
   saveLocal();
   const card = document.getElementById('inc-' + id);
   if (card) card.remove();
-  if (S.sbUrl && S.sbKey) {
-    try {
-      await fetch(`${S.sbUrl}/rest/v1/income?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json' }
-      });
-    } catch(e) {}
-  }
-  toast('Income deleted', 'ok');
+  await pushChanges('Income deleted');
   renderLog();
 }
 
@@ -2263,7 +2296,7 @@ async function submitTransfer() {
   if (!date) return toast('Select a date', 'err');
 
   const xfer = {
-    id: Date.now(),
+    id: newId(),
     date, amount,
     fromAccount: Number(fromRaw),
     toAccount:   Number(toRaw),
@@ -2272,20 +2305,13 @@ async function submitTransfer() {
     addedBy: currentUser
   };
   S.transfers.unshift(xfer);
-  saveLocal();
-
-  setSyncState('syncing');
-  const ok = await sbFetch('transfers', {
-    method: 'POST',
-    prefer: 'return=minimal',
-    body: JSON.stringify({
-      id: xfer.id, date: xfer.date, amount: xfer.amount,
-      from_account: xfer.fromAccount, to_account: xfer.toAccount,
-      description: xfer.desc, month: xfer.month, added_by: xfer.addedBy
-    })
+  queueOp('transfers', 'POST', xfer.id, {
+    id: xfer.id, date: xfer.date, amount: xfer.amount,
+    from_account: xfer.fromAccount, to_account: xfer.toAccount,
+    description: xfer.desc, month: xfer.month, added_by: xfer.addedBy
   });
-  if (ok) { setSyncState('online'); toast('✓ Transfer saved & synced', 'ok'); }
-  else    { setSyncState('offline'); toast('Saved locally (offline)', ''); }
+  saveLocal();
+  await pushChanges('✓ Transfer saved');
   resetTransferForm();
 }
 
@@ -2300,18 +2326,11 @@ function resetTransferForm() {
 async function deleteTransfer(id) {
   if (!confirm('Delete this transfer?')) return;
   S.transfers = S.transfers.filter(t => t.id !== id);
+  queueOp('transfers', 'DELETE', id);
   saveLocal();
   const card = document.getElementById('xfer-' + id);
   if (card) card.remove();
-  if (S.sbUrl && S.sbKey) {
-    try {
-      await fetch(`${S.sbUrl}/rest/v1/transfers?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json' }
-      });
-    } catch(e) {}
-  }
-  toast('Transfer deleted', 'ok');
+  await pushChanges('Transfer deleted');
   renderLog();
 }
 
@@ -2436,10 +2455,13 @@ function renderCategoryBar() {
   sel.className = 'cat-filter-select' + (S.logCategoryFilter !== 'All' ? ' active' : '');
 }
 
+// HTML-escapes text, then wraps search matches. Escaping first means any
+// stored markup (descriptions, names) renders as text, never executes.
 function hl(text, q) {
-  if (!q || text == null) return text != null ? String(text) : '';
+  const safe = escapeHtml(text);
+  if (!q) return safe;
   const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return String(text).replace(new RegExp(esc, 'gi'), m => `<span class="sh">${m}</span>`);
+  return safe.replace(new RegExp(esc, 'gi'), m => `<span class="sh">${m}</span>`);
 }
 
 function setModalKind(kind) {
@@ -2548,32 +2570,26 @@ async function saveEdit() {
       month: date.slice(0,7)
     };
     S.transfers[idx] = updated;
+    queueOp('transfers', 'PATCH', id, {
+      amount: updated.amount, date: updated.date,
+      from_account: updated.fromAccount, to_account: updated.toAccount,
+      description: updated.desc, month: updated.month
+    });
     saveLocal();
     closeEditModal();
     renderLog();
-    if (S.sbUrl && S.sbKey) {
-      try {
-        await fetch(`${S.sbUrl}/rest/v1/transfers?id=eq.${id}`, {
-          method: 'PATCH',
-          headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            amount: updated.amount, date: updated.date,
-            from_account: updated.fromAccount, to_account: updated.toAccount,
-            description: updated.desc, month: updated.month
-          })
-        });
-      } catch(e) {}
-    }
-    toast('✓ Transfer updated', 'ok');
+    await pushChanges('✓ Transfer updated');
     return;
   }
 
   if (kind === 'income') {
     const idx = S.income.findIndex(x => x.id === id);
     if (idx === -1) return;
+    const amount = parseAmount(document.getElementById('edit-amount').value);
+    if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
     const updated = {
       ...S.income[idx],
-      amount: parseAmount(document.getElementById('edit-amount').value),
+      amount,
       source: document.getElementById('edit-source').value,
       date,
       desc: document.getElementById('edit-desc').value.trim(),
@@ -2582,33 +2598,27 @@ async function saveEdit() {
       month: date.slice(0,7)
     };
     S.income[idx] = updated;
+    queueOp('income', 'PATCH', id, {
+      amount: updated.amount, source: updated.source,
+      date: updated.date, description: updated.desc,
+      received_by: updated.receivedBy, account: updated.account,
+      month: updated.month
+    });
     saveLocal();
     closeEditModal();
     renderLog();
-    if (S.sbUrl && S.sbKey) {
-      try {
-        await fetch(`${S.sbUrl}/rest/v1/income?id=eq.${id}`, {
-          method: 'PATCH',
-          headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            amount: updated.amount, source: updated.source,
-            date: updated.date, description: updated.desc,
-            received_by: updated.receivedBy, account: updated.account,
-            month: updated.month
-          })
-        });
-      } catch(e) {}
-    }
-    toast('✓ Income updated', 'ok');
+    await pushChanges('✓ Income updated');
     return;
   }
 
   // Expense path
   const idx = S.entries.findIndex(x => x.id === id);
   if (idx === -1) return;
+  const amount = parseAmount(document.getElementById('edit-amount').value);
+  if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
   const updated = {
     ...S.entries[idx],
-    amount: parseAmount(document.getElementById('edit-amount').value),
+    amount,
     category: document.getElementById('edit-cat').value,
     type: document.getElementById('edit-type').value,
     freq: document.getElementById('edit-freq').value,
@@ -2621,50 +2631,28 @@ async function saveEdit() {
     month: date.slice(0,7)
   };
   S.entries[idx] = updated;
+  queueOp('expenses', 'PATCH', id, {
+    amount: updated.amount, category: updated.category,
+    type: updated.type, freq: updated.freq,
+    date: updated.date, description: updated.desc,
+    for_whom: updated.forWhom, paid_by: updated.paidBy,
+    saving: updated.saving, month: updated.month,
+    account: updated.account
+  });
   saveLocal();
   closeEditModal();
   renderLog();
-  if (S.sbUrl && S.sbKey) {
-    try {
-      await fetch(`${S.sbUrl}/rest/v1/expenses?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          amount: updated.amount, category: updated.category,
-          type: updated.type, freq: updated.freq,
-          date: updated.date, description: updated.desc,
-          for_whom: updated.forWhom, paid_by: updated.paidBy,
-          saving: updated.saving, month: updated.month,
-          account: updated.account
-        })
-      });
-    } catch(e) {}
-  }
-  toast('✓ Entry updated', 'ok');
+  await pushChanges('✓ Entry updated');
 }
 
 async function deleteEntry(id) {
   if (!confirm('Delete this entry?')) return;
-  // Remove locally
   S.entries = S.entries.filter(e => e.id !== id);
+  queueOp('expenses', 'DELETE', id);
   saveLocal();
-  // Remove from card immediately
   const card = document.getElementById('entry-' + id);
   if (card) card.remove();
-  // Delete from Supabase
-  if (S.sbUrl && S.sbKey) {
-    try {
-      await fetch(S.sbUrl + '/rest/v1/expenses?id=eq.' + id, {
-        method: 'DELETE',
-        headers: {
-          'apikey': S.sbKey,
-          'Authorization': 'Bearer ' + S.sbKey,
-          'Content-Type': 'application/json'
-        }
-      });
-    } catch(e) {}
-  }
-  toast('Entry deleted', 'ok');
+  await pushChanges('Entry deleted');
   renderLog();
 }
 
@@ -3035,14 +3023,14 @@ function renderDash() {
             const bal = accountBalance(a);
             const ownerClass = 'owner-' + (a.owner || 'Joint').toLowerCase();
             return `<div class="split-item" style="padding-left:26px;padding-right:14px;cursor:pointer" onclick="setLogAccountFilter(${a.id})">
-              <div><div class="split-name">${a.name}<span class="acct-chip ${ownerClass}">${a.owner || 'Joint'}</span></div>
+              <div><div class="split-name">${escapeHtml(a.name)}<span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span></div>
               <div class="split-pct">tap to view transactions</div></div>
               <div class="split-amt" style="${isLiab?'color:var(--red)':''}">₹${fmt(Math.round(bal))}</div>
             </div>`;
           }).join('');
           return `<div class="acct-group collapsed">
             <div class="acct-group-head" onclick="toggleAcctGroup(this)">
-              <div class="acct-group-label">${label}<span class="acct-group-count">${g.accts.length}</span></div>
+              <div class="acct-group-label">${escapeHtml(label)}<span class="acct-group-count">${g.accts.length}</span></div>
               <div class="acct-group-total ${isLiab?'liab':''}">₹${fmt(Math.round(g.total))}<span class="acct-group-chevron">▾</span></div>
             </div>
             <div class="acct-group-body">${items}</div>
@@ -3092,8 +3080,8 @@ function renderDash() {
   const mx = sorted[0]?.[1] || 1;
   document.getElementById('d-bars').innerHTML = sorted.length
     ? sorted.map(([c,v]) => `
-        <div class="bar-item" style="cursor:pointer" onclick="setLogCategoryFilterGo('${c.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
-          <div class="bar-name">${c}</div>
+        <div class="bar-item" style="cursor:pointer" data-cat="${escapeHtml(c)}" onclick="setLogCategoryFilterGo(this.dataset.cat)">
+          <div class="bar-name">${escapeHtml(c)}</div>
           <div class="bar-track"><div class="bar-fill" style="width:${v/mx*100}%"></div></div>
           <div class="bar-val" style="width:90px;text-align:right">₹${Math.round(v/1000)}k <span style="color:var(--ink3);font-size:11px">(${total ? Math.round(v/total*100) : 0}%)</span></div>
         </div>`).join('')
@@ -3120,7 +3108,7 @@ function renderCfg() {
 function renderCfgList(key, items) {
   document.getElementById('cfg-'+key+'-list').innerHTML = items.map((item,i) => `
     <div class="cfg-item">
-      <div class="cfg-item-name">${item}</div>
+      <div class="cfg-item-name">${escapeHtml(item)}</div>
       <button class="btn-del" onclick="delCfgItem('${key}',${i})">Remove</button>
     </div>`).join('');
 }
@@ -3192,8 +3180,8 @@ function renderAccountsList() {
     return `
     <div class="acct-row" id="acct-row-${a.id}" data-acct-id="${a.id}">
       <div class="acct-row-main">
-        <div class="acct-row-name">${a.name}<span class="acct-chip ${a.isLiability?'liab':''}">${a.type}</span><span class="acct-chip ${ownerClass}">${a.owner || 'Joint'}</span></div>
-        <div class="acct-row-sub">${a.notes ? a.notes + ' · ' : ''}opened ${a.openingDate || '—'}</div>
+        <div class="acct-row-name">${escapeHtml(a.name)}<span class="acct-chip ${a.isLiability?'liab':''}">${escapeHtml(a.type)}</span><span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span></div>
+        <div class="acct-row-sub">${a.notes ? escapeHtml(a.notes) + ' · ' : ''}opened ${a.openingDate || '—'}</div>
         ${isManual ? `
           <div class="acct-mtm">
             <input type="text" inputmode="decimal" oninput="onAmountInput(this)" id="mtm-${a.id}" placeholder="Update value (₹)">
@@ -3280,47 +3268,28 @@ async function saveAccount() {
     S.accounts[idx] = acct;
   } else {
     acct = {
-      id: Date.now(), name, type, owner,
+      id: newId(), name, type, owner,
       openingBalance: opening, openingDate, currentValue, isLiability,
       currency: 'INR', notes, archived: false
     };
     S.accounts.unshift(acct);
   }
+  queueOp('accounts', editId ? 'PATCH' : 'POST', acct.id, {
+    id: acct.id, name: acct.name, type: acct.type,
+    owner: acct.owner,
+    opening_balance: acct.openingBalance,
+    opening_date: acct.openingDate || null,
+    current_value: acct.currentValue,
+    is_liability: acct.isLiability,
+    currency: acct.currency,
+    notes: acct.notes || null,
+    archived: acct.archived
+  });
   saveLocal();
   closeAccountEditor();
   renderCfg();
   buildSelects();
-
-  // Push to Supabase
-  if (S.sbUrl && S.sbKey) {
-    const body = {
-      id: acct.id, name: acct.name, type: acct.type,
-      owner: acct.owner,
-      opening_balance: acct.openingBalance,
-      opening_date: acct.openingDate || null,
-      current_value: acct.currentValue,
-      is_liability: acct.isLiability,
-      currency: acct.currency,
-      notes: acct.notes || null,
-      archived: acct.archived
-    };
-    try {
-      if (editId) {
-        await fetch(`${S.sbUrl}/rest/v1/accounts?id=eq.${acct.id}`, {
-          method: 'PATCH',
-          headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify(body)
-        });
-      } else {
-        await fetch(`${S.sbUrl}/rest/v1/accounts`, {
-          method: 'POST',
-          headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify(body)
-        });
-      }
-    } catch(e) {}
-  }
-  toast(editId ? '✓ Account updated' : '✓ Account added', 'ok');
+  await pushChanges(editId ? '✓ Account updated' : '✓ Account added');
 }
 
 async function archiveAccount(id) {
@@ -3328,19 +3297,11 @@ async function archiveAccount(id) {
   if (!a) return;
   if (!confirm(`Archive "${a.name}"?\n\nHistory stays intact; the account just stops appearing in pickers and net worth.`)) return;
   a.archived = true;
+  queueOp('accounts', 'PATCH', id, { archived: true });
   saveLocal();
   renderCfg();
   buildSelects();
-  if (S.sbUrl && S.sbKey) {
-    try {
-      await fetch(`${S.sbUrl}/rest/v1/accounts?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ archived: true })
-      });
-    } catch(e) {}
-  }
-  toast('Account archived', 'ok');
+  await pushChanges('Account archived');
 }
 
 async function updateAccountValue(id) {
@@ -3351,19 +3312,11 @@ async function updateAccountValue(id) {
   const a = S.accounts.find(x => x.id === id);
   if (!a) return;
   a.currentValue = v;
+  queueOp('accounts', 'PATCH', id, { current_value: v });
   saveLocal();
   inp.value = '';
   renderCfg();
-  if (S.sbUrl && S.sbKey) {
-    try {
-      await fetch(`${S.sbUrl}/rest/v1/accounts?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: { apikey: S.sbKey, Authorization: `Bearer ${S.sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ current_value: v })
-      });
-    } catch(e) {}
-  }
-  toast('✓ Value updated', 'ok');
+  await pushChanges('✓ Value updated');
 }
 
 // ══════════════════════════════════════════════════
@@ -3550,6 +3503,7 @@ async function importBackup(input) {
   S.income    = incomeArr;
   S.accounts  = accountsArr;
   S.transfers = transfersArr;
+  S.pendingOps = []; // a full restore supersedes any queued incremental ops
   saveLocal();
   buildSelects();
   renderLog();
@@ -3611,6 +3565,12 @@ function toast(msg, type='') {
 // ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
+// Retry any queued offline writes as soon as the network returns.
+window.addEventListener('online', () => {
+  flushPendingOps().then(() => {
+    if (S.sbUrl && S.sbKey && !S.pendingOps.length) setSyncState('online');
+  });
+});
 initSetup();
 </script>
 </body>
