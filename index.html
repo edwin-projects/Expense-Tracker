@@ -683,10 +683,22 @@ select.finput option { background: white; color: var(--ink); }
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
 .spend-bar {
-  height: 9px; background: var(--border); border-radius: 5px;
-  overflow: hidden; margin: 11px auto 0; max-width: 280px;
+  width: 172px; height: 24px; margin: 12px auto 0;
+  background: var(--border); border-radius: 12px;
+  position: relative; overflow: hidden;
 }
-.spend-fill { height: 100%; border-radius: 5px; transition: width .3s ease; }
+.spend-fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  border-radius: 12px; overflow: hidden; transition: width .3s ease;
+}
+.sb-label {
+  position: absolute; top: 0; left: 0; width: 172px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap; pointer-events: none;
+}
+.sb-label-bg { color: var(--ink2); }
+.sb-label-fg { color: #fff; }
 
 #backup-reminder {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1352,7 +1364,10 @@ select.modal-input option { background: white; }
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
         <div class="stat-val" id="d-cf-net">₹0</div>
-        <div class="spend-bar" id="d-spend-bar" style="display:none"><div class="spend-fill" id="d-spend-fill"></div></div>
+        <div class="spend-bar" id="d-spend-bar" style="display:none">
+          <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
+          <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
+        </div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
       </div>
     </div>
@@ -2198,9 +2213,23 @@ const ACCOUNT_GROUP_LABELS = {
 
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
+// How many times each account is referenced across all logged
+// transactions — drives "most used first" ordering in the pickers.
+function accountUseCounts() {
+  const use = {};
+  const bump = id => { if (id != null) use[id] = (use[id] || 0) + 1; };
+  S.entries.forEach(e => bump(e.account));
+  S.income.forEach(i => bump(i.account));
+  S.transfers.forEach(t => { bump(t.fromAccount); bump(t.toAccount); });
+  return use;
+}
+
 function accountOptionsHTML(placeholder, currentVal) {
   const optEl = a =>
     `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')})</option>`;
+  const use = accountUseCounts();
+  const byUse = arr => [...arr].sort((a,b) =>
+    (use[b.id] || 0) - (use[a.id] || 0) || a.name.localeCompare(b.name));
   const byType = arr => {
     const groups = {};
     arr.forEach(a => { const t = a.type || 'Other'; (groups[t] = groups[t] || []).push(a); });
@@ -2209,26 +2238,29 @@ function accountOptionsHTML(placeholder, currentVal) {
       ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
     ];
     return types.map(t =>
-      `<optgroup label="${escapeHtml(t)}">` + groups[t].map(optEl).join('') + `</optgroup>`
+      `<optgroup label="${escapeHtml(t)}">` + byUse(groups[t]).map(optEl).join('') + `</optgroup>`
     ).join('');
   };
   const all  = S.accounts.filter(a => !a.archived);
-  // The logged-in person's own accounts are listed first for quick picking.
+  // The logged-in person's own accounts come first, ordered most-used first.
   const mine = currentUser ? all.filter(a => (a.owner || 'Joint') === currentUser) : [];
   const rest = all.filter(a => !mine.includes(a));
   let body = '';
   if (mine.length) {
-    body += `<optgroup label="${escapeHtml(currentUser + "’s Accounts")}">` + mine.map(optEl).join('') + `</optgroup>`;
+    body += `<optgroup label="${escapeHtml(currentUser + "’s Accounts")}">` + byUse(mine).map(optEl).join('') + `</optgroup>`;
   }
   body += byType(rest);
   return `<option value="">${placeholder}</option>` + body;
 }
 
-// First non-archived account owned by the logged-in person — used to
-// pre-select the account picker on the Add Expense / Add Income forms.
+// The logged-in person's most-used account — pre-selected on the
+// Add Expense / Add Income forms.
 function defaultAccountId() {
-  const mine = S.accounts.find(a => !a.archived && (a.owner || 'Joint') === currentUser);
-  return mine ? String(mine.id) : '';
+  const mine = S.accounts.filter(a => !a.archived && (a.owner || 'Joint') === currentUser);
+  if (!mine.length) return '';
+  const use = accountUseCounts();
+  mine.sort((a,b) => (use[b.id] || 0) - (use[a.id] || 0) || a.name.localeCompare(b.name));
+  return String(mine[0].id);
 }
 
 function buildSelects() {
@@ -3199,16 +3231,17 @@ function renderDash() {
   const spendFill = document.getElementById('d-spend-fill');
   if (incTotal > 0) {
     // Spend ratio: green under 65%, amber 65–99%, red at 100%+ (deficit).
-    const spendPct = expTotal / incTotal * 100;
+    const spendPct = Math.round(expTotal / incTotal * 100);
     const tier = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
     spendBar.style.display = '';
+    netSub.style.display = 'none';
     spendFill.style.width = Math.min(spendPct, 100) + '%';
     spendFill.style.background = tier;
-    netSub.textContent = net >= 0
-      ? `₹${fmt(expTotal)} spent · ₹${fmt(net)} left`
-      : `Overspent by ₹${fmt(Math.abs(net))}`;
+    document.getElementById('d-spend-label-bg').textContent = spendPct + '% spent';
+    document.getElementById('d-spend-label-fg').textContent = spendPct + '% spent';
   } else {
     spendBar.style.display = 'none';
+    netSub.style.display = '';
     netSub.textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
   }
   const netCard = document.getElementById('d-cf-net-card');
