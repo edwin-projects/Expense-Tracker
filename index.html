@@ -682,6 +682,7 @@ select.finput option { background: white; color: var(--ink); }
   line-height: 1;
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
+.spend-pct { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Per-person split inside a stat card */
 .card-split { margin-top: 9px; padding-top: 7px; border-top: 1px solid rgba(0,0,0,0.08); }
@@ -2166,23 +2167,36 @@ const ACCOUNT_GROUP_LABELS = {
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
 function accountOptionsHTML(placeholder, currentVal) {
-  const groups = {};
-  S.accounts.filter(a => !a.archived).forEach(a => {
-    const t = a.type || 'Other';
-    (groups[t] = groups[t] || []).push(a);
-  });
-  const types = [
-    ...ACCOUNT_TYPE_ORDER.filter(t => groups[t]),
-    ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
-  ];
-  const body = types.map(t =>
-    `<optgroup label="${escapeHtml(t)}">` +
-    groups[t].map(a =>
-      `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')})</option>`
-    ).join('') +
-    `</optgroup>`
-  ).join('');
+  const optEl = a =>
+    `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')})</option>`;
+  const byType = arr => {
+    const groups = {};
+    arr.forEach(a => { const t = a.type || 'Other'; (groups[t] = groups[t] || []).push(a); });
+    const types = [
+      ...ACCOUNT_TYPE_ORDER.filter(t => groups[t]),
+      ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
+    ];
+    return types.map(t =>
+      `<optgroup label="${escapeHtml(t)}">` + groups[t].map(optEl).join('') + `</optgroup>`
+    ).join('');
+  };
+  const all  = S.accounts.filter(a => !a.archived);
+  // The logged-in person's own accounts are listed first for quick picking.
+  const mine = currentUser ? all.filter(a => (a.owner || 'Joint') === currentUser) : [];
+  const rest = all.filter(a => !mine.includes(a));
+  let body = '';
+  if (mine.length) {
+    body += `<optgroup label="${escapeHtml(currentUser + "’s Accounts")}">` + mine.map(optEl).join('') + `</optgroup>`;
+  }
+  body += byType(rest);
   return `<option value="">${placeholder}</option>` + body;
+}
+
+// First non-archived account owned by the logged-in person — used to
+// pre-select the account picker on the Add Expense / Add Income forms.
+function defaultAccountId() {
+  const mine = S.accounts.find(a => !a.archived && (a.owner || 'Joint') === currentUser);
+  return mine ? String(mine.id) : '';
 }
 
 function buildSelects() {
@@ -2331,7 +2345,7 @@ function resetForm() {
   document.getElementById('f-type').value = '';
   document.getElementById('f-freq').value = '';
   document.getElementById('f-desc').value = '';
-  const acct = document.getElementById('f-account'); if (acct) acct.value = '';
+  const acct = document.getElementById('f-account'); if (acct) acct.value = defaultAccountId();
   setDefaultDate();
   const me = currentUser || 'Edwin';
   document.querySelectorAll('.pill[data-g="for"]').forEach(p => p.classList.toggle('active', p.dataset.v === me));
@@ -2377,7 +2391,7 @@ function resetIncomeForm() {
   document.getElementById('i-amount').value = '';
   document.getElementById('i-source').value = '';
   document.getElementById('i-desc').value = '';
-  document.getElementById('i-account').value = '';
+  document.getElementById('i-account').value = defaultAccountId();
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('i-oneoff').checked = false;
   document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === (currentUser || 'Edwin')));
@@ -3148,12 +3162,15 @@ function renderDash() {
   const netEl = document.getElementById('d-cf-net');
   netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.abs(net));
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('d-cf-net-sub').textContent =
-    incTotal > 0
-      ? (net >= 0
-          ? `Surplus · ${Math.round(net / incTotal * 100)}% of income saved`
-          : `Deficit · spent ${Math.round(expTotal / incTotal * 100)}% of income`)
-      : (net >= 0 ? 'Surplus for this period' : 'Deficit for this period');
+  const netSub = document.getElementById('d-cf-net-sub');
+  if (incTotal > 0) {
+    // Spend ratio: green under 65%, amber 65–99%, red at 100%+ (deficit).
+    const spendPct = Math.round(expTotal / incTotal * 100);
+    const pctColor = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
+    netSub.innerHTML = `<span class="spend-pct" style="color:${pctColor}">${spendPct}%</span> of income spent`;
+  } else {
+    netSub.textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
+  }
   const netCard = document.getElementById('d-cf-net-card');
   netCard.style.background  = net >= 0 ? 'var(--green-bg)' : '#fff0f0';
   netCard.style.borderColor = net >= 0 ? '#a0d4b8' : '#ffb3b3';
