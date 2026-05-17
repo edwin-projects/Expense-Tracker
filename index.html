@@ -1203,6 +1203,9 @@ select.modal-input option { background: white; }
     <div id="log-back-banner" onclick="returnToSummary()" style="display:none;position:fixed;bottom:88px;left:50%;transform:translateX(-50%);padding:11px 20px;background:var(--blue);border:none;border-radius:24px;font-size:13px;color:#fff;font-weight:600;cursor:pointer;align-items:center;gap:6px;z-index:55;box-shadow:0 6px 18px rgba(0,0,0,0.25);white-space:nowrap">
       ← Back to Summary
     </div>
+    <div style="display:flex;justify-content:flex-end;margin:14px 0 0">
+      <button onclick="clearAllLogFilters()" style="background:none;border:1px solid var(--border2);color:var(--ink2);padding:6px 13px;border-radius:15px;font-size:11.5px;font-family:'Outfit',sans-serif;font-weight:600;cursor:pointer">✕ Clear all filters</button>
+    </div>
     <div class="log-bar">
       <div class="log-chip active" data-k="All" onclick="setLogKind(this)">All</div>
       <div class="log-chip" data-k="Expense" onclick="setLogKind(this)">Expense</div>
@@ -2376,6 +2379,22 @@ function clearLogPeriodFilter() {
   renderLog();
 }
 
+// Reset every Log filter and show the full history
+function clearAllLogFilters() {
+  S.logKind = 'All';
+  S.logFilter = 'All';
+  S.logType = 'All';
+  S.logCategoryFilter = 'All';
+  S.logAccountFilter = null;
+  S.logPeriod = 'all';
+  S.logSearch = '';
+  const search = document.getElementById('log-search-input');
+  if (search) search.value = '';
+  const searchClear = document.getElementById('log-search-clear');
+  if (searchClear) searchClear.style.display = 'none';
+  renderLog();
+}
+
 function setCategoryFilter(val) {
   S.logCategoryFilter = val;
   renderLog();
@@ -2740,7 +2759,9 @@ function renderLog() {
     items = items.filter(x => x._searchSrc.some(v => v && String(v).toLowerCase().includes(q)));
   }
 
-  items.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  // Newest first: by date, then by id (created-at) so same-day entries
+  // — expense, income or transfer — keep a stable latest-first order.
+  items.sort((a,b) => (b.date||'').localeCompare(a.date||'') || (Number(b.id)||0) - (Number(a.id)||0));
 
   // Totals bar (transfers are excluded from cash-flow totals by design)
   if (items.length) {
