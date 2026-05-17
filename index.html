@@ -594,6 +594,12 @@ select.finput option { background: white; color: var(--ink); }
 .acct-chip.owner-divya { background: var(--pink-bg);  border-color: #e0b0c8; color: var(--pink); }
 .acct-chip.owner-aj    { background: var(--teal-bg);  border-color: #a0d4cc; color: var(--teal); }
 .acct-chip.owner-joint { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+.acct-chip.longterm { background: #f3f0e8; border-color: #ddd5c2; color: #6b5d3f; }
+.flag-toggle {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 12.5px; color: var(--ink2); flex: 1; line-height: 1.35;
+}
+.flag-toggle input { width: 17px; height: 17px; accent-color: var(--ink); flex-shrink: 0; }
 .btn-del-entry {
   margin-top: 10px;
   background: none;
@@ -1176,6 +1182,13 @@ select.modal-input option { background: white; }
         <span class="flabel">Description</span>
         <input class="finput" id="i-desc" type="text" placeholder="Brief note…">
       </div>
+      <div class="frow">
+        <span class="flabel">One-off</span>
+        <label class="flag-toggle">
+          <input type="checkbox" id="i-oneoff">
+          Exclude from the monthly trend
+        </label>
+      </div>
     </div>
 
     <button class="btn-submit" style="background:var(--green)" onclick="submitIncome()">Save Income</button>
@@ -1307,7 +1320,7 @@ select.modal-input option { background: white; }
     <div class="sec-label">Net Worth</div>
     <div class="stat-grid">
       <div class="stat-card full" style="background:#eef4fb;border-color:#bcd2e6;text-align:center">
-        <div class="stat-lbl" style="color:#1a4a7a">Net Worth (today)</div>
+        <div class="stat-lbl" style="color:#1a4a7a">Active Net Worth (today)</div>
         <div class="stat-val" id="d-networth" style="color:#1a4a7a">₹0</div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
         <div class="card-split" id="d-networth-split"></div>
@@ -1325,6 +1338,14 @@ select.modal-input option { background: white; }
         <div class="stat-val" id="d-liab" style="color:#c0392b">₹0</div>
         <div class="stat-sub" id="d-liab-sub" style="color:#c0392b">0 accounts</div>
         <div class="card-split" id="d-liab-split"></div>
+      </div>
+    </div>
+    <div class="stat-grid" id="d-longterm-grid" style="display:none">
+      <div class="stat-card full" style="background:#f3f0e8;border-color:#ddd5c2;text-align:center">
+        <div class="stat-lbl" style="color:#6b5d3f">Long-term Holdings</div>
+        <div class="stat-val" id="d-longterm" style="color:#6b5d3f">₹0</div>
+        <div class="stat-sub" id="d-longterm-sub" style="color:#6b5d3f">Tracked apart from active net worth</div>
+        <div class="card-split" id="d-longterm-split"></div>
       </div>
     </div>
     <div class="fcard" id="d-accounts-card" style="padding:4px 0;display:none">
@@ -1518,6 +1539,13 @@ select.modal-input option { background: white; }
           <span class="flabel">Notes</span>
           <input id="acct-notes" type="text" placeholder="Optional…">
         </div>
+        <div class="frow">
+          <span class="flabel">Long-term</span>
+          <label class="flag-toggle">
+            <input type="checkbox" id="acct-longterm">
+            Permanent holding — track apart from active net worth
+          </label>
+        </div>
         <div class="acct-editor-actions">
           <button class="btn-save-cfg" style="background:var(--bg);color:var(--ink);border:1.5px solid var(--border2)" onclick="closeAccountEditor()">Cancel</button>
           <button class="btn-save-cfg" style="background:var(--ink);color:white;border:none" onclick="saveAccount()">Save Account</button>
@@ -1592,6 +1620,9 @@ select.modal-input option { background: white; }
       <div class="modal-field">
         <div class="modal-label">Description</div>
         <input class="modal-input" id="edit-desc" type="text" placeholder="Brief note…">
+      </div>
+      <div class="modal-field edit-only-income" style="display:none">
+        <label class="flag-toggle"><input type="checkbox" id="edit-oneoff"> One-off — exclude from the monthly trend</label>
       </div>
       <div class="modal-field edit-only-expense">
         <div class="modal-label">Expense For</div>
@@ -1881,6 +1912,7 @@ async function syncNow() {
       openingDate: r.opening_date || '',
       currentValue: r.current_value != null ? Number(r.current_value) : null,
       isLiability: !!r.is_liability,
+      longTerm: !!r.long_term,
       currency: r.currency || 'INR',
       notes: r.notes || '',
       archived: !!r.archived,
@@ -1894,7 +1926,8 @@ async function syncNow() {
       id: r.id, date: r.date, amount: Number(r.amount),
       source: r.source, receivedBy: r.received_by,
       account: r.account != null ? Number(r.account) : null,
-      desc: r.description, month: r.month, addedBy: r.added_by
+      desc: r.description, month: r.month, addedBy: r.added_by,
+      oneOff: !!r.one_off
     })), ...localOnly];
   }
   if (xferRows && Array.isArray(xferRows)) {
@@ -2274,14 +2307,16 @@ async function submitIncome() {
     id: newId(),
     date, amount, source, receivedBy, account, desc,
     month: date.slice(0,7),
-    addedBy: currentUser
+    addedBy: currentUser,
+    oneOff: document.getElementById('i-oneoff').checked
   };
   S.income.unshift(entry);
   queueOp('income', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
     account: entry.account, description: entry.desc,
-    month: entry.month, added_by: entry.addedBy
+    month: entry.month, added_by: entry.addedBy,
+    one_off: entry.oneOff
   });
   saveLocal();
   await pushChanges('✓ Income saved');
@@ -2294,6 +2329,7 @@ function resetIncomeForm() {
   document.getElementById('i-desc').value = '';
   document.getElementById('i-account').value = '';
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('i-oneoff').checked = false;
   document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === 'Edwin'));
 }
 
@@ -2538,6 +2574,7 @@ function openEditIncomeModal(id) {
   document.getElementById('edit-amount').value = formatIndianNumber(i.amount);
   document.getElementById('edit-date').value = i.date;
   document.getElementById('edit-desc').value = i.desc || '';
+  document.getElementById('edit-oneoff').checked = !!i.oneOff;
   document.querySelectorAll('.modal-pill[data-mg="received"]').forEach(p => {
     p.classList.toggle('active', p.dataset.mv === i.receivedBy);
   });
@@ -2622,14 +2659,15 @@ async function saveEdit() {
       desc: document.getElementById('edit-desc').value.trim(),
       receivedBy: getModalPill('received'),
       account,
-      month: date.slice(0,7)
+      month: date.slice(0,7),
+      oneOff: document.getElementById('edit-oneoff').checked
     };
     S.income[idx] = updated;
     queueOp('income', 'PATCH', id, {
       amount: updated.amount, source: updated.source,
       date: updated.date, description: updated.desc,
       received_by: updated.receivedBy, account: updated.account,
-      month: updated.month
+      month: updated.month, one_off: updated.oneOff
     });
     saveLocal();
     closeEditModal();
@@ -2715,7 +2753,8 @@ async function repeatIncome(id) {
     id: clone.id, date: clone.date, amount: clone.amount,
     source: clone.source, received_by: clone.receivedBy,
     account: clone.account, description: clone.desc,
-    month: clone.month, added_by: clone.addedBy
+    month: clone.month, added_by: clone.addedBy,
+    one_off: !!clone.oneOff
   });
   saveLocal();
   renderLog();
@@ -2910,6 +2949,7 @@ function renderIncomeCard(i, q) {
           <div class="echip income">+ Income</div>
           <div class="echip paid">By: ${hl(i.receivedBy, q)}</div>
           ${an ? `<div class="echip acct">⊞ ${hl(an, q)}</div>` : ''}
+          ${i.oneOff ? `<div class="echip">One-off</div>` : ''}
         </div>
         ${i.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(i.addedBy, q)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -3008,9 +3048,10 @@ function accountBalance(acct) {
   return Number(acct.openingBalance || 0) + inflow + xferIn - outflow - xferOut;
 }
 
+// Active net worth — long-term holdings are excluded by design.
 function netWorth(ownerFilter) {
   return S.accounts
-    .filter(a => !a.archived && (!ownerFilter || ownerFilter === 'All' || (a.owner || 'Joint') === ownerFilter))
+    .filter(a => !a.archived && !a.longTerm && (!ownerFilter || ownerFilter === 'All' || (a.owner || 'Joint') === ownerFilter))
     .reduce((s, a) => s + accountBalance(a) * (a.isLiability ? -1 : 1), 0);
 }
 
@@ -3073,30 +3114,49 @@ function renderDash() {
   ]);
 
   // ── Net Worth (always today) ──
+  // "Active" excludes long-term holdings (business capital, land, gold,
+  // locked FDs) so the headline reflects money the family actively moves.
   const active = S.accounts.filter(a => !a.archived);
-  const assetsTotal = active.filter(a => !a.isLiability).reduce((s,a) => s + accountBalance(a), 0);
-  const liabTotal   = active.filter(a =>  a.isLiability).reduce((s,a) => s + accountBalance(a), 0);
+  const activeAccts   = active.filter(a => !a.longTerm);
+  const longTermAccts = active.filter(a =>  a.longTerm);
+  const ownerNet = a => accountBalance(a) * (a.isLiability ? -1 : 1);
+  const assetsTotal = activeAccts.filter(a => !a.isLiability).reduce((s,a) => s + accountBalance(a), 0);
+  const liabTotal   = activeAccts.filter(a =>  a.isLiability).reduce((s,a) => s + accountBalance(a), 0);
   const nw = assetsTotal - liabTotal;
   document.getElementById('d-networth').textContent = (nw >= 0 ? '₹' : '−₹') + fmt(Math.abs(Math.round(nw)));
-  document.getElementById('d-networth-sub').textContent = active.length ? `Across ${active.length} accounts` : 'Add accounts in Config to start';
+  document.getElementById('d-networth-sub').textContent = active.length ? `Across ${activeAccts.length} active accounts` : 'Add accounts in Config to start';
   document.getElementById('d-assets').textContent = '₹' + fmt(Math.round(assetsTotal));
-  document.getElementById('d-assets-sub').textContent = active.filter(a => !a.isLiability).length + ' accounts';
+  document.getElementById('d-assets-sub').textContent = activeAccts.filter(a => !a.isLiability).length + ' accounts';
   document.getElementById('d-liab').textContent = '₹' + fmt(Math.round(liabTotal));
-  document.getElementById('d-liab-sub').textContent = active.filter(a => a.isLiability).length + ' accounts';
+  document.getElementById('d-liab-sub').textContent = activeAccts.filter(a => a.isLiability).length + ' accounts';
+
+  // Long-term holdings — shown apart, only when some exist
+  const ltGrid  = document.getElementById('d-longterm-grid');
+  const ltTotal = longTermAccts.reduce((s,a) => s + ownerNet(a), 0);
+  if (longTermAccts.length) {
+    ltGrid.style.display = '';
+    document.getElementById('d-longterm').textContent = (ltTotal >= 0 ? '₹' : '−₹') + fmt(Math.abs(Math.round(ltTotal)));
+    document.getElementById('d-longterm-sub').textContent =
+      `${longTermAccts.length} holding${longTermAccts.length > 1 ? 's' : ''} · kept out of active net worth`;
+  } else {
+    ltGrid.style.display = 'none';
+  }
 
   // Net-worth / assets / liabilities split by account owner
   const owners = ['Edwin','Divya','Joint','AJ'];
   const ownerOwns = a => (a.owner || 'Joint');
   const nwByOwner     = owners.map(o => [o, netWorth(o)]);
-  const assetsByOwner = owners.map(o => [o, active.filter(a => !a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
-  const liabByOwner   = owners.map(o => [o, active.filter(a =>  a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
+  const assetsByOwner = owners.map(o => [o, activeAccts.filter(a => !a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
+  const liabByOwner   = owners.map(o => [o, activeAccts.filter(a =>  a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
+  const ltByOwner     = owners.map(o => [o, longTermAccts.filter(a => ownerOwns(a) === o).reduce((s,a) => s + ownerNet(a), 0)]);
   document.getElementById('d-networth-split').innerHTML = cardSplitHTML([{pairs: nwByOwner}]);
   document.getElementById('d-assets-split').innerHTML   = cardSplitHTML([{pairs: assetsByOwner}]);
   document.getElementById('d-liab-split').innerHTML     = cardSplitHTML([{pairs: liabByOwner}]);
+  document.getElementById('d-longterm-split').innerHTML = cardSplitHTML([{pairs: ltByOwner}]);
 
   const acctCard = document.getElementById('d-accounts-card');
   const acctList = document.getElementById('d-accounts-list');
-  if (active.length) {
+  if (activeAccts.length) {
     // Accounts are grouped by type into collapsible groups; each group's
     // top line shows the combined total, tap to reveal the accounts.
     const rows = (arr, header) => {
@@ -3130,7 +3190,7 @@ function renderDash() {
         }).join('');
       return `<div class="acct-section-head">${header}</div>` + groupHTML;
     };
-    acctList.innerHTML = rows(active.filter(a => !a.isLiability), 'Assets') + rows(active.filter(a => a.isLiability), 'Liabilities');
+    acctList.innerHTML = rows(activeAccts.filter(a => !a.isLiability), 'Assets') + rows(activeAccts.filter(a => a.isLiability), 'Liabilities');
     acctCard.style.display = 'block';
   } else {
     acctCard.style.display = 'none';
@@ -3189,7 +3249,7 @@ function renderDash() {
     const d = new Date(fyY, 3 + k, 1); // April (FY start) through March
     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
-    const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key).reduce((s,i)=>s+Number(i.amount),0);
+    const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key && !i.oneOff).reduce((s,i)=>s+Number(i.amount),0);
     const mExp  = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
     const mCard = S.entries.filter(e => (e.date||'').slice(0,7) === key && ccIds.has(e.account)).reduce((s,e)=>s+Number(e.amount),0);
     trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp, card:mCard });
@@ -3305,7 +3365,7 @@ function renderAccountsList() {
     return `
     <div class="acct-row" id="acct-row-${a.id}" data-acct-id="${a.id}">
       <div class="acct-row-main">
-        <div class="acct-row-name">${escapeHtml(a.name)}<span class="acct-chip ${a.isLiability?'liab':''}">${escapeHtml(a.type)}</span><span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span></div>
+        <div class="acct-row-name">${escapeHtml(a.name)}<span class="acct-chip ${a.isLiability?'liab':''}">${escapeHtml(a.type)}</span><span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span>${a.longTerm ? '<span class="acct-chip longterm">Long-term</span>' : ''}</div>
         <div class="acct-row-sub">${a.notes ? escapeHtml(a.notes) + ' · ' : ''}opened ${a.openingDate || '—'}</div>
         ${isManual ? `
           <div class="acct-mtm">
@@ -3322,7 +3382,8 @@ function renderAccountsList() {
   };
   // Within each section, accounts are grouped by type into collapsible
   // groups so the list stays short as it grows — tap a group to expand.
-  const groupsFor = arr => {
+  // sectionKey keeps each section's group state independent.
+  const groupsFor = (arr, sectionKey) => {
     const groups = {};
     arr.forEach(a => { (groups[a.type] = groups[a.type] || []).push(a); });
     return Object.entries(groups)
@@ -3331,8 +3392,9 @@ function renderAccountsList() {
       .map(g => {
         const isLiab = g.accts[0].isLiability;
         const label = ACCOUNT_GROUP_LABELS[g.type] || g.type;
+        const key = sectionKey + ':' + g.type;
         const items = [...g.accts].sort((x,y) => accountBalance(y) - accountBalance(x)).map(row).join('');
-        return `<div class="acct-group${expanded.has(g.type) ? '' : ' collapsed'}" data-type="${escapeHtml(g.type)}">
+        return `<div class="acct-group${expanded.has(key) ? '' : ' collapsed'}" data-type="${escapeHtml(key)}">
           <div class="acct-group-head" onclick="toggleAcctGroup(this)">
             <div class="acct-group-label">${escapeHtml(label)}<span class="acct-group-count">${g.accts.length}</span></div>
             <div class="acct-group-total ${isLiab?'liab':''}">₹${fmt(Math.round(g.total))}<span class="acct-group-chevron">▾</span></div>
@@ -3342,10 +3404,13 @@ function renderAccountsList() {
       }).join('');
   };
   let html = '';
-  const assets = active.filter(a => !a.isLiability);
-  const liabs  = active.filter(a =>  a.isLiability);
-  if (assets.length) html += `<div class="acct-section-head">Assets</div>` + groupsFor(assets);
-  if (liabs.length)  html += `<div class="acct-section-head">Liabilities</div>` + groupsFor(liabs);
+  const activeAccts   = active.filter(a => !a.longTerm);
+  const longTermAccts = active.filter(a =>  a.longTerm);
+  const assets = activeAccts.filter(a => !a.isLiability);
+  const liabs  = activeAccts.filter(a =>  a.isLiability);
+  if (assets.length)        html += `<div class="acct-section-head">Assets</div>` + groupsFor(assets, 'asset');
+  if (liabs.length)         html += `<div class="acct-section-head">Liabilities</div>` + groupsFor(liabs, 'liab');
+  if (longTermAccts.length) html += `<div class="acct-section-head">Long-term Holdings</div>` + groupsFor(longTermAccts, 'longterm');
   list.innerHTML = html;
 }
 
@@ -3363,6 +3428,7 @@ function openAccountEditor(id) {
   document.getElementById('acct-opening-date').value = a ? (a.openingDate || '') : new Date().toISOString().split('T')[0];
   document.getElementById('acct-current').value      = a && a.currentValue != null ? formatIndianNumber(a.currentValue) : '';
   document.getElementById('acct-notes').value        = a ? (a.notes || '') : '';
+  document.getElementById('acct-longterm').checked   = a ? !!a.longTerm : false;
   onAccountTypeChange();
 
   // Anchor the editor right under the row being edited (or back to its
@@ -3409,6 +3475,7 @@ async function saveAccount() {
   const currentRaw = document.getElementById('acct-current').value;
   const currentValue = MANUAL_VALUE_TYPES.has(type) && currentRaw !== '' ? parseAmount(currentRaw) : null;
   const notes = document.getElementById('acct-notes').value.trim();
+  const longTerm = document.getElementById('acct-longterm').checked;
   const isLiability = LIABILITY_TYPES.has(type);
   const editId = document.getElementById('acct-edit-id').value;
 
@@ -3416,12 +3483,12 @@ async function saveAccount() {
   if (editId) {
     const idx = S.accounts.findIndex(a => a.id === Number(editId));
     if (idx === -1) return;
-    acct = {...S.accounts[idx], name, type, owner, openingBalance: opening, openingDate, currentValue, isLiability, notes};
+    acct = {...S.accounts[idx], name, type, owner, openingBalance: opening, openingDate, currentValue, isLiability, longTerm, notes};
     S.accounts[idx] = acct;
   } else {
     acct = {
       id: newId(), name, type, owner,
-      openingBalance: opening, openingDate, currentValue, isLiability,
+      openingBalance: opening, openingDate, currentValue, isLiability, longTerm,
       currency: 'INR', notes, archived: false
     };
     S.accounts.unshift(acct);
@@ -3433,6 +3500,7 @@ async function saveAccount() {
     opening_date: acct.openingDate || null,
     current_value: acct.currentValue,
     is_liability: acct.isLiability,
+    long_term: !!acct.longTerm,
     currency: acct.currency,
     notes: acct.notes || null,
     archived: acct.archived
@@ -3618,7 +3686,8 @@ async function importBackup(input) {
       id: x.id, date: x.date, amount: x.amount,
       source: x.source, received_by: x.receivedBy,
       account: x.account ?? null, description: x.desc,
-      month: x.month, added_by: x.addedBy
+      month: x.month, added_by: x.addedBy,
+      one_off: !!x.oneOff
     })));
   }
   // Accounts
@@ -3630,6 +3699,7 @@ async function importBackup(input) {
       opening_date: a.openingDate || null,
       current_value: a.currentValue ?? null,
       is_liability: !!a.isLiability,
+      long_term: !!a.longTerm,
       currency: a.currency || 'INR',
       notes: a.notes || null,
       archived: !!a.archived
