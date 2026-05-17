@@ -2656,6 +2656,61 @@ async function deleteEntry(id) {
   renderLog();
 }
 
+// ── Repeat (recurring entries) ───────────────────────────────────────
+// One-tap clone of an entry, dated today — for rent, EMIs, subscriptions,
+// salary and the like. The clone gets a fresh id; edit it after if the
+// amount changed.
+async function repeatEntry(id) {
+  const e = S.entries.find(x => x.id === id);
+  if (!e) return;
+  const date = new Date().toISOString().split('T')[0];
+  const clone = { ...e, id: newId(), date, month: date.slice(0,7), addedBy: currentUser };
+  S.entries.unshift(clone);
+  queueOp('expenses', 'POST', clone.id, {
+    id: clone.id, date: clone.date, amount: clone.amount,
+    category: clone.category, type: clone.type, freq: clone.freq,
+    for_whom: clone.forWhom, paid_by: clone.paidBy,
+    saving: clone.saving, description: clone.desc,
+    month: clone.month, added_by: clone.addedBy, account: clone.account
+  });
+  saveLocal();
+  renderLog();
+  await pushChanges('✓ Repeated for today');
+}
+
+async function repeatIncome(id) {
+  const i = S.income.find(x => x.id === id);
+  if (!i) return;
+  const date = new Date().toISOString().split('T')[0];
+  const clone = { ...i, id: newId(), date, month: date.slice(0,7), addedBy: currentUser };
+  S.income.unshift(clone);
+  queueOp('income', 'POST', clone.id, {
+    id: clone.id, date: clone.date, amount: clone.amount,
+    source: clone.source, received_by: clone.receivedBy,
+    account: clone.account, description: clone.desc,
+    month: clone.month, added_by: clone.addedBy
+  });
+  saveLocal();
+  renderLog();
+  await pushChanges('✓ Repeated for today');
+}
+
+async function repeatTransfer(id) {
+  const t = S.transfers.find(x => x.id === id);
+  if (!t) return;
+  const date = new Date().toISOString().split('T')[0];
+  const clone = { ...t, id: newId(), date, month: date.slice(0,7), addedBy: currentUser };
+  S.transfers.unshift(clone);
+  queueOp('transfers', 'POST', clone.id, {
+    id: clone.id, date: clone.date, amount: clone.amount,
+    from_account: clone.fromAccount, to_account: clone.toAccount,
+    description: clone.desc, month: clone.month, added_by: clone.addedBy
+  });
+  saveLocal();
+  renderLog();
+  await pushChanges('✓ Repeated for today');
+}
+
 function setLogSearch(val) {
   S.logSearch = val.trim();
   document.getElementById('log-search-clear').style.display = val ? 'block' : 'none';
@@ -2804,8 +2859,9 @@ function renderExpenseCard(e, q) {
           ${an ? `<div class="echip acct">⊟ ${hl(an, q)}</div>` : ''}
         </div>
         ${e.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(e.addedBy, q)}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px">
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditModal(${e.id})">✏ Edit</button>
+          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="repeatEntry(${e.id})">↻ Repeat</button>
           <button class="btn-del-entry" onclick="deleteEntry(${e.id})">🗑 Delete</button>
         </div>
       </div>
@@ -2829,8 +2885,9 @@ function renderIncomeCard(i, q) {
           ${an ? `<div class="echip acct">⊞ ${hl(an, q)}</div>` : ''}
         </div>
         ${i.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(i.addedBy, q)}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px">
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditIncomeModal(${i.id})">✏ Edit</button>
+          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="repeatIncome(${i.id})">↻ Repeat</button>
           <button class="btn-del-entry" onclick="deleteIncome(${i.id})">🗑 Delete</button>
         </div>
       </div>
@@ -2853,8 +2910,9 @@ function renderTransferCard(t, q) {
           <div class="echip transfer">⇄ Transfer</div>
         </div>
         ${t.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(t.addedBy, q)}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px">
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditTransferModal(${t.id})">✏ Edit</button>
+          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="repeatTransfer(${t.id})">↻ Repeat</button>
           <button class="btn-del-entry" onclick="deleteTransfer(${t.id})">🗑 Delete</button>
         </div>
       </div>
