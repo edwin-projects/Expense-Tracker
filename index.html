@@ -682,7 +682,11 @@ select.finput option { background: white; color: var(--ink); }
   line-height: 1;
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
-.spend-pct { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.spend-bar {
+  height: 9px; background: var(--border); border-radius: 5px;
+  overflow: hidden; margin: 11px auto 0; max-width: 280px;
+}
+.spend-fill { height: 100%; border-radius: 5px; transition: width .3s ease; }
 
 /* Per-person split inside a stat card */
 .card-split { margin-top: 9px; padding-top: 7px; border-top: 1px solid rgba(0,0,0,0.08); }
@@ -1325,6 +1329,7 @@ select.modal-input option { background: white; }
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
         <div class="stat-val" id="d-cf-net">₹0</div>
+        <div class="spend-bar" id="d-spend-bar" style="display:none"><div class="spend-fill" id="d-spend-fill"></div></div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
       </div>
     </div>
@@ -3163,12 +3168,20 @@ function renderDash() {
   netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.abs(net));
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
   const netSub = document.getElementById('d-cf-net-sub');
+  const spendBar = document.getElementById('d-spend-bar');
+  const spendFill = document.getElementById('d-spend-fill');
   if (incTotal > 0) {
     // Spend ratio: green under 65%, amber 65–99%, red at 100%+ (deficit).
-    const spendPct = Math.round(expTotal / incTotal * 100);
-    const pctColor = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
-    netSub.innerHTML = `<span class="spend-pct" style="color:${pctColor}">${spendPct}%</span> of income spent`;
+    const spendPct = expTotal / incTotal * 100;
+    const tier = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
+    spendBar.style.display = '';
+    spendFill.style.width = Math.min(spendPct, 100) + '%';
+    spendFill.style.background = tier;
+    netSub.textContent = net >= 0
+      ? `₹${fmt(expTotal)} spent · ₹${fmt(net)} left`
+      : `Overspent by ₹${fmt(Math.abs(net))}`;
   } else {
+    spendBar.style.display = 'none';
     netSub.textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
   }
   const netCard = document.getElementById('d-cf-net-card');
