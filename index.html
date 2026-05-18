@@ -1863,6 +1863,7 @@ function loadLocal() {
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
+  if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
   // is locked out after the upgrade — each person can change theirs in Config.
   if (!S.pins || typeof S.pins !== 'object') S.pins = {};
@@ -3127,14 +3128,19 @@ function filteredIncome()  { return S.income .filter(i => inPeriod(i.date)); }
 // netWorth flips liability sign so each contributes correctly.
 // Receivable/Payable are computed (transaction-driven): lending/borrowing/
 // repayment all flow through Transfers; opening_balance carries pre-existing debt.
-function accountBalance(acct) {
+// Pass asOf (a YYYY-MM-DD date) to get the balance as of that date —
+// transaction-driven accounts are cut off there; manually-valued accounts
+// (Investment/Asset/Loan) have no dated history, so their current value is
+// used (frozen at snapshot time).
+function accountBalance(acct, asOf) {
   if (acct.type === 'Investment' || acct.type === 'Asset' || acct.type === 'Loan') {
     return Number(acct.currentValue ?? acct.openingBalance ?? 0);
   }
-  const inflow  = S.income   .filter(i => i.account     === acct.id).reduce((s,i) => s + Number(i.amount), 0);
-  const outflow = S.entries  .filter(e => e.account     === acct.id).reduce((s,e) => s + Number(e.amount), 0);
-  const xferIn  = S.transfers.filter(t => t.toAccount   === acct.id).reduce((s,t) => s + Number(t.amount), 0);
-  const xferOut = S.transfers.filter(t => t.fromAccount === acct.id).reduce((s,t) => s + Number(t.amount), 0);
+  const upto = d => !asOf || (d || '') <= asOf;
+  const inflow  = S.income   .filter(i => i.account     === acct.id && upto(i.date)).reduce((s,i) => s + Number(i.amount), 0);
+  const outflow = S.entries  .filter(e => e.account     === acct.id && upto(e.date)).reduce((s,e) => s + Number(e.amount), 0);
+  const xferIn  = S.transfers.filter(t => t.toAccount   === acct.id && upto(t.date)).reduce((s,t) => s + Number(t.amount), 0);
+  const xferOut = S.transfers.filter(t => t.fromAccount === acct.id && upto(t.date)).reduce((s,t) => s + Number(t.amount), 0);
   if (acct.type === 'Credit Card' || acct.type === 'Payable') {
     // Outstanding grows with charges / money-out, shrinks with payments-in
     return Number(acct.openingBalance || 0) + outflow + xferOut - inflow - xferIn;
@@ -3147,6 +3153,34 @@ function netWorth(ownerFilter) {
   return S.accounts
     .filter(a => !a.archived && !a.longTerm && (!ownerFilter || ownerFilter === 'All' || (a.owner || 'Joint') === ownerFilter))
     .reduce((s, a) => s + accountBalance(a) * (a.isLiability ? -1 : 1), 0);
+}
+
+// Active net worth as of a past date — used for month-end snapshots.
+function netWorthAsOf(dateStr) {
+  return S.accounts
+    .filter(a => !a.archived && !a.longTerm)
+    .reduce((s, a) => s + accountBalance(a, dateStr) * (a.isLiability ? -1 : 1), 0);
+}
+
+// Freezes active net worth at the end of each completed month, so the
+// Monthly Trend can show real month-over-month change. Once a month is
+// snapshotted the value is fixed (manually-valued accounts like FDs are
+// frozen at first capture; transaction-driven accounts are exact).
+function ensureMonthlySnapshots() {
+  const now = new Date();
+  let changed = false;
+  // Snapshot the 14 months up to last month (covers the FY plus a baseline).
+  for (let k = 1; k <= 14; k++) {
+    const m = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    const key = m.getFullYear() + '-' + String(m.getMonth() + 1).padStart(2, '0');
+    if (S.nwSnapshots[key] == null) {
+      const lastDay = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+      const ds = lastDay.getFullYear() + '-' + String(lastDay.getMonth()+1).padStart(2,'0') + '-' + String(lastDay.getDate()).padStart(2,'0');
+      S.nwSnapshots[key] = Math.round(netWorthAsOf(ds));
+      changed = true;
+    }
+  }
+  if (changed) saveLocal();
 }
 
 function ownerOf(acct) { return acct ? (acct.owner || 'Joint') : null; }
@@ -3365,16 +3399,19 @@ function renderDash() {
     if (key === curKey) curIdx = k;
     trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp });
   }
-  // Running active net worth — anchored at today's figure for the current
-  // month, rolled backward and forward by each month's Net.
-  const nwAt = [];
-  nwAt[curIdx] = nw;
-  for (let i = curIdx - 1; i >= 0;  i--) nwAt[i] = nwAt[i+1] - trend[i+1].net;
-  for (let i = curIdx + 1; i < 12;  i++) nwAt[i] = nwAt[i-1] + trend[i].net;
+  // Net worth per month: a frozen month-end snapshot for each completed
+  // month, today's live figure for the current month.
+  ensureMonthlySnapshots();
+  const baseD = new Date(fyY, 2, 1); // March — baseline for April's % change
+  const baselineKey = baseD.getFullYear() + '-' + String(baseD.getMonth()+1).padStart(2,'0');
   trend.forEach((t, i) => {
-    t.nw = nwAt[i];
-    const prev = i > 0 ? nwAt[i-1] : nwAt[i] - t.net;
-    t.nwPct = prev > 0 ? (t.nw - prev) / prev * 100 : null;
+    t.nw = i < curIdx ? S.nwSnapshots[t.key]
+         : i === curIdx ? Math.round(nw)
+         : null;
+  });
+  trend.forEach((t, i) => {
+    const prev = i > 0 ? trend[i-1].nw : S.nwSnapshots[baselineKey];
+    t.nwPct = (t.nw != null && prev != null && prev > 0) ? (t.nw - prev) / prev * 100 : null;
   });
 
   document.getElementById('d-trend').innerHTML =
@@ -3387,11 +3424,12 @@ function renderDash() {
       const nc = t.net >= 0 ? 'pos' : 'neg';
       const pct = t.nwPct == null ? ''
         : `<br><span class="trend-nw-pct ${t.nwPct >= 0 ? 'pos' : 'neg'}">${t.nwPct >= 0 ? '+' : '−'}${Math.abs(Math.round(t.nwPct))}%</span>`;
+      const nwTxt = t.nw == null ? '—' : '₹' + fmtShort(t.nw);
       return `<div class="trend-row${cur}"><span class="trend-month">${t.label}</span>`
         + `<span class="trend-in">₹${fmtShort(t.inc)}</span>`
         + `<span class="trend-out">₹${fmtShort(t.exp)}</span>`
         + `<span class="trend-net ${nc}">${t.net>=0?'+':'−'}₹${fmtShort(Math.abs(t.net))}</span>`
-        + `<span class="trend-nw">₹${fmtShort(t.nw)}${pct}</span></div>`;
+        + `<span class="trend-nw">${nwTxt}${pct}</span></div>`;
     }).join('');
 }
 
@@ -3725,6 +3763,7 @@ function buildBackupPayload() {
     income: S.income,
     accounts: S.accounts,
     transfers: S.transfers,
+    nwSnapshots: S.nwSnapshots,
   };
 }
 
@@ -3923,6 +3962,7 @@ async function importBackup(input) {
   S.income    = incomeArr;
   S.accounts  = accountsArr;
   S.transfers = transfersArr;
+  if (payload.nwSnapshots && typeof payload.nwSnapshots === 'object') S.nwSnapshots = payload.nwSnapshots;
   S.pendingOps = []; // a full restore supersedes any queued incremental ops
   saveLocal();
   buildSelects();
