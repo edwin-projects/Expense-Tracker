@@ -741,7 +741,7 @@ select.finput option { background: white; color: var(--ink); }
 /* Monthly trend */
 #d-trend { max-height: 360px; overflow-y: auto; }
 .trend-row {
-  display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.15fr 1fr;
+  display: grid; grid-template-columns: 1.05fr 0.9fr 0.9fr 1.05fr 1.35fr;
   gap: 4px; align-items: center; padding: 9px 14px;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px; font-variant-numeric: tabular-nums;
@@ -759,7 +759,10 @@ select.finput option { background: white; color: var(--ink); }
 .trend-out { color: var(--ink2); }
 .trend-net.pos { color: var(--green); font-weight: 600; }
 .trend-net.neg { color: var(--red); font-weight: 600; }
-.trend-card { color: var(--ink2); }
+.trend-nw { color: var(--ink); font-weight: 600; line-height: 1.3; }
+.trend-nw-pct { font-size: 9.5px; font-weight: 600; }
+.trend-nw-pct.pos { color: var(--green); }
+.trend-nw-pct.neg { color: var(--red); }
 .trend-row.empty span { color: var(--ink3); }
 
 /* Split rows */
@@ -3348,33 +3351,47 @@ function renderDash() {
     : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No data for this period</div>';
 
   // ── Monthly trend (all 12 months of the current financial year) ──
-  const ccIds = new Set(S.accounts.filter(a => a.type === 'Credit Card').map(a => a.id));
   const tNow = new Date();
   const fyY = fyStartYear(tNow);
   const curKey = tNow.getFullYear() + '-' + String(tNow.getMonth()+1).padStart(2,'0');
   const trend = [];
+  let curIdx = 11;
   for (let k = 0; k < 12; k++) {
     const d = new Date(fyY, 3 + k, 1); // April (FY start) through March
     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
     const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key).reduce((s,i)=>s+Number(i.amount),0);
     const mExp  = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
-    const mCard = S.entries.filter(e => (e.date||'').slice(0,7) === key && ccIds.has(e.account)).reduce((s,e)=>s+Number(e.amount),0);
-    trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp, card:mCard });
+    if (key === curKey) curIdx = k;
+    trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp });
   }
+  // Running active net worth — anchored at today's figure for the current
+  // month, rolled backward and forward by each month's Net.
+  const nwAt = [];
+  nwAt[curIdx] = nw;
+  for (let i = curIdx - 1; i >= 0;  i--) nwAt[i] = nwAt[i+1] - trend[i+1].net;
+  for (let i = curIdx + 1; i < 12;  i++) nwAt[i] = nwAt[i-1] + trend[i].net;
+  trend.forEach((t, i) => {
+    t.nw = nwAt[i];
+    const prev = i > 0 ? nwAt[i-1] : nwAt[i] - t.net;
+    t.nwPct = prev > 0 ? (t.nw - prev) / prev * 100 : null;
+  });
+
   document.getElementById('d-trend').innerHTML =
-    `<div class="trend-row trend-head"><span class="trend-month">Month</span><span>In</span><span>Out</span><span>Net</span><span>Cards</span></div>` +
+    `<div class="trend-row trend-head"><span class="trend-month">Month</span><span>In</span><span>Out</span><span>Net</span><span>Net Worth</span></div>` +
     trend.map(t => {
       const cur = t.key === curKey ? ' current' : '';
       if (t.inc === 0 && t.exp === 0) {
         return `<div class="trend-row empty${cur}"><span class="trend-month">${t.label}</span><span>—</span><span>—</span><span>—</span><span>—</span></div>`;
       }
       const nc = t.net >= 0 ? 'pos' : 'neg';
+      const pct = t.nwPct == null ? ''
+        : `<br><span class="trend-nw-pct ${t.nwPct >= 0 ? 'pos' : 'neg'}">${t.nwPct >= 0 ? '+' : '−'}${Math.abs(Math.round(t.nwPct))}%</span>`;
       return `<div class="trend-row${cur}"><span class="trend-month">${t.label}</span>`
         + `<span class="trend-in">₹${fmtShort(t.inc)}</span>`
         + `<span class="trend-out">₹${fmtShort(t.exp)}</span>`
         + `<span class="trend-net ${nc}">${t.net>=0?'+':'−'}₹${fmtShort(Math.abs(t.net))}</span>`
-        + `<span class="trend-card">₹${fmtShort(t.card)}</span></div>`;
+        + `<span class="trend-nw">₹${fmtShort(t.nw)}${pct}</span></div>`;
     }).join('');
 }
 
