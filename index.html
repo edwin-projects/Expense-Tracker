@@ -3562,7 +3562,12 @@ function toggleCfgCard(head) {
 }
 
 function toggleAcctGroup(head) {
-  head.parentElement.classList.toggle('collapsed');
+  const group = head.parentElement;
+  // Accordion: opening a group collapses every other group in the same list.
+  if (group.classList.contains('collapsed')) {
+    group.parentElement.querySelectorAll('.acct-group').forEach(g => g.classList.add('collapsed'));
+  }
+  group.classList.toggle('collapsed');
 }
 
 function toggleAddRow(key) {
