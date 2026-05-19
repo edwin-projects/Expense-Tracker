@@ -2228,15 +2228,6 @@ function accountOptionsHTML(placeholder, currentVal) {
   return `<option value="">${placeholder}</option>` + body;
 }
 
-// The logged-in person's first account — pre-selected on the
-// Add Expense / Add Income forms.
-function defaultAccountId() {
-  const mine = S.accounts
-    .filter(a => !a.archived && (a.owner || 'Joint') === currentUser)
-    .sort((a,b) => a.name.localeCompare(b.name));
-  return mine.length ? String(mine[0].id) : '';
-}
-
 function buildSelects() {
   // Trailing option on Expense/Income dropdowns — selecting it jumps to Config
   const addOpt = label => `<option value="__add__">＋ Add new ${label}…</option>`;
@@ -2383,7 +2374,7 @@ function resetForm() {
   document.getElementById('f-type').value = '';
   document.getElementById('f-freq').value = '';
   document.getElementById('f-desc').value = '';
-  const acct = document.getElementById('f-account'); if (acct) acct.value = defaultAccountId();
+  const acct = document.getElementById('f-account'); if (acct) acct.value = '';
   setDefaultDate();
   const me = currentUser || 'Edwin';
   document.querySelectorAll('.pill[data-g="for"]').forEach(p => p.classList.toggle('active', p.dataset.v === me));
@@ -2427,7 +2418,7 @@ function resetIncomeForm() {
   document.getElementById('i-amount').value = '';
   document.getElementById('i-source').value = '';
   document.getElementById('i-desc').value = '';
-  document.getElementById('i-account').value = defaultAccountId();
+  document.getElementById('i-account').value = '';
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
   document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === (currentUser || 'Edwin')));
 }
