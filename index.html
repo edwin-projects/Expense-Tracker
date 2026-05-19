@@ -407,6 +407,9 @@ select.finput option { background: white; color: var(--ink); }
   box-shadow: var(--shadow-md);
 }
 .btn-submit:active { transform: scale(0.98); background: #333; }
+.btn-submit:disabled, .btn-save-cfg:disabled, .btn-modal-save:disabled {
+  opacity: 0.5; cursor: default; box-shadow: none; transform: none;
+}
 
 /* ── LOG ── */
 .log-bar {
@@ -1190,7 +1193,7 @@ select.modal-input option { background: white; }
       </div>
     </div>
 
-    <button class="btn-submit" onclick="submitExpense()">Save Expense</button>
+    <button class="btn-submit" onclick="runSave(this, submitExpense)">Save Expense</button>
   </div>
 
   <!-- INCOME PAGE -->
@@ -1238,7 +1241,7 @@ select.modal-input option { background: white; }
       </div>
     </div>
 
-    <button class="btn-submit" style="background:var(--green)" onclick="submitIncome()">Save Income</button>
+    <button class="btn-submit" style="background:var(--green)" onclick="runSave(this, submitIncome)">Save Income</button>
   </div>
 
   <!-- TRANSFER PAGE -->
@@ -1279,7 +1282,7 @@ select.modal-input option { background: white; }
       Transfers move money between your own accounts (e.g. paying a credit-card bill from a bank account). They don't count as Income or Expense in the cash-flow view.
     </div>
 
-    <button class="btn-submit" style="background:#5b6ed8" onclick="submitTransfer()">Save Transfer</button>
+    <button class="btn-submit" style="background:#5b6ed8" onclick="runSave(this, submitTransfer)">Save Transfer</button>
   </div>
 
   <!-- LOG PAGE -->
@@ -1621,7 +1624,7 @@ select.modal-input option { background: white; }
         </div>
         <div class="acct-editor-actions">
           <button class="btn-save-cfg" style="background:var(--bg);color:var(--ink);border:1.5px solid var(--border2)" onclick="closeAccountEditor()">Cancel</button>
-          <button class="btn-save-cfg" style="background:var(--ink);color:white;border:none" onclick="saveAccount()">Save Account</button>
+          <button class="btn-save-cfg" style="background:var(--ink);color:white;border:none" onclick="runSave(this, saveAccount)">Save Account</button>
         </div>
       </div>
     </div>
@@ -1726,7 +1729,7 @@ select.modal-input option { background: white; }
           <div class="modal-pill" data-mg="saving" data-mv="No" onclick="pickModalPill(this)">No</div>
         </div>
       </div>
-      <button class="btn-modal-save" onclick="saveEdit()">Save Changes</button>
+      <button class="btn-modal-save" onclick="runSave(this, saveEdit)">Save Changes</button>
     </div>
   </div>
 
@@ -2325,6 +2328,23 @@ function onPickAccount(acctIdRaw, pillGroup) {
 
 function setDefaultDate() {
   document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+}
+
+// Runs a save handler with the button disabled + showing "Saving…" so a
+// double-tap can't fire it twice and create duplicate entries.
+async function runSave(btn, fn) {
+  if (btn.dataset.saving) return;
+  const label = btn.textContent;
+  btn.dataset.saving = '1';
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await fn();
+  } finally {
+    delete btn.dataset.saving;
+    btn.disabled = false;
+    btn.textContent = label;
+  }
 }
 
 async function submitExpense() {
