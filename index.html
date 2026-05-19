@@ -3558,7 +3558,12 @@ function delCfgItem(key, i) {
 }
 
 function toggleCfgCard(head) {
-  head.parentElement.classList.toggle('collapsed');
+  const card = head.parentElement;
+  // Accordion: opening a Config section collapses the others.
+  if (card.classList.contains('collapsed')) {
+    document.querySelectorAll('.cfg-card.collapsible').forEach(c => c.classList.add('collapsed'));
+  }
+  card.classList.toggle('collapsed');
 }
 
 function toggleAcctGroup(head) {
