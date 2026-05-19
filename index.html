@@ -850,6 +850,16 @@ select.finput option { background: white; color: var(--ink); }
   font-family: 'Outfit', sans-serif;
   cursor: pointer;
 }
+.btn-cfg-edit {
+  background: none;
+  border: 1px solid #c8e0f8;
+  color: var(--blue);
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+}
 .btn-add-row {
   display: flex;
   align-items: center;
@@ -3482,11 +3492,59 @@ function renderCfgList(key, items) {
   document.getElementById('cfg-'+key+'-list').innerHTML = items.map((item,i) => `
     <div class="cfg-item">
       <div class="cfg-item-name">${escapeHtml(item)}</div>
+      <button class="btn-cfg-edit" onclick="editCfgItem('${key}',${i})">Edit</button>
       <button class="btn-del" onclick="delCfgItem('${key}',${i})">Remove</button>
     </div>`).join('');
 }
 
 const CFG_MAP = {cat:'categories', type:'types', freq:'frequencies', src:'incomeSources'};
+
+// Renaming a config item cascades to every record that references it.
+const CFG_RENAME = {
+  cat:  { list: 'entries', field: 'category', table: 'expenses', col: 'category' },
+  type: { list: 'entries', field: 'type',     table: 'expenses', col: 'type' },
+  freq: { list: 'entries', field: 'freq',     table: 'expenses', col: 'freq' },
+  src:  { list: 'income',  field: 'source',   table: 'income',   col: 'source' },
+};
+
+// Swap a config row into an inline name editor.
+function editCfgItem(key, i) {
+  const arr = S[CFG_MAP[key]];
+  const row = document.getElementById('cfg-'+key+'-list').children[i];
+  if (!row || arr[i] == null) return;
+  row.innerHTML = `
+    <input class="cfg-input" id="edit-cfg-${key}" style="flex:1;min-width:0" value="${escapeHtml(arr[i])}"
+      onkeydown="if(event.key==='Enter')saveCfgRename('${key}',${i})">
+    <button class="btn-cfg-edit" onclick="saveCfgRename('${key}',${i})">Save</button>
+    <button class="btn-del" style="border-color:var(--border2);color:var(--ink2)" onclick="renderCfg()">Cancel</button>`;
+  const inp = row.querySelector('input');
+  inp.focus();
+  inp.select();
+}
+
+async function saveCfgRename(key, i) {
+  const arr = S[CFG_MAP[key]];
+  const oldVal = arr[i];
+  const newVal = (document.getElementById('edit-cfg-'+key).value || '').trim();
+  if (!newVal) return toast('Enter a name', 'err');
+  if (newVal === oldVal) { renderCfg(); return; }
+  if (arr.some((v, idx) => idx !== i && v === newVal)) return toast('Already exists', 'err');
+  arr[i] = newVal;
+  // Cascade to existing records and queue the changes for sync.
+  const r = CFG_RENAME[key];
+  let n = 0;
+  S[r.list].forEach(rec => {
+    if (rec[r.field] === oldVal) {
+      rec[r.field] = newVal;
+      queueOp(r.table, 'PATCH', rec.id, { [r.col]: newVal });
+      n++;
+    }
+  });
+  saveLocal();
+  buildSelects();
+  renderCfg();
+  await pushChanges(n ? `✓ Renamed · ${n} updated` : '✓ Renamed');
+}
 
 function delCfgItem(key, i) {
   const map = CFG_MAP;
