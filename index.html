@@ -688,7 +688,7 @@ select.finput option { background: white; color: var(--ink); }
 .spend-bar {
   width: 172px; height: 24px; flex-shrink: 0;
   background: var(--border); border-radius: 12px;
-  position: relative; overflow: hidden;
+  position: relative; overflow: visible;
 }
 .spend-fill {
   position: absolute; left: 0; top: 0; height: 100%;
@@ -702,16 +702,21 @@ select.finput option { background: white; color: var(--ink); }
 }
 .sb-label-bg { color: var(--ink2); }
 .sb-label-fg { color: #fff; }
-.spend-wrap { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 12px 0 0; }
-.spend-over { color: var(--red); font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+.spend-wrap { display: flex; align-items: center; justify-content: center; margin: 12px 0 0; }
+/* Dashed 100% goalposts + the dark-red overflow segment beyond them */
+.spend-bracket { position: absolute; top: -5px; bottom: -5px; border-left: 2px dashed var(--ink3); display: none; }
+.spend-bracket.left { left: 0; }
+.spend-bracket.right { right: 0; }
+.spend-bar.over .spend-bracket { display: block; }
+.spend-overflow { height: 24px; flex-shrink: 0; background: #8c1a0c; border-radius: 0 12px 12px 0; display: none; }
 
 /* Spend split by type ("Where it goes") */
-.typesplit-bar { display: flex; height: 20px; border-radius: 10px; overflow: hidden; background: var(--border); max-width: 172px; margin: 0 auto; }
+.typesplit-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: var(--border); max-width: 172px; margin: 0 auto; }
 .typesplit-bar > div { height: 100%; }
-.typesplit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px 16px; margin-top: 13px; }
-.tl-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink2); }
-.tl-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.tl-pct { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.typesplit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; margin: 11px auto 0; max-width: 172px; }
+.tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
+.tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tl-pct { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 #backup-reminder {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1387,8 +1392,10 @@ select.modal-input option { background: white; }
           <div class="spend-bar" id="d-spend-bar">
             <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
             <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
+            <div class="spend-bracket left"></div>
+            <div class="spend-bracket right"></div>
           </div>
-          <span class="spend-over" id="d-spend-over"></span>
+          <div class="spend-overflow" id="d-spend-over"></div>
         </div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
         <div id="d-typesplit" style="display:none;margin-top:16px">
@@ -3274,22 +3281,37 @@ function renderDash() {
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
   const netSub = document.getElementById('d-cf-net-sub');
   const spendWrap = document.getElementById('d-spend-wrap');
+  const spendBar = document.getElementById('d-spend-bar');
   const spendFill = document.getElementById('d-spend-fill');
+  const spendOver = document.getElementById('d-spend-over');
   if (incTotal > 0) {
-    // Spend ratio: green under 65%, amber 65–99%, red at 100%+ (deficit).
     const spendPct = Math.round(expTotal / incTotal * 100);
-    const tier = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
+    const over = spendPct > 100;
     spendWrap.style.display = 'flex';
     netSub.style.display = 'none';
-    spendFill.style.width = Math.min(spendPct, 100) + '%';
-    spendFill.style.background = tier;
-    // Over 100%: cap the bar's label at 100% and show the excess overflowing after it.
-    const inBar = (spendPct > 100 ? 100 : spendPct) + '% spent';
-    document.getElementById('d-spend-label-bg').textContent = inBar;
-    document.getElementById('d-spend-label-fg').textContent = inBar;
-    document.getElementById('d-spend-over').textContent = spendPct > 100 ? '+' + (spendPct - 100) + '%' : '';
+    spendBar.classList.toggle('over', over);
+    const label = spendPct + '% spent';
+    document.getElementById('d-spend-label-bg').textContent = label;
+    document.getElementById('d-spend-label-fg').textContent = label;
+    if (over) {
+      // The 100% bar (light red) stays full; the excess overflows past the
+      // dashed 100% mark as a dark-red extension in the same bar.
+      spendFill.style.width = '100%';
+      spendFill.style.background = '#d96459';
+      spendFill.style.borderRadius = '12px 0 0 12px';
+      spendOver.style.display = 'block';
+      spendOver.style.width = Math.min((spendPct - 100) / 100 * 172, 60) + 'px';
+    } else {
+      // Spend ratio: green under 65%, amber 65–99%, red at 100%.
+      spendFill.style.width = spendPct + '%';
+      spendFill.style.background = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
+      spendFill.style.borderRadius = '12px';
+      spendOver.style.display = 'none';
+    }
   } else {
     spendWrap.style.display = 'none';
+    spendBar.classList.remove('over');
+    spendOver.style.display = 'none';
     netSub.style.display = '';
     netSub.textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
   }
