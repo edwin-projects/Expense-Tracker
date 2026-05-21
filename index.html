@@ -703,6 +703,14 @@ select.finput option { background: white; color: var(--ink); }
 .sb-label-bg { color: var(--ink2); }
 .sb-label-fg { color: #fff; }
 
+/* Spend split by type ("Where it goes") */
+.typesplit-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--border); }
+.typesplit-bar > div { height: 100%; }
+.typesplit-legend { display: flex; flex-wrap: wrap; gap: 9px 16px; margin-top: 13px; }
+.tl-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink2); }
+.tl-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.tl-pct { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+
 #backup-reminder {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin: 10px 14px 0; padding: 10px 12px;
@@ -1379,6 +1387,12 @@ select.modal-input option { background: white; }
         </div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
       </div>
+    </div>
+
+    <div class="sec-label" id="d-typesplit-label" style="display:none">Where It Goes</div>
+    <div class="fcard" id="d-typesplit-card" style="display:none;padding:16px">
+      <div class="typesplit-bar" id="d-typesplit-bar"></div>
+      <div class="typesplit-legend" id="d-typesplit-legend"></div>
     </div>
 
     <div class="sec-label">Net Worth</div>
@@ -2216,6 +2230,14 @@ const ACCOUNT_GROUP_LABELS = {
   'Receivable': "You're owed",
   'Payable': 'You owe',
 };
+
+// Colours for the "Where it goes" expense-type split.
+const TYPE_COLORS = {
+  'Essentials': '#3a9d6e',
+  'Non-Essentials': '#d99a2b',
+  'Fun': '#d56fa0',
+};
+const TYPE_FALLBACK = ['#6b8fb5', '#9b7bb8', '#b58a6b', '#7b9b8a'];
 
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
@@ -3268,6 +3290,28 @@ function renderDash() {
   const netCard = document.getElementById('d-cf-net-card');
   netCard.style.background  = net >= 0 ? 'var(--green-bg)' : '#fff0f0';
   netCard.style.borderColor = net >= 0 ? '#a0d4b8' : '#ffb3b3';
+
+  // ── Spend split by type ("Where it goes") ──
+  const tsLabel = document.getElementById('d-typesplit-label');
+  const tsCard  = document.getElementById('d-typesplit-card');
+  if (expTotal > 0) {
+    const byType = {};
+    es.forEach(e => { const t = e.type || 'Other'; byType[t] = (byType[t] || 0) + Number(e.amount); });
+    let fb = 0;
+    const segs = Object.entries(byType)
+      .map(([type, amt]) => ({ type, pct: amt / expTotal * 100 }))
+      .sort((a,b) => b.pct - a.pct)
+      .map(s => ({ ...s, color: TYPE_COLORS[s.type] || TYPE_FALLBACK[fb++ % TYPE_FALLBACK.length] }));
+    document.getElementById('d-typesplit-bar').innerHTML =
+      segs.map(s => `<div style="width:${s.pct}%;background:${s.color}"></div>`).join('');
+    document.getElementById('d-typesplit-legend').innerHTML =
+      segs.map(s => `<span class="tl-item"><span class="tl-dot" style="background:${s.color}"></span>${escapeHtml(s.type)} <span class="tl-pct">${Math.round(s.pct)}%</span></span>`).join('');
+    tsLabel.style.display = '';
+    tsCard.style.display = '';
+  } else {
+    tsLabel.style.display = 'none';
+    tsCard.style.display = 'none';
+  }
 
   // Income split by who received it; Expenses split by who paid (the
   // "For" split lives in the Expense Breakdown card below)
