@@ -704,14 +704,17 @@ select.finput option { background: white; color: var(--ink); }
 .sb-label-fg { color: #fff; }
 .spend-wrap { display: flex; align-items: center; justify-content: center; margin: 12px 0 0; }
 /* Dashed 100% goalposts + the dark-red overflow segment beyond them */
-.spend-bracket { position: absolute; top: -5px; bottom: -5px; border-left: 2px dashed var(--ink3); display: none; }
-.spend-bracket.left { left: 0; }
-.spend-bracket.right { right: 0; }
+/* Neon 100% goalpost — sits within the bar at the overflow junction */
+.spend-bracket {
+  position: absolute; right: 0; top: 4px; bottom: 4px; width: 2px;
+  background: repeating-linear-gradient(to bottom, #e6ff00 0 3px, transparent 3px 6px);
+  display: none;
+}
 .spend-bar.over .spend-bracket { display: block; }
 .spend-overflow { height: 24px; flex-shrink: 0; background: #8c1a0c; border-radius: 0 12px 12px 0; display: none; }
 
 /* Spend split by type ("Where it goes") */
-.typesplit-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: var(--border); max-width: 172px; margin: 0 auto; }
+.typesplit-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: var(--border); width: 172px; margin: 0 auto; }
 .typesplit-bar > div { height: 100%; }
 .typesplit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; margin: 11px auto 0; max-width: 172px; }
 .tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
@@ -1392,8 +1395,7 @@ select.modal-input option { background: white; }
           <div class="spend-bar" id="d-spend-bar">
             <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
             <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
-            <div class="spend-bracket left"></div>
-            <div class="spend-bracket right"></div>
+            <div class="spend-bracket"></div>
           </div>
           <div class="spend-overflow" id="d-spend-over"></div>
         </div>
