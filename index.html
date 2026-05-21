@@ -1916,6 +1916,7 @@ function loadLocal() {
   if (!Array.isArray(S.transfers)) S.transfers = [];
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
+  if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
   // is locked out after the upgrade — each person can change theirs in Config.
@@ -1987,7 +1988,11 @@ async function sendOp(op) {
     else if (op.method === 'DELETE') res = await fetch(base + '?id=eq.' + op.id, { method:'DELETE', headers });
     else return false;
     // A duplicate-insert (409) means the row already landed — treat as done.
-    return res.ok || (op.method === 'POST' && res.status === 409);
+    if (res.ok || (op.method === 'POST' && res.status === 409)) return true;
+    // If the optional app_config table doesn't exist yet, drop the op so it
+    // can't block the main queue (config simply won't sync until it's created).
+    if (op.table === 'app_config' && (res.status === 404 || res.status === 400)) return true;
+    return false;
   } catch(e) { return false; }
 }
 
@@ -2015,14 +2020,27 @@ async function pushChanges(okMsg) {
   }
 }
 
+// Queue the shared config lists (single app_config row) for sync.
+function pushConfig() {
+  S.configSynced = true;
+  queueOp('app_config', 'PATCH', 1, {
+    categories: S.categories,
+    types: S.types,
+    frequencies: S.frequencies,
+    income_sources: S.incomeSources,
+    updated_at: new Date().toISOString(),
+  });
+}
+
 async function syncNow() {
   setSyncState('syncing');
   await flushPendingOps();
-  const [rows, acctRows, incRows, xferRows] = await Promise.all([
+  const [rows, acctRows, incRows, xferRows, cfgRows] = await Promise.all([
     sbFetch('expenses?select=*&order=date.desc'),
     sbFetch('accounts?select=*&order=created_at.asc'),
     sbFetch('income?select=*&order=date.desc'),
-    sbFetch('transfers?select=*&order=date.desc')
+    sbFetch('transfers?select=*&order=date.desc'),
+    sbFetch('app_config?select=*')
   ]);
   if (rows && Array.isArray(rows)) {
     const remoteIds = new Set(rows.map(r => r.id));
@@ -2071,6 +2089,33 @@ async function syncNow() {
       toAccount:   r.to_account   != null ? Number(r.to_account)   : null,
       desc: r.description, month: r.month, addedBy: r.added_by
     })), ...localOnly];
+  }
+  // Shared config lists (categories / types / frequencies / income sources).
+  if (cfgRows && Array.isArray(cfgRows) && cfgRows[0]) {
+    const r = cfgRows[0];
+    const arr = v => Array.isArray(v) ? v : [];
+    const srv = {
+      categories: arr(r.categories), types: arr(r.types),
+      frequencies: arr(r.frequencies), incomeSources: arr(r.income_sources),
+    };
+    const union = (a, b) => [...a, ...b.filter(x => !a.includes(x))];
+    if (!S.configSynced) {
+      // First sync on this device: merge so neither person loses their lists.
+      S.categories    = union(srv.categories, S.categories);
+      S.types         = union(srv.types, S.types);
+      S.frequencies   = union(srv.frequencies, S.frequencies);
+      S.incomeSources = union(srv.incomeSources, S.incomeSources);
+      S.configSynced = true;
+      pushConfig();
+    } else if (srv.categories.length || srv.types.length || srv.frequencies.length || srv.incomeSources.length) {
+      // Thereafter the server is the shared source of truth — adds and
+      // removals both propagate across devices.
+      S.categories = srv.categories;
+      S.types = srv.types;
+      S.frequencies = srv.frequencies;
+      S.incomeSources = srv.incomeSources;
+    }
+    buildSelects();
   }
   if (rows && Array.isArray(rows)) {
     saveLocal();
@@ -3671,21 +3716,24 @@ async function saveCfgRename(key, i) {
       n++;
     }
   });
+  pushConfig();
   saveLocal();
   buildSelects();
   renderCfg();
   await pushChanges(n ? `✓ Renamed · ${n} updated` : '✓ Renamed');
 }
 
-function delCfgItem(key, i) {
+async function delCfgItem(key, i) {
   const map = CFG_MAP;
   const arr = S[map[key]];
   if (arr.length <= 1) return toast('Keep at least one item','err');
   if (!confirm(`Remove "${arr[i]}"?`)) return;
   arr.splice(i, 1);
+  pushConfig();
   saveLocal();
   buildSelects();
   renderCfg();
+  await pushChanges('Removed');
 }
 
 function toggleCfgCard(head) {
@@ -3712,19 +3760,20 @@ function toggleAddRow(key) {
   if (el.classList.contains('show')) document.getElementById('new-'+key).focus();
 }
 
-function addCfgItem(key) {
+async function addCfgItem(key) {
   const map = CFG_MAP;
   const inp = document.getElementById('new-'+key);
   const val = inp.value.trim();
   if (!val) return toast('Enter a name','err');
   if (S[map[key]].includes(val)) return toast('Already exists','err');
   S[map[key]].push(val);
+  pushConfig();
   saveLocal();
   buildSelects();
   inp.value = '';
   document.getElementById('add-'+key).classList.remove('show');
   renderCfg();
-  toast('✓ Added: ' + val, 'ok');
+  await pushChanges('✓ Added: ' + val);
 }
 
 // ══════════════════════════════════════════════════
@@ -4167,6 +4216,7 @@ async function importBackup(input) {
     S.types         = payload.config.types         || S.types;
     S.frequencies   = payload.config.frequencies   || S.frequencies;
     S.incomeSources = payload.config.incomeSources || S.incomeSources;
+    pushConfig(); // push restored lists so the shared config matches the backup
   }
   S.entries   = payload.entries;
   S.income    = incomeArr;
