@@ -662,6 +662,15 @@ select.finput option { background: white; color: var(--ink); }
   transition: all 0.15s;
 }
 .period-btn.active { background: var(--ink); border-color: var(--ink); color: white; }
+#month-picker { margin: -8px 0 16px; }
+.month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.month-chip {
+  text-align: center; padding: 8px 0; border-radius: 9px;
+  border: 1.5px solid var(--border2); background: var(--surface);
+  font-family: 'Outfit', sans-serif; font-size: 12.5px; color: var(--ink2);
+  cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.month-chip.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .stat-card {
@@ -1368,8 +1377,11 @@ select.modal-input option { background: white; }
     <div class="period-row">
       <div class="period-btn active" onclick="setPeriod('month',this)">This Month</div>
       <div class="period-btn" onclick="setPeriod('lastmonth',this)">Last Month</div>
-      <div class="period-btn" onclick="setPeriod('quarter',this)">Quarter</div>
+      <div class="period-btn" id="period-months-btn" onclick="openMonthPicker(this)">Months ▾</div>
       <div class="period-btn" onclick="setPeriod('year',this)">Full Year</div>
+    </div>
+    <div id="month-picker" style="display:none">
+      <div class="month-grid" id="month-grid"></div>
     </div>
 
     <div class="sec-label">Cash Flow</div>
@@ -1870,6 +1882,7 @@ let S = {
   accounts: [],
   transfers: [],
   dashPeriod: 'month',
+  dashMonths: [],
   logFilter: 'All',
   logCategoryFilter: 'All',
   logSearch: '',
@@ -1902,6 +1915,7 @@ function loadLocal() {
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
+  if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
   // is locked out after the upgrade — each person can change theirs in Config.
@@ -2192,6 +2206,10 @@ function enterApp() {
   // Default the people pills to whoever just logged in.
   resetForm();
   resetIncomeForm();
+  // Start the Summary period on "This Month" each session.
+  S.dashPeriod = 'month';
+  document.querySelectorAll('.period-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+  document.getElementById('month-picker').style.display = 'none';
   checkBackupReminder();
   syncNow();
 }
@@ -3147,18 +3165,61 @@ function setPeriod(p, el) {
   S.dashPeriod = p;
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+  document.getElementById('month-picker').style.display = 'none';
+  renderDash();
+}
+
+// The 12 FY months (April → March) for the multi-month picker.
+function fyMonthsList() {
+  const fy = fyStartYear(new Date());
+  const arr = [];
+  for (let k = 0; k < 12; k++) {
+    const d = new Date(fy, 3 + k, 1);
+    arr.push({
+      key: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'),
+      label: d.toLocaleDateString('en-IN', { month: 'short' }),
+    });
+  }
+  return arr;
+}
+
+function buildMonthChips() {
+  const grid = document.getElementById('month-grid');
+  if (!grid) return;
+  grid.innerHTML = fyMonthsList().map(m =>
+    `<div class="month-chip${S.dashMonths.includes(m.key) ? ' sel' : ''}" onclick="toggleMonthChip('${m.key}')">${m.label}</div>`
+  ).join('');
+}
+
+function openMonthPicker(el) {
+  S.dashPeriod = 'months';
+  if (!S.dashMonths.length) {
+    const now = new Date();
+    S.dashMonths = [now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0')];
+  }
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('month-picker').style.display = 'block';
+  buildMonthChips();
+  renderDash();
+}
+
+function toggleMonthChip(key) {
+  const i = S.dashMonths.indexOf(key);
+  if (i >= 0) S.dashMonths.splice(i, 1); else S.dashMonths.push(key);
+  saveLocal();
+  buildMonthChips();
   renderDash();
 }
 
 // Indian financial year: April–March. The FY is identified by the
 // calendar year in which its April falls.
 function fyStartYear(d) { return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; }
-// FY quarter index 0–3: Q1 Apr–Jun, Q2 Jul–Sep, Q3 Oct–Dec, Q4 Jan–Mar.
-function fyQuarter(d) { return Math.floor(((d.getMonth() - 3 + 12) % 12) / 3); }
 
 function inPeriod(dateStr, period = S.dashPeriod) {
   if (period === 'all') return true;
   if (!dateStr) return false;
+  if (period === 'months') return S.dashMonths.includes(dateStr.slice(0,7));
   const now = new Date();
   const d = new Date(dateStr + 'T00:00:00');
   if (period === 'year')    return fyStartYear(d) === fyStartYear(now);
@@ -3167,11 +3228,10 @@ function inPeriod(dateStr, period = S.dashPeriod) {
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
   }
-  if (period === 'quarter') return fyQuarter(d) === fyQuarter(now) && fyStartYear(d) === fyStartYear(now);
   return true;
 }
 
-const PERIOD_LABELS = { month: 'This Month', lastmonth: 'Last Month', quarter: 'This Quarter', year: 'Full Year' };
+const PERIOD_LABELS = { month: 'This Month', lastmonth: 'Last Month', months: 'Selected Months', year: 'Full Year' };
 
 function filteredEntries() { return S.entries.filter(e => inPeriod(e.date)); }
 function filteredIncome()  { return S.income .filter(i => inPeriod(i.date)); }
