@@ -686,7 +686,7 @@ select.finput option { background: white; color: var(--ink); }
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
 .spend-bar {
-  width: 172px; height: 24px; margin: 12px auto 0;
+  width: 172px; height: 24px; flex-shrink: 0;
   background: var(--border); border-radius: 12px;
   position: relative; overflow: hidden;
 }
@@ -702,9 +702,11 @@ select.finput option { background: white; color: var(--ink); }
 }
 .sb-label-bg { color: var(--ink2); }
 .sb-label-fg { color: #fff; }
+.spend-wrap { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 12px 0 0; }
+.spend-over { color: var(--red); font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* Spend split by type ("Where it goes") */
-.typesplit-bar { display: flex; height: 20px; border-radius: 10px; overflow: hidden; background: var(--border); max-width: 280px; margin: 0 auto; }
+.typesplit-bar { display: flex; height: 20px; border-radius: 10px; overflow: hidden; background: var(--border); max-width: 172px; margin: 0 auto; }
 .typesplit-bar > div { height: 100%; }
 .typesplit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px 16px; margin-top: 13px; }
 .tl-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink2); }
@@ -1381,9 +1383,12 @@ select.modal-input option { background: white; }
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
         <div class="stat-val" id="d-cf-net">₹0</div>
-        <div class="spend-bar" id="d-spend-bar" style="display:none">
-          <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
-          <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
+        <div class="spend-wrap" id="d-spend-wrap" style="display:none">
+          <div class="spend-bar" id="d-spend-bar">
+            <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
+            <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
+          </div>
+          <span class="spend-over" id="d-spend-over"></span>
         </div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
         <div id="d-typesplit" style="display:none;margin-top:16px">
@@ -3268,20 +3273,23 @@ function renderDash() {
   netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.abs(net));
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
   const netSub = document.getElementById('d-cf-net-sub');
-  const spendBar = document.getElementById('d-spend-bar');
+  const spendWrap = document.getElementById('d-spend-wrap');
   const spendFill = document.getElementById('d-spend-fill');
   if (incTotal > 0) {
     // Spend ratio: green under 65%, amber 65–99%, red at 100%+ (deficit).
     const spendPct = Math.round(expTotal / incTotal * 100);
     const tier = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
-    spendBar.style.display = '';
+    spendWrap.style.display = 'flex';
     netSub.style.display = 'none';
     spendFill.style.width = Math.min(spendPct, 100) + '%';
     spendFill.style.background = tier;
-    document.getElementById('d-spend-label-bg').textContent = spendPct + '% spent';
-    document.getElementById('d-spend-label-fg').textContent = spendPct + '% spent';
+    // Over 100%: cap the bar's label at 100% and show the excess overflowing after it.
+    const inBar = (spendPct > 100 ? 100 : spendPct) + '% spent';
+    document.getElementById('d-spend-label-bg').textContent = inBar;
+    document.getElementById('d-spend-label-fg').textContent = inBar;
+    document.getElementById('d-spend-over').textContent = spendPct > 100 ? '+' + (spendPct - 100) + '%' : '';
   } else {
-    spendBar.style.display = 'none';
+    spendWrap.style.display = 'none';
     netSub.style.display = '';
     netSub.textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
   }
