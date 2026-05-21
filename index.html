@@ -2042,9 +2042,14 @@ async function syncNow() {
     sbFetch('transfers?select=*&order=date.desc'),
     sbFetch('app_config?select=*')
   ]);
+  // When the queue is fully flushed (online), every genuine local record is
+  // already on the server — so anything missing from the server was deleted
+  // on the other device and should be dropped here too. When offline (queue
+  // not empty) we keep local-only records so unsynced creations aren't lost.
+  const flushed = !S.pendingOps.length;
   if (rows && Array.isArray(rows)) {
     const remoteIds = new Set(rows.map(r => r.id));
-    const localOnly = S.entries.filter(e => !remoteIds.has(e.id));
+    const localOnly = flushed ? [] : S.entries.filter(e => !remoteIds.has(e.id));
     S.entries = [...rows.map(r => ({
       id: r.id, date: r.date, amount: Number(r.amount),
       category: r.category, type: r.type, freq: r.freq,
@@ -2056,7 +2061,7 @@ async function syncNow() {
   }
   if (acctRows && Array.isArray(acctRows)) {
     const remoteIds = new Set(acctRows.map(r => r.id));
-    const localOnly = S.accounts.filter(a => !remoteIds.has(a.id));
+    const localOnly = flushed ? [] : S.accounts.filter(a => !remoteIds.has(a.id));
     S.accounts = [...acctRows.map(r => ({
       id: Number(r.id), name: r.name, type: r.type,
       openingBalance: Number(r.opening_balance || 0),
@@ -2072,7 +2077,7 @@ async function syncNow() {
   }
   if (incRows && Array.isArray(incRows)) {
     const remoteIds = new Set(incRows.map(r => r.id));
-    const localOnly = S.income.filter(i => !remoteIds.has(i.id));
+    const localOnly = flushed ? [] : S.income.filter(i => !remoteIds.has(i.id));
     S.income = [...incRows.map(r => ({
       id: r.id, date: r.date, amount: Number(r.amount),
       source: r.source, receivedBy: r.received_by,
@@ -2082,7 +2087,7 @@ async function syncNow() {
   }
   if (xferRows && Array.isArray(xferRows)) {
     const remoteIds = new Set(xferRows.map(r => r.id));
-    const localOnly = S.transfers.filter(t => !remoteIds.has(t.id));
+    const localOnly = flushed ? [] : S.transfers.filter(t => !remoteIds.has(t.id));
     S.transfers = [...xferRows.map(r => ({
       id: r.id, date: r.date, amount: Number(r.amount),
       fromAccount: r.from_account != null ? Number(r.from_account) : null,
