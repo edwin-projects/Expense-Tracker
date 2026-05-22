@@ -3323,7 +3323,10 @@ function utilColor(pct) {
 // asset accounts, remaining limit for credit cards, amount owed otherwise.
 function acctAvailLabel(a) {
   const bal = accountBalance(a);
-  if (a.type === 'Credit Card' && a.creditLimit > 0) return '₹' + fmt(Math.round(a.creditLimit - bal)) + ' left';
+  if (a.type === 'Credit Card' && a.creditLimit > 0) {
+    const pct = Math.round(bal / a.creditLimit * 100);
+    return '₹' + fmt(Math.round(a.creditLimit - bal)) + ' left · ' + pct + '% used';
+  }
   if (a.isLiability) return '₹' + fmt(Math.round(bal)) + ' owed';
   return '₹' + fmt(Math.round(bal));
 }
