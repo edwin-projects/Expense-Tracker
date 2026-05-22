@@ -559,6 +559,9 @@ select.finput option { background: white; color: var(--ink); }
 .acct-row-sub { font-size: 11.5px; color: var(--ink3); margin-top: 2px; }
 .acct-row-bal { font-family: 'Outfit', sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; color: var(--ink); flex-shrink: 0; }
 .acct-row-bal.liab { color: var(--red); }
+.acct-row-right { flex-shrink: 0; text-align: right; }
+.acct-row-limit { font-family: 'Outfit', sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; color: var(--green); margin-top: 2px; }
+.acct-row-limit span { color: var(--ink3); font-weight: 500; font-size: 11px; }
 .acct-section-head {
   font-size: 11px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em;
   font-weight: 600; padding: 10px 14px 4px;
@@ -3868,7 +3871,10 @@ function renderAccountsList() {
           <button class="btn-del-entry" onclick="archiveAccount(${a.id})">🗄 Archive</button>
         </div>
       </div>
-      <div class="acct-row-bal ${a.isLiability?'liab':''}">₹${fmt(Math.round(bal))}</div>
+      <div class="acct-row-right">
+        <div class="acct-row-bal ${a.isLiability?'liab':''}">₹${fmt(Math.round(bal))}</div>
+        ${a.type === 'Credit Card' && a.creditLimit > 0 ? `<div class="acct-row-limit">₹${fmt(Math.round(a.creditLimit))}<span> limit</span></div>` : ''}
+      </div>
     </div>`;
   };
   // Within each section, accounts are grouped by type into collapsible
