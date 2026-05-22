@@ -1682,6 +1682,16 @@ select.modal-input option { background: white; }
       </div>
     </div>
 
+    <!-- Archived -->
+    <div class="sec-label">Archived</div>
+    <div class="cfg-card collapsible collapsed">
+      <div class="cfg-head" onclick="toggleCfgCard(this)">
+        <span>Archived Accounts <span class="cfg-count" id="archived-count"></span></span>
+        <span class="cfg-chevron">▾</span>
+      </div>
+      <div id="cfg-archived-list"></div>
+    </div>
+
     <!-- Data -->
     <div class="sec-label">Data</div>
     <div class="cfg-card">
@@ -3680,6 +3690,7 @@ function renderCfg() {
   renderCfgList('freq', S.frequencies);
   renderCfgList('src', S.incomeSources);
   renderAccountsList();
+  renderArchivedList();
   document.getElementById('cat-count').textContent = S.categories.length + ' items';
   document.getElementById('src-count').textContent = S.incomeSources.length + ' items';
   document.getElementById('acct-count').textContent = S.accounts.filter(a => !a.archived).length + ' active';
@@ -4007,6 +4018,44 @@ async function archiveAccount(id) {
   renderCfg();
   buildSelects();
   await pushChanges('Account archived');
+}
+
+// Lists archived accounts in Config so they can be reviewed or restored.
+function renderArchivedList() {
+  const list = document.getElementById('cfg-archived-list');
+  if (!list) return;
+  const archived = S.accounts.filter(a => a.archived);
+  const countEl = document.getElementById('archived-count');
+  if (countEl) countEl.textContent = archived.length + ' items';
+  if (!archived.length) {
+    list.innerHTML = `<div style="padding:16px;color:var(--ink3);font-size:13px;text-align:center">No archived accounts.</div>`;
+    return;
+  }
+  list.innerHTML = archived.map(a => {
+    const ownerClass = 'owner-' + (a.owner || 'Joint').toLowerCase();
+    return `
+    <div class="acct-row">
+      <div class="acct-row-main">
+        <div class="acct-row-name">${escapeHtml(a.name)}<span class="acct-chip ${a.isLiability?'liab':''}">${escapeHtml(a.type)}</span><span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span></div>
+        <div class="acct-row-sub">${a.notes ? escapeHtml(a.notes) + ' · ' : ''}opened ${a.openingDate || '—'}</div>
+        <div style="margin-top:8px">
+          <button class="btn-cfg-edit" onclick="unarchiveAccount(${a.id})">↩ Restore</button>
+        </div>
+      </div>
+      <div class="acct-row-bal ${a.isLiability?'liab':''}">₹${fmt(Math.round(accountBalance(a)))}</div>
+    </div>`;
+  }).join('');
+}
+
+async function unarchiveAccount(id) {
+  const a = S.accounts.find(x => x.id === id);
+  if (!a) return;
+  a.archived = false;
+  queueOp('accounts', 'PATCH', id, { archived: false });
+  saveLocal();
+  renderCfg();
+  buildSelects();
+  await pushChanges('✓ Restored');
 }
 
 async function updateAccountValue(id) {
