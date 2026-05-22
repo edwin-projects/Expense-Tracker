@@ -807,6 +807,7 @@ select.finput option { background: white; color: var(--ink); }
 .split-name { font-size: 14px; color: var(--ink); font-weight: 500; }
 .split-pct { font-size: 12px; color: var(--ink3); margin-top: 2px; }
 .split-amt { font-family: 'Outfit', sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 17px; color: var(--ink); }
+.split-util { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 1px; }
 
 /* ── Account groups (Summary) ── */
 .acct-group { border-bottom: 1px solid var(--border); }
@@ -1659,6 +1660,10 @@ select.modal-input option { background: white; }
           <span class="flabel">Current Value (₹)</span>
           <input id="acct-current" type="text" inputmode="decimal" oninput="onAmountInput(this)" placeholder="0">
         </div>
+        <div class="frow" id="acct-limit-row" style="display:none">
+          <span class="flabel">Credit Limit (₹)</span>
+          <input id="acct-limit" type="text" inputmode="decimal" oninput="onAmountInput(this)" placeholder="0">
+        </div>
         <div class="frow">
           <span class="flabel">Notes</span>
           <input id="acct-notes" type="text" placeholder="Optional…">
@@ -2067,6 +2072,7 @@ async function syncNow() {
       openingBalance: Number(r.opening_balance || 0),
       openingDate: r.opening_date || '',
       currentValue: r.current_value != null ? Number(r.current_value) : null,
+      creditLimit: r.credit_limit != null ? Number(r.credit_limit) : null,
       isLiability: !!r.is_liability,
       longTerm: !!r.long_term,
       currency: r.currency || 'INR',
@@ -3295,6 +3301,11 @@ function filteredIncome()  { return S.income .filter(i => inPeriod(i.date)); }
 // repayment all flow through Transfers; opening_balance carries pre-existing debt.
 // Pass asOf (a YYYY-MM-DD date) to get the balance as of that date —
 // transaction-driven accounts are cut off there; manually-valued accounts
+// Credit-card utilization colour: green under 20%, amber 20–30%, red above 30%.
+function utilColor(pct) {
+  return pct < 20 ? 'var(--green)' : pct <= 30 ? 'var(--amber)' : 'var(--red)';
+}
+
 // (Investment/Asset/Loan) have no dated history, so their current value is
 // used (frozen at snapshot time).
 function accountBalance(acct, asOf) {
@@ -3517,19 +3528,35 @@ function renderDash() {
         .sort((x,y) => y.total - x.total)
         .map(g => {
           const isLiab = g.accts[0].isLiability;
+          const isCC = g.type === 'Credit Card';
           const label = ACCOUNT_GROUP_LABELS[g.type] || g.type;
           const items = [...g.accts].sort((x,y) => accountBalance(y) - accountBalance(x)).map(a => {
             const bal = accountBalance(a);
             const ownerClass = 'owner-' + (a.owner || 'Joint').toLowerCase();
+            let util = '';
+            if (isCC && a.creditLimit > 0) {
+              const pct = Math.round(bal / a.creditLimit * 100);
+              util = `<div class="split-util" style="color:${utilColor(pct)}">${pct}% of limit</div>`;
+            }
             return `<div class="split-item" style="padding-left:26px;padding-right:14px;cursor:pointer" onclick="setLogAccountFilter(${a.id})">
               <div><div class="split-name">${escapeHtml(a.name)}<span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span></div>
               <div class="split-pct">tap to view transactions</div></div>
-              <div class="split-amt" style="${isLiab?'color:var(--red)':''}">₹${fmt(Math.round(bal))}</div>
+              <div style="text-align:right;flex-shrink:0"><div class="split-amt" style="${isLiab?'color:var(--red)':''}">₹${fmt(Math.round(bal))}</div>${util}</div>
             </div>`;
           }).join('');
+          // Overall utilization for the Credit Cards group (cards with a limit set)
+          let headUtil = '';
+          if (isCC) {
+            const withLimit = g.accts.filter(a => a.creditLimit > 0);
+            const limTot = withLimit.reduce((s,a) => s + a.creditLimit, 0);
+            if (limTot > 0) {
+              const pct = Math.round(withLimit.reduce((s,a) => s + accountBalance(a), 0) / limTot * 100);
+              headUtil = ` <span class="split-util" style="color:${utilColor(pct)}">${pct}% used</span>`;
+            }
+          }
           return `<div class="acct-group collapsed">
             <div class="acct-group-head" onclick="toggleAcctGroup(this)">
-              <div class="acct-group-label">${escapeHtml(label)}<span class="acct-group-count">${g.accts.length}</span></div>
+              <div class="acct-group-label">${escapeHtml(label)}<span class="acct-group-count">${g.accts.length}</span>${headUtil}</div>
               <div class="acct-group-total ${isLiab?'liab':''}">₹${fmt(Math.round(g.total))}<span class="acct-group-chevron">▾</span></div>
             </div>
             <div class="acct-group-body">${items}</div>
@@ -3871,6 +3898,7 @@ function openAccountEditor(id) {
   document.getElementById('acct-opening').value      = a ? formatIndianNumber(a.openingBalance) : '';
   document.getElementById('acct-opening-date').value = a ? (a.openingDate || '') : new Date().toISOString().split('T')[0];
   document.getElementById('acct-current').value      = a && a.currentValue != null ? formatIndianNumber(a.currentValue) : '';
+  document.getElementById('acct-limit').value        = a && a.creditLimit != null ? formatIndianNumber(a.creditLimit) : '';
   document.getElementById('acct-notes').value        = a ? (a.notes || '') : '';
   document.getElementById('acct-longterm').checked   = a ? !!a.longTerm : false;
   onAccountTypeChange();
@@ -3907,6 +3935,7 @@ function closeAccountEditor() {
 function onAccountTypeChange() {
   const t = document.getElementById('acct-type').value;
   document.getElementById('acct-cv-row').style.display = MANUAL_VALUE_TYPES.has(t) ? 'flex' : 'none';
+  document.getElementById('acct-limit-row').style.display = t === 'Credit Card' ? 'flex' : 'none';
 }
 
 async function saveAccount() {
@@ -3918,6 +3947,8 @@ async function saveAccount() {
   const openingDate = document.getElementById('acct-opening-date').value || null;
   const currentRaw = document.getElementById('acct-current').value;
   const currentValue = MANUAL_VALUE_TYPES.has(type) && currentRaw !== '' ? parseAmount(currentRaw) : null;
+  const limitRaw = document.getElementById('acct-limit').value;
+  const creditLimit = type === 'Credit Card' && limitRaw !== '' ? parseAmount(limitRaw) : null;
   const notes = document.getElementById('acct-notes').value.trim();
   const longTerm = document.getElementById('acct-longterm').checked;
   const isLiability = LIABILITY_TYPES.has(type);
@@ -3927,12 +3958,12 @@ async function saveAccount() {
   if (editId) {
     const idx = S.accounts.findIndex(a => a.id === Number(editId));
     if (idx === -1) return;
-    acct = {...S.accounts[idx], name, type, owner, openingBalance: opening, openingDate, currentValue, isLiability, longTerm, notes};
+    acct = {...S.accounts[idx], name, type, owner, openingBalance: opening, openingDate, currentValue, creditLimit, isLiability, longTerm, notes};
     S.accounts[idx] = acct;
   } else {
     acct = {
       id: newId(), name, type, owner,
-      openingBalance: opening, openingDate, currentValue, isLiability, longTerm,
+      openingBalance: opening, openingDate, currentValue, creditLimit, isLiability, longTerm,
       currency: 'INR', notes, archived: false
     };
     S.accounts.unshift(acct);
@@ -3943,6 +3974,7 @@ async function saveAccount() {
     opening_balance: acct.openingBalance,
     opening_date: acct.openingDate || null,
     current_value: acct.currentValue,
+    credit_limit: acct.creditLimit,
     is_liability: acct.isLiability,
     long_term: !!acct.longTerm,
     currency: acct.currency,
@@ -4199,6 +4231,7 @@ async function importBackup(input) {
       opening_balance: a.openingBalance ?? 0,
       opening_date: a.openingDate || null,
       current_value: a.currentValue ?? null,
+      credit_limit: a.creditLimit ?? null,
       is_liability: !!a.isLiability,
       long_term: !!a.longTerm,
       currency: a.currency || 'INR',
