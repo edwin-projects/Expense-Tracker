@@ -2331,7 +2331,7 @@ const TYPE_FALLBACK = ['#6b8fb5', '#9b7bb8', '#b58a6b', '#7b9b8a'];
 // logged-in person's own accounts are listed first, then alphabetical.
 function accountOptionsHTML(placeholder, currentVal) {
   const optEl = a =>
-    `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')})</option>`;
+    `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')} · ${acctAvailLabel(a)})</option>`;
   const groups = {};
   S.accounts.filter(a => !a.archived).forEach(a => {
     const t = a.type || 'Other';
@@ -3304,6 +3304,15 @@ function filteredIncome()  { return S.income .filter(i => inPeriod(i.date)); }
 // Credit-card utilization colour: green under 20%, amber 20–30%, red above 30%.
 function utilColor(pct) {
   return pct < 20 ? 'var(--green)' : pct <= 30 ? 'var(--amber)' : 'var(--red)';
+}
+
+// Short "available" label for the account pickers: spendable balance for
+// asset accounts, remaining limit for credit cards, amount owed otherwise.
+function acctAvailLabel(a) {
+  const bal = accountBalance(a);
+  if (a.type === 'Credit Card' && a.creditLimit > 0) return '₹' + fmt(Math.round(a.creditLimit - bal)) + ' left';
+  if (a.isLiability) return '₹' + fmt(Math.round(bal)) + ' owed';
+  return '₹' + fmt(Math.round(bal));
 }
 
 // (Investment/Asset/Loan) have no dated history, so their current value is
