@@ -4154,9 +4154,12 @@ function exportBackup() {
 async function shareBackup() {
   const json = JSON.stringify(buildBackupPayload(), null, 2);
   const file = new File([json], backupFileName(), { type: 'application/json' });
+  const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const title = `D & E Finance backup — ${dateStr}`;
+  const text = `D & E Finance backup as of ${dateStr}. Family finance data (JSON) attached.`;
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'D & E Finance backup' });
+      await navigator.share({ files: [file], title, text });
       markBackupDone();
     } catch(e) {
       // share sheet dismissed — leave the reminder showing
