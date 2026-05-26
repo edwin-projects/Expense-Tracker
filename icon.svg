@@ -1,6 +1,6 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <rect width="512" height="512" rx="115" fill="#262320"/>
-  <text x="256" y="185" font-family="Georgia, DejaVu Serif, Times New Roman, serif" font-size="155" font-weight="700" text-anchor="middle" dominant-baseline="central"><tspan fill="#E7D7AC">D</tspan><tspan font-family="Helvetica, FreeSans, Arial, sans-serif" font-weight="600" fill="#D8A93B" dy="12">₹</tspan><tspan fill="#E7D7AC" dy="-12">E</tspan></text>
+  <text x="256" y="170" font-family="Georgia, DejaVu Serif, Times New Roman, serif" font-size="155" font-weight="700" text-anchor="middle" dominant-baseline="central"><tspan fill="#E7D7AC">D</tspan><tspan font-family="Helvetica, FreeSans, Arial, sans-serif" font-weight="600" fill="#D8A93B" dy="12">₹</tspan><tspan fill="#E7D7AC" dy="-12">E</tspan></text>
   <rect x="150" y="370" width="56" height="60"  rx="9" fill="#6FAE84"/>
   <rect x="228" y="335" width="56" height="95"  rx="9" fill="#A7B45E"/>
   <rect x="306" y="300" width="56" height="130" rx="9" fill="#D8A93B"/>
