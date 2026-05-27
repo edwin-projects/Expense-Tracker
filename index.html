@@ -2588,6 +2588,18 @@ async function deleteIncome(id) {
 }
 
 // ── Transfers ────────────────────────────────────────────────────────
+// Soft guard: a transfer out of an asset account for more than it holds
+// leaves it negative — usually because its current value wasn't recorded
+// (e.g. redeeming an investment whose value is still blank, so it falls back
+// to the opening balance or 0). Warn but allow.
+function confirmIfOverdraws(fromAcctId, amount) {
+  const a = S.accounts.find(x => x.id === fromAcctId);
+  if (!a || a.isLiability) return true;
+  const bal = accountBalance(a);
+  if (amount <= bal) return true;
+  return confirm(`This transfer (₹${fmt(Math.round(amount))}) is more than ${a.name}'s balance (₹${fmt(Math.round(bal))}).\n\nIt will leave ${a.name} negative. Continue?`);
+}
+
 async function submitTransfer() {
   const amount = parseAmount(document.getElementById('t-amount').value);
   const fromRaw = document.getElementById('t-from').value;
@@ -2600,6 +2612,7 @@ async function submitTransfer() {
   if (!toRaw)   return toast('Pick the destination account', 'err');
   if (fromRaw === toRaw) return toast('From and To must be different', 'err');
   if (!date) return toast('Select a date', 'err');
+  if (!confirmIfOverdraws(Number(fromRaw), amount)) return;
 
   const xfer = {
     id: newId(),
