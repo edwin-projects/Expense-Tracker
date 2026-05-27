@@ -3333,17 +3333,22 @@ function acctAvailLabel(a) {
   return '₹' + fmt(Math.round(bal));
 }
 
-// (Investment/Asset/Loan) have no dated history, so their current value is
-// used (frozen at snapshot time).
+// (Investment/Asset/Loan) carry a user-entered current value rather than a
+// dated transaction history. Transfers still move real money in/out of them
+// (e.g. redeeming an investment into a bank account), so those must adjust the
+// value too — otherwise the moved amount is counted in both the source and the
+// destination.
 function accountBalance(acct, asOf) {
-  if (acct.type === 'Investment' || acct.type === 'Asset' || acct.type === 'Loan') {
-    return Number(acct.currentValue ?? acct.openingBalance ?? 0);
-  }
   const upto = d => !asOf || (d || '') <= asOf;
-  const inflow  = S.income   .filter(i => i.account     === acct.id && upto(i.date)).reduce((s,i) => s + Number(i.amount), 0);
-  const outflow = S.entries  .filter(e => e.account     === acct.id && upto(e.date)).reduce((s,e) => s + Number(e.amount), 0);
   const xferIn  = S.transfers.filter(t => t.toAccount   === acct.id && upto(t.date)).reduce((s,t) => s + Number(t.amount), 0);
   const xferOut = S.transfers.filter(t => t.fromAccount === acct.id && upto(t.date)).reduce((s,t) => s + Number(t.amount), 0);
+  if (acct.type === 'Investment' || acct.type === 'Asset' || acct.type === 'Loan') {
+    const base = Number(acct.currentValue ?? acct.openingBalance ?? 0);
+    // Loan is a liability: drawing more (out) grows it, repaying (in) shrinks it.
+    return acct.type === 'Loan' ? base + xferOut - xferIn : base + xferIn - xferOut;
+  }
+  const inflow  = S.income   .filter(i => i.account     === acct.id && upto(i.date)).reduce((s,i) => s + Number(i.amount), 0);
+  const outflow = S.entries  .filter(e => e.account     === acct.id && upto(e.date)).reduce((s,e) => s + Number(e.amount), 0);
   if (acct.type === 'Credit Card' || acct.type === 'Payable') {
     // Outstanding grows with charges / money-out, shrinks with payments-in
     return Number(acct.openingBalance || 0) + outflow + xferOut - inflow - xferIn;
