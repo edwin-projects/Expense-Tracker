@@ -1098,7 +1098,7 @@ select.modal-input option { background: white; }
     <input class="setup-input" id="sb-url" placeholder="https://xxxx.supabase.co" autocomplete="off" autocorrect="off" autocapitalize="off">
     <div class="setup-label">Supabase Anon Key</div>
     <input class="setup-input" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." autocomplete="off" autocorrect="off" autocapitalize="off">
-    <button class="setup-btn" onclick="saveSupabase()">Save & Continue</button>
+    <button class="setup-btn" onclick="runSave(this, saveSupabase, 'Saving…')">Save & Continue</button>
     <div class="setup-hint">
       1. Go to <strong>supabase.com</strong> → New project (free)<br>
       2. Settings → API → copy <strong>Project URL</strong> and <strong>anon public key</strong><br>
@@ -1163,7 +1163,7 @@ select.modal-input option { background: white; }
 
   <div id="backup-reminder" style="display:none">
     <span id="backup-reminder-text" onclick="exportBackup()">📦 Weekly backup due — tap to download</span>
-    <button onclick="shareBackup()">✉ Email</button>
+    <button onclick="runSave(this, shareBackup, 'Sharing…')">✉ Email</button>
     <button class="br-dismiss" onclick="dismissBackupReminder()">✕</button>
   </div>
 
@@ -1520,7 +1520,7 @@ select.modal-input option { background: white; }
         <span style="font-size:12px">To change, tap Exit and re-enter credentials.</span>
       </div>
       <div style="padding:14px 16px">
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2)" onclick="syncNow()">↻ Force Sync Now</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2)" onclick="runSave(this, syncNow, 'Syncing…')">↻ Force Sync Now</button>
       </div>
     </div>
 
@@ -1536,12 +1536,12 @@ select.modal-input option { background: white; }
         <div class="pin-set-row">
           <span class="flabel">Edwin's PIN</span>
           <input id="pin-set-Edwin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
-          <button onclick="savePin('Edwin')">Save</button>
+          <button onclick="runSave(this, () => savePin('Edwin'), 'Saving…')">Save</button>
         </div>
         <div class="pin-set-row">
           <span class="flabel">Divya's PIN</span>
           <input id="pin-set-Divya" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
-          <button onclick="savePin('Divya')">Save</button>
+          <button onclick="runSave(this, () => savePin('Divya'), 'Saving…')">Save</button>
         </div>
       </div>
     </div>
@@ -1559,7 +1559,7 @@ select.modal-input option { background: white; }
       </div>
       <div class="add-input-row" id="add-cat">
         <input class="cfg-input" id="new-cat" placeholder="Category name…">
-        <button class="btn-save-cfg" onclick="addCfgItem('cat')">Add</button>
+        <button class="btn-save-cfg" onclick="runSave(this, () => addCfgItem('cat'), 'Adding…')">Add</button>
       </div>
     </div>
 
@@ -1576,7 +1576,7 @@ select.modal-input option { background: white; }
       </div>
       <div class="add-input-row" id="add-type">
         <input class="cfg-input" id="new-type" placeholder="Type name…">
-        <button class="btn-save-cfg" onclick="addCfgItem('type')">Add</button>
+        <button class="btn-save-cfg" onclick="runSave(this, () => addCfgItem('type'), 'Adding…')">Add</button>
       </div>
     </div>
 
@@ -1593,7 +1593,7 @@ select.modal-input option { background: white; }
       </div>
       <div class="add-input-row" id="add-freq">
         <input class="cfg-input" id="new-freq" placeholder="Frequency name…">
-        <button class="btn-save-cfg" onclick="addCfgItem('freq')">Add</button>
+        <button class="btn-save-cfg" onclick="runSave(this, () => addCfgItem('freq'), 'Adding…')">Add</button>
       </div>
     </div>
 
@@ -1610,7 +1610,7 @@ select.modal-input option { background: white; }
       </div>
       <div class="add-input-row" id="add-src">
         <input class="cfg-input" id="new-src" placeholder="Source name…">
-        <button class="btn-save-cfg" onclick="addCfgItem('src')">Add</button>
+        <button class="btn-save-cfg" onclick="runSave(this, () => addCfgItem('src'), 'Adding…')">Add</button>
       </div>
     </div>
 
@@ -1701,13 +1701,13 @@ select.modal-input option { background: white; }
     <div class="sec-label">Data</div>
     <div class="cfg-card">
       <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-        <button class="btn-save-cfg" style="width:100%;background:var(--ink);color:white;border:none" onclick="exportXLSX()">⬇ Export Expenses (.xlsx)</button>
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="exportGSheet()">↗ Expenses for Google Sheets</button>
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--green);border:1.5px solid var(--green);margin-top:0" onclick="exportIncomeCSV()">⬇ Export Income (.csv)</button>
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="exportAccountsCSV()">⬇ Export Accounts (.csv)</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--ink);color:white;border:none" onclick="runSave(this, exportXLSX, 'Exporting…')">⬇ Export Expenses (.xlsx)</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="runSave(this, exportGSheet, 'Exporting…')">↗ Expenses for Google Sheets</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--green);border:1.5px solid var(--green);margin-top:0" onclick="runSave(this, exportIncomeCSV, 'Exporting…')">⬇ Export Income (.csv)</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="runSave(this, exportAccountsCSV, 'Exporting…')">⬇ Export Accounts (.csv)</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
-        <button class="btn-save-cfg" style="width:100%;background:var(--green);color:white;border:none" onclick="exportBackup()">⬇ Download Backup (.json)</button>
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--green);border:1.5px solid var(--green);margin-top:0" onclick="shareBackup()">✉ Email / Share Backup</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--green);color:white;border:none" onclick="runSave(this, exportBackup, 'Preparing…')">⬇ Download Backup (.json)</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--green);border:1.5px solid var(--green);margin-top:0" onclick="runSave(this, shareBackup, 'Sharing…')">✉ Email / Share Backup</button>
         <label style="width:100%;margin:0">
           <input type="file" id="backup-file-input" accept=".json" style="display:none" onchange="importBackup(this)">
           <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⬆ Import Backup (.json)</span>
@@ -2463,20 +2463,23 @@ function setDefaultDate() {
   document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
 }
 
-// Runs a save handler with the button disabled + showing "Saving…" so a
-// double-tap can't fire it twice and create duplicate entries.
-async function runSave(btn, fn) {
+// Runs a save handler with the button disabled + showing a busy label (e.g.
+// "Saving…", "Deleting…") so the user has visible feedback while the action
+// is in flight and a double-tap can't fire it twice.
+async function runSave(btn, fn, busyLabel = 'Saving…') {
   if (btn.dataset.saving) return;
   const label = btn.textContent;
   btn.dataset.saving = '1';
   btn.disabled = true;
-  btn.textContent = 'Saving…';
+  btn.textContent = busyLabel;
   try {
     await fn();
   } finally {
-    delete btn.dataset.saving;
-    btn.disabled = false;
-    btn.textContent = label;
+    if (btn.isConnected) {
+      delete btn.dataset.saving;
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   }
 }
 
@@ -2581,9 +2584,9 @@ async function deleteIncome(id) {
   S.income = S.income.filter(i => i.id !== id);
   queueOp('income', 'DELETE', id);
   saveLocal();
+  await pushChanges('Income deleted');
   const card = document.getElementById('inc-' + id);
   if (card) card.remove();
-  await pushChanges('Income deleted');
   renderLog();
 }
 
@@ -2647,9 +2650,9 @@ async function deleteTransfer(id) {
   S.transfers = S.transfers.filter(t => t.id !== id);
   queueOp('transfers', 'DELETE', id);
   saveLocal();
+  await pushChanges('Transfer deleted');
   const card = document.getElementById('xfer-' + id);
   if (card) card.remove();
-  await pushChanges('Transfer deleted');
   renderLog();
 }
 
@@ -2895,9 +2898,9 @@ async function saveEdit() {
       description: updated.desc, month: updated.month
     });
     saveLocal();
+    await pushChanges('✓ Transfer updated');
     closeEditModal();
     renderLog();
-    await pushChanges('✓ Transfer updated');
     return;
   }
 
@@ -2924,9 +2927,9 @@ async function saveEdit() {
       month: updated.month
     });
     saveLocal();
+    await pushChanges('✓ Income updated');
     closeEditModal();
     renderLog();
-    await pushChanges('✓ Income updated');
     return;
   }
 
@@ -2959,9 +2962,9 @@ async function saveEdit() {
     account: updated.account
   });
   saveLocal();
+  await pushChanges('✓ Entry updated');
   closeEditModal();
   renderLog();
-  await pushChanges('✓ Entry updated');
 }
 
 async function deleteEntry(id) {
@@ -2969,9 +2972,9 @@ async function deleteEntry(id) {
   S.entries = S.entries.filter(e => e.id !== id);
   queueOp('expenses', 'DELETE', id);
   saveLocal();
+  await pushChanges('Entry deleted');
   const card = document.getElementById('entry-' + id);
   if (card) card.remove();
-  await pushChanges('Entry deleted');
   renderLog();
 }
 
@@ -2993,8 +2996,8 @@ async function repeatEntry(id) {
     month: clone.month, added_by: clone.addedBy, account: clone.account
   });
   saveLocal();
-  renderLog();
   await pushChanges('✓ Repeated for today');
+  renderLog();
 }
 
 async function repeatIncome(id) {
@@ -3010,8 +3013,8 @@ async function repeatIncome(id) {
     month: clone.month, added_by: clone.addedBy
   });
   saveLocal();
-  renderLog();
   await pushChanges('✓ Repeated for today');
+  renderLog();
 }
 
 async function repeatTransfer(id) {
@@ -3026,8 +3029,8 @@ async function repeatTransfer(id) {
     description: clone.desc, month: clone.month, added_by: clone.addedBy
   });
   saveLocal();
-  renderLog();
   await pushChanges('✓ Repeated for today');
+  renderLog();
 }
 
 function setLogSearch(val) {
@@ -3180,8 +3183,8 @@ function renderExpenseCard(e, q) {
         ${e.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(e.addedBy, q)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditModal(${e.id})">✏ Edit</button>
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="repeatEntry(${e.id})">↻ Repeat</button>
-          <button class="btn-del-entry" onclick="deleteEntry(${e.id})">🗑 Delete</button>
+          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="runSave(this, () => repeatEntry(${e.id}), 'Repeating…')">↻ Repeat</button>
+          <button class="btn-del-entry" onclick="runSave(this, () => deleteEntry(${e.id}), 'Deleting…')">🗑 Delete</button>
         </div>
       </div>
       <div class="entry-right">
@@ -3206,8 +3209,8 @@ function renderIncomeCard(i, q) {
         ${i.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(i.addedBy, q)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditIncomeModal(${i.id})">✏ Edit</button>
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="repeatIncome(${i.id})">↻ Repeat</button>
-          <button class="btn-del-entry" onclick="deleteIncome(${i.id})">🗑 Delete</button>
+          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="runSave(this, () => repeatIncome(${i.id}), 'Repeating…')">↻ Repeat</button>
+          <button class="btn-del-entry" onclick="runSave(this, () => deleteIncome(${i.id}), 'Deleting…')">🗑 Delete</button>
         </div>
       </div>
       <div class="entry-right">
@@ -3231,8 +3234,8 @@ function renderTransferCard(t, q) {
         ${t.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(t.addedBy, q)}</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="openEditTransferModal(${t.id})">✏ Edit</button>
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="repeatTransfer(${t.id})">↻ Repeat</button>
-          <button class="btn-del-entry" onclick="deleteTransfer(${t.id})">🗑 Delete</button>
+          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer" onclick="runSave(this, () => repeatTransfer(${t.id}), 'Repeating…')">↻ Repeat</button>
+          <button class="btn-del-entry" onclick="runSave(this, () => deleteTransfer(${t.id}), 'Deleting…')">🗑 Delete</button>
         </div>
       </div>
       <div class="entry-right">
@@ -3747,7 +3750,7 @@ function renderCfgList(key, items) {
     <div class="cfg-item">
       <div class="cfg-item-name">${escapeHtml(item)}</div>
       <button class="btn-cfg-edit" onclick="editCfgItem('${key}',${i})">Edit</button>
-      <button class="btn-del" onclick="delCfgItem('${key}',${i})">Remove</button>
+      <button class="btn-del" onclick="runSave(this, () => delCfgItem('${key}',${i}), 'Removing…')">Remove</button>
     </div>`).join('');
 }
 
@@ -3769,7 +3772,7 @@ function editCfgItem(key, i) {
   row.innerHTML = `
     <input class="cfg-input" id="edit-cfg-${key}" style="flex:1;min-width:0" value="${escapeHtml(arr[i])}"
       onkeydown="if(event.key==='Enter')saveCfgRename('${key}',${i})">
-    <button class="btn-cfg-edit" onclick="saveCfgRename('${key}',${i})">Save</button>
+    <button class="btn-cfg-edit" onclick="runSave(this, () => saveCfgRename('${key}',${i}), 'Saving…')">Save</button>
     <button class="btn-del" style="border-color:var(--border2);color:var(--ink2)" onclick="renderCfg()">Cancel</button>`;
   const inp = row.querySelector('input');
   inp.focus();
@@ -3796,9 +3799,9 @@ async function saveCfgRename(key, i) {
   });
   pushConfig();
   saveLocal();
+  await pushChanges(n ? `✓ Renamed · ${n} updated` : '✓ Renamed');
   buildSelects();
   renderCfg();
-  await pushChanges(n ? `✓ Renamed · ${n} updated` : '✓ Renamed');
 }
 
 async function delCfgItem(key, i) {
@@ -3809,9 +3812,9 @@ async function delCfgItem(key, i) {
   arr.splice(i, 1);
   pushConfig();
   saveLocal();
+  await pushChanges('Removed');
   buildSelects();
   renderCfg();
-  await pushChanges('Removed');
 }
 
 function toggleCfgCard(head) {
@@ -3847,11 +3850,11 @@ async function addCfgItem(key) {
   S[map[key]].push(val);
   pushConfig();
   saveLocal();
+  await pushChanges('✓ Added: ' + val);
   buildSelects();
   inp.value = '';
   document.getElementById('add-'+key).classList.remove('show');
   renderCfg();
-  await pushChanges('✓ Added: ' + val);
 }
 
 // ══════════════════════════════════════════════════
@@ -3887,11 +3890,11 @@ function renderAccountsList() {
         ${isManual ? `
           <div class="acct-mtm">
             <input type="text" inputmode="decimal" oninput="onAmountInput(this)" id="mtm-${a.id}" placeholder="Update value (₹)">
-            <button onclick="updateAccountValue(${a.id})">Update</button>
+            <button onclick="runSave(this, () => updateAccountValue(${a.id}), 'Updating…')">Update</button>
           </div>` : ''}
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn-del-entry" style="background:none;border:1px solid #c8e0f8;color:var(--blue)" onclick="openAccountEditor(${a.id})">✏ Edit</button>
-          <button class="btn-del-entry" onclick="archiveAccount(${a.id})">🗄 Archive</button>
+          <button class="btn-del-entry" onclick="runSave(this, () => archiveAccount(${a.id}), 'Archiving…')">🗄 Archive</button>
         </div>
       </div>
       <div class="acct-row-right">
@@ -4044,9 +4047,9 @@ async function archiveAccount(id) {
   a.archived = true;
   queueOp('accounts', 'PATCH', id, { archived: true });
   saveLocal();
+  await pushChanges('Account archived');
   renderCfg();
   buildSelects();
-  await pushChanges('Account archived');
 }
 
 // Lists archived accounts in Config so they can be reviewed or restored.
@@ -4068,7 +4071,7 @@ function renderArchivedList() {
         <div class="acct-row-name">${escapeHtml(a.name)}<span class="acct-chip ${a.isLiability?'liab':''}">${escapeHtml(a.type)}</span><span class="acct-chip ${ownerClass}">${escapeHtml(a.owner || 'Joint')}</span></div>
         <div class="acct-row-sub">${a.notes ? escapeHtml(a.notes) + ' · ' : ''}opened ${a.openingDate || '—'}</div>
         <div style="margin-top:8px">
-          <button class="btn-cfg-edit" onclick="unarchiveAccount(${a.id})">↩ Restore</button>
+          <button class="btn-cfg-edit" onclick="runSave(this, () => unarchiveAccount(${a.id}), 'Restoring…')">↩ Restore</button>
         </div>
       </div>
       <div class="acct-row-bal ${a.isLiability?'liab':''}">₹${fmt(Math.round(accountBalance(a)))}</div>
@@ -4082,9 +4085,9 @@ async function unarchiveAccount(id) {
   a.archived = false;
   queueOp('accounts', 'PATCH', id, { archived: false });
   saveLocal();
+  await pushChanges('✓ Restored');
   renderCfg();
   buildSelects();
-  await pushChanges('✓ Restored');
 }
 
 async function updateAccountValue(id) {
@@ -4097,9 +4100,9 @@ async function updateAccountValue(id) {
   a.currentValue = v;
   queueOp('accounts', 'PATCH', id, { current_value: v });
   saveLocal();
+  await pushChanges('✓ Value updated');
   inp.value = '';
   renderCfg();
-  await pushChanges('✓ Value updated');
 }
 
 // ══════════════════════════════════════════════════
