@@ -1457,11 +1457,10 @@ select.modal-input option { background: white; }
         <div class="stat-lbl" style="color:#1a4a7a">Active Net Worth (today)</div>
         <div class="stat-val" id="d-networth" style="color:#1a4a7a">₹0</div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
-        <div class="card-split" id="d-networth-split" style="max-width:172px;margin:9px auto 0"></div>
-        <div id="d-nw-typesplit" style="display:none;margin-top:14px">
+        <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
+        <div id="d-nw-typesplit" style="display:none;margin-top:22px">
           <div class="typesplit-bar" id="d-nw-typebar"></div>
           <div class="typesplit-legend" id="d-nw-typelegend"></div>
-          <div id="d-nw-typeaccounts" class="cf-breakdown" style="display:none;margin-top:4px"></div>
         </div>
       </div>
     </div>
@@ -3745,7 +3744,23 @@ function renderDash() {
   const assetsByOwner = owners.map(o => [o, activeAccts.filter(a => !a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
   const liabByOwner   = owners.map(o => [o, activeAccts.filter(a =>  a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
   const ltByOwner     = owners.map(o => [o, longTermAccts.filter(a => ownerOwns(a) === o).reduce((s,a) => s + ownerNet(a), 0)]);
-  document.getElementById('d-networth-split').innerHTML = cardSplitHTML([{pairs: nwByOwner}]);
+  // Owner split rendered in the same row style as the bar legend so names,
+  // amounts and percentages line up under the bar instead of stretching
+  // across the card. Each owner gets their colour as the dot.
+  const OWNER_COLORS = { Edwin: 'var(--blue)', Divya: 'var(--pink)', AJ: 'var(--teal)', Joint: 'var(--amber)', Both: 'var(--amber)' };
+  const OWNER_TINTS  = { Edwin: 'rgba(45,106,159,0.08)', Divya: 'rgba(160,69,110,0.08)', AJ: 'rgba(45,138,122,0.08)', Joint: 'rgba(193,127,42,0.08)', Both: 'rgba(193,127,42,0.08)' };
+  const nwDenom = nwByOwner.reduce((s, [, a]) => s + a, 0) || 1;
+  document.getElementById('d-networth-split').innerHTML =
+    nwByOwner.filter(([, a]) => Math.round(a) !== 0).sort((a, b) => b[1] - a[1]).map(([name, amt]) => {
+      const disp = name === 'Both' ? 'Joint' : name;
+      const pct = Math.round(amt / nwDenom * 100);
+      return `<div class="cf-bd-row" style="background:${OWNER_TINTS[name] || 'transparent'}">`
+        + `<span class="cf-bd-dot" style="background:${OWNER_COLORS[name] || '#999'}"></span>`
+        + `<span>${disp}</span>`
+        + `<span class="cf-bd-amt">${amt < 0 ? '−' : ''}₹${fmt(Math.abs(Math.round(amt)))}</span>`
+        + `<span class="cf-bd-pct">${pct}%</span>`
+        + `</div>`;
+    }).join('');
 
   // "Where it's parked" — active asset balances split by account type, with
   // the same bar + tinted-legend style as the cash-flow card. Each row taps
@@ -3779,42 +3794,38 @@ function renderDash() {
         const textColor = s.type === 'Investment' ? `color:${GOLD_TEXT};` : '';
         return `<div style="${textColor}width:${s.pct}%;background:${barBg(s)}">${p >= 12 ? p + '%' : ''}</div>`;
       }).join('');
+    // Interleave: each type row, then (if expanded) its accounts inline
+    // right under it — not at the bottom of the section.
     document.getElementById('d-nw-typelegend').innerHTML =
       tsegs.map(s => {
         const exp = S.nwExpandedType === s.type;
         const caret = exp ? '▾' : '▸';
-        return `<div class="cf-bd-row" onclick="toggleNwType('${s.type.replace(/'/g, "\\'")}')" style="cursor:pointer;background:${rowTint(s)}">`
+        let html = `<div class="cf-bd-row" onclick="toggleNwType('${s.type.replace(/'/g, "\\'")}')" style="cursor:pointer;background:${rowTint(s)}">`
           + `<span class="cf-bd-dot" style="background:${dotBg(s)}"></span>`
           + `<span>${caret} ${escapeHtml(s.type)}</span>`
           + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
           + `<span class="cf-bd-pct">${Math.round(s.pct)}%</span>`
           + `</div>`;
+        if (exp) {
+          const typeAccts = activeAccts
+            .filter(a => !a.isLiability && a.type === s.type)
+            .map(a => ({ a, bal: accountBalance(a) }))
+            .filter(x => x.bal > 0)
+            .sort((x, y) => y.bal - x.bal);
+          const typeTotal = typeAccts.reduce((acc, x) => acc + x.bal, 0) || 1;
+          html += typeAccts.map(({ a, bal }) =>
+            `<div class="cf-bd-row" onclick="setLogAccountFilter(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
+            + `<span></span>`
+            + `<span style="padding-left:4px;opacity:0.9">${escapeHtml(a.name)}</span>`
+            + `<span class="cf-bd-amt">₹${fmt(Math.round(bal))}</span>`
+            + `<span class="cf-bd-pct">${Math.round(bal / typeTotal * 100)}%</span>`
+            + `</div>`).join('');
+        }
+        return html;
       }).join('');
-    // Inline expansion of accounts for the selected type — same row shape,
-    // no dot, slightly subdued. Tap a single account to filter the Log to it.
-    const acctBox = document.getElementById('d-nw-typeaccounts');
-    if (S.nwExpandedType && tsegs.some(s => s.type === S.nwExpandedType)) {
-      const typeAccts = activeAccts
-        .filter(a => !a.isLiability && a.type === S.nwExpandedType)
-        .map(a => ({ a, bal: accountBalance(a) }))
-        .filter(x => x.bal > 0)
-        .sort((x, y) => y.bal - x.bal);
-      const typeTotal = typeAccts.reduce((s, x) => s + x.bal, 0) || 1;
-      acctBox.innerHTML = typeAccts.map(({ a, bal }) =>
-        `<div class="cf-bd-row" onclick="setLogAccountFilter(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
-        + `<span></span>`
-        + `<span style="padding-left:4px;opacity:0.9">${escapeHtml(a.name)}</span>`
-        + `<span class="cf-bd-amt">₹${fmt(Math.round(bal))}</span>`
-        + `<span class="cf-bd-pct">${Math.round(bal / typeTotal * 100)}%</span>`
-        + `</div>`).join('');
-      acctBox.style.display = '';
-    } else {
-      acctBox.style.display = 'none';
-    }
     nwTypeBox.style.display = '';
   } else {
     nwTypeBox.style.display = 'none';
-    document.getElementById('d-nw-typeaccounts').style.display = 'none';
   }
 
   document.getElementById('d-assets-split').innerHTML   = cardSplitHTML([{pairs: assetsByOwner}]);
