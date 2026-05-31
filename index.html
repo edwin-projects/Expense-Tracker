@@ -3542,9 +3542,11 @@ function renderDash() {
       const r = (i) => firstIdx === i && lastIdx === i ? '12px'
                      : firstIdx === i ? '12px 0 0 12px'
                      : lastIdx === i ? '0 12px 12px 0' : '0';
-      const GOLD_BAR = 'linear-gradient(135deg, #8a6d1c 0%, #d4af37 35%, #f4e285 50%, #d4af37 65%, #8a6d1c 100%)';
+      const GOLD_BAR = 'linear-gradient(135deg, #b08949 0%, #d8c082 35%, #f0e2b6 50%, #d8c082 65%, #b08949 100%)';
       setSeg(spendFill, spendPct, 0,                      'var(--red)',   r(0));
       setSeg(invFill,   shownInv, spendPct,               GOLD_BAR,       r(1));
+      // Champagne is too pale for white text — use a dark engraved brown.
+      invFill.style.color = '#5e4818';
       setSeg(savFill,   shownSav, spendPct + shownInv,    'var(--green)', r(2));
     }
     // Legend rows — Spent / Invested / Savings — with ₹ amount and %.
@@ -3553,11 +3555,11 @@ function renderDash() {
     // Premium gold for Invested — gradient on the dot, faint warm-gold tint
     // on the row. Signals growth/wealth and stays clearly apart from the
     // red of Spent (which the flat amber was starting to mimic).
-    const GOLD_DOT = 'radial-gradient(circle at 35% 30%, #f4e285 0%, #d4af37 50%, #8a6d1c 100%)';
+    const GOLD_DOT = 'radial-gradient(circle at 32% 28%, #f5e8c4 0%, #d8c082 50%, #b08949 100%)';
     const rows = [
-      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',  label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
-      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: 'rgba(212,175,55,0.14)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
-      { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',  label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
+      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
+      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: 'rgba(216,192,130,0.16)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
+      { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
     ];
     breakdown.innerHTML = rows.map(rw => {
       const sign    = rw.amt < 0 ? '−' : '';
