@@ -1462,7 +1462,7 @@ select.modal-input option { background: white; }
         <div class="stat-val" id="d-networth" style="color:#1a4a7a">₹0</div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
         <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
-        <div id="d-nw-typesplit" style="display:none;margin-top:22px">
+        <div id="d-nw-typesplit" style="display:none;margin-top:10px">
           <div class="typesplit-bar" id="d-nw-typebar"></div>
           <div class="typesplit-legend" id="d-nw-typelegend"></div>
         </div>
@@ -1488,7 +1488,7 @@ select.modal-input option { background: white; }
         <div class="stat-val" id="d-longterm" style="color:#6b5d3f">₹0</div>
         <div class="stat-sub" id="d-longterm-sub" style="color:#6b5d3f">Tracked apart from active net worth</div>
         <div class="cf-breakdown" id="d-longterm-split" style="margin:10px auto 0"></div>
-        <div id="d-lt-typesplit" style="display:none;margin-top:22px">
+        <div id="d-lt-typesplit" style="display:none;margin-top:10px">
           <div class="typesplit-bar" id="d-lt-typebar"></div>
           <div class="typesplit-legend" id="d-lt-typelegend"></div>
         </div>
@@ -2848,6 +2848,27 @@ function toggleLtType(type) {
   renderDash();
 }
 
+// Jump to a specific account's row in the Config tab and briefly highlight
+// it — the "see the account itself" destination for taps from net-worth /
+// long-term breakdowns. The Log is rarely what you want when you're asking
+// "what is this holding".
+function gotoAccount(id) {
+  const navItem = [...document.querySelectorAll('.nav-item')]
+    .find(n => n.querySelector('.nav-label')?.textContent.trim() === 'CONFIG');
+  if (navItem) goPage('cfg', navItem); else renderCfg();
+  setTimeout(() => {
+    const row = document.getElementById('acct-row-' + id);
+    if (!row) return;
+    row.closest('.cfg-card')?.classList.remove('collapsed');
+    row.closest('.acct-group')?.classList.remove('collapsed');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const prev = row.style.background;
+    row.style.transition = 'background 0.4s';
+    row.style.background = 'rgba(193,127,42,0.18)';
+    setTimeout(() => { row.style.background = prev; }, 1400);
+  }, 60);
+}
+
 function setLogPersonFilterGo(name, kind, type, anchor) {
   S.logFilter = name;
   S.logKind = kind || 'All';
@@ -3636,7 +3657,7 @@ function renderTypeBreakdown(boxId, barId, legendId, accts, total, expandedType,
           .sort((x, y) => y.bal - x.bal);
         const typeTotal = typeAccts.reduce((acc, x) => acc + x.bal, 0) || 1;
         html += typeAccts.map(({ a, bal }) =>
-          `<div class="cf-bd-row sub" onclick="setLogAccountFilter(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
+          `<div class="cf-bd-row sub" onclick="gotoAccount(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
           + `<span>${escapeHtml(a.name)}</span>`
           + `<span class="cf-bd-amt">₹${fmt(Math.round(bal))}</span>`
           + `<span class="cf-bd-pct">${Math.round(bal / typeTotal * 100)}%</span>`
