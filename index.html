@@ -734,7 +734,7 @@ select.finput option { background: white; color: var(--ink); }
 /* Spend split by type ("Where it goes") */
 .typesplit-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: var(--border); width: 172px; margin: 0 auto; }
 .typesplit-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
-.typesplit-legend { display: flex; flex-direction: column; gap: 4px; margin: 11px auto 0; width: 172px; }
+.typesplit-legend { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
 .tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
 .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .tl-pct { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -743,7 +743,7 @@ select.finput option { background: white; color: var(--ink); }
    as the spend bar, stacked rows that fit inside the 172px bar width.
    Each row carries a subtle background tint of its accent colour so it
    reads as a small table aligned with the bar segments. */
-.cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 12px auto 0; width: 172px; }
+.cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
 .cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 58px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 3px 4px; border-radius: 5px; box-sizing: border-box; }
 .cf-bd-dot { width: 8px; height: 8px; border-radius: 50%; }
 .cf-bd-row > :nth-child(2) { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3542,16 +3542,21 @@ function renderDash() {
       const r = (i) => firstIdx === i && lastIdx === i ? '12px'
                      : firstIdx === i ? '12px 0 0 12px'
                      : lastIdx === i ? '0 12px 12px 0' : '0';
+      const GOLD_BAR = 'linear-gradient(135deg, #8a6d1c 0%, #d4af37 35%, #f4e285 50%, #d4af37 65%, #8a6d1c 100%)';
       setSeg(spendFill, spendPct, 0,                      'var(--red)',   r(0));
-      setSeg(invFill,   shownInv, spendPct,               'var(--amber)', r(1));
+      setSeg(invFill,   shownInv, spendPct,               GOLD_BAR,       r(1));
       setSeg(savFill,   shownSav, spendPct + shownInv,    'var(--green)', r(2));
     }
     // Legend rows — Spent / Invested / Savings — with ₹ amount and %.
     const savAmt = net - invTotal;
     const savPct = 100 - spendPct - invPct;
+    // Premium gold for Invested — gradient on the dot, faint warm-gold tint
+    // on the row. Signals growth/wealth and stays clearly apart from the
+    // red of Spent (which the flat amber was starting to mimic).
+    const GOLD_DOT = 'radial-gradient(circle at 35% 30%, #f4e285 0%, #d4af37 50%, #8a6d1c 100%)';
     const rows = [
       { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',  label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
-      ...(invTotal > 0 ? [{ color: 'var(--amber)', tint: 'rgba(193,127,42,0.08)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
+      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: 'rgba(212,175,55,0.14)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
       { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',  label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
     ];
     breakdown.innerHTML = rows.map(rw => {
