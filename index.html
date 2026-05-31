@@ -735,6 +735,13 @@ select.finput option { background: white; color: var(--ink); }
 .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .tl-pct { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
+/* Spent / Invested / Free breakdown shown under the spend bar */
+.cf-breakdown { display: flex; flex-direction: column; gap: 5px; margin: 12px auto 0; width: 240px; max-width: 100%; padding: 0 4px; }
+.cf-bd-row { display: grid; grid-template-columns: 9px 1fr auto 48px; gap: 10px; align-items: center; font-size: 12.5px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.cf-bd-dot { width: 9px; height: 9px; border-radius: 50%; }
+.cf-bd-amt { font-weight: 600; color: var(--ink); }
+.cf-bd-pct { font-weight: 700; color: var(--ink); text-align: right; }
+
 #backup-reminder {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin: 10px 14px 0; padding: 10px 12px;
@@ -1423,6 +1430,7 @@ select.modal-input option { background: white; }
           </div>
           <div class="spend-overflow" id="d-spend-over"></div>
         </div>
+        <div class="cf-breakdown" id="d-cf-breakdown" style="display:none"></div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
         <div id="d-typesplit" style="display:none;margin-top:16px">
           <div class="typesplit-bar" id="d-typesplit-bar"></div>
@@ -3486,6 +3494,7 @@ function renderDash() {
   const spendFill = document.getElementById('d-spend-fill');
   const spendOver = document.getElementById('d-spend-over');
   const invFill = document.getElementById('d-spend-fill-inv');
+  const breakdown = document.getElementById('d-cf-breakdown');
   if (incTotal > 0) {
     const spendPct = Math.round(expTotal / incTotal * 100);
     const invPct   = Math.round(invTotal / incTotal * 100);
@@ -3495,19 +3504,21 @@ function renderDash() {
     const label = spendPct + '% spent';
     document.getElementById('d-spend-label-bg').textContent = label;
     document.getElementById('d-spend-label-fg').textContent = label;
+    const spentColor = over ? '#d96459'
+      : spendPct < 65 ? 'var(--green)'
+      : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
     if (over) {
       // The 100% bar (light red) stays full; the excess overflows past the
       // dashed 100% mark as a dark-red extension in the same bar.
       spendFill.style.width = '100%';
-      spendFill.style.background = '#d96459';
+      spendFill.style.background = spentColor;
       spendFill.style.borderRadius = '12px 0 0 12px';
       spendOver.style.display = 'block';
       spendOver.style.width = Math.min((spendPct - 100) / 100 * 172, 60) + 'px';
       invFill.style.display = 'none';
     } else {
-      // Spend ratio: green under 65%, amber 65–99%, red at 100%.
       spendFill.style.width = spendPct + '%';
-      spendFill.style.background = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
+      spendFill.style.background = spentColor;
       spendOver.style.display = 'none';
       const hasInv = invTotal > 0 && spendPct < 100;
       spendFill.style.borderRadius = hasInv && spendPct > 0 ? '12px 0 0 12px' : '12px';
@@ -3527,20 +3538,36 @@ function renderDash() {
         invFill.style.display = 'none';
       }
     }
-    if (invTotal > 0) {
-      const free = net - invTotal;
-      netSub.style.display = '';
-      netSub.style.color = free < 0 ? 'var(--red)' : '';
-      netSub.textContent = `Invested ₹${fmt(Math.round(invTotal))} · Free ${free < 0 ? '−' : ''}₹${fmt(Math.round(Math.abs(free)))}`;
-    } else {
-      netSub.style.display = 'none';
-      netSub.style.color = '';
-    }
+    // Spent / Invested / Free legend with both rupees and %.
+    const free = net - invTotal;
+    const freePct = 100 - spendPct - invPct;
+    const rows = [
+      { color: spentColor, label: 'Spent',    amt: expTotal, pct: spendPct },
+      ...(invTotal > 0 ? [{ color: '#5b6ed8', label: 'Invested', amt: invTotal, pct: invPct }] : []),
+      { color: null, label: 'Free', amt: free, pct: freePct, isFree: true },
+    ];
+    breakdown.innerHTML = rows.map(r => {
+      const dotStyle = r.color
+        ? `background:${r.color}`
+        : `background:transparent;border:1.5px solid var(--ink3)`;
+      const sign = r.amt < 0 ? '−' : '';
+      const pctSign = r.pct < 0 ? '−' : '';
+      const valColor = r.isFree && r.amt < 0 ? 'color:var(--red)' : '';
+      return `<div class="cf-bd-row">`
+        + `<span class="cf-bd-dot" style="${dotStyle}"></span>`
+        + `<span>${r.label}</span>`
+        + `<span class="cf-bd-amt" style="${valColor}">${sign}₹${fmt(Math.round(Math.abs(r.amt)))}</span>`
+        + `<span class="cf-bd-pct" style="${valColor}">${pctSign}${Math.abs(r.pct)}%</span>`
+        + `</div>`;
+    }).join('');
+    breakdown.style.display = '';
+    netSub.style.display = 'none';
   } else {
     spendWrap.style.display = 'none';
     spendBar.classList.remove('over');
     spendOver.style.display = 'none';
     invFill.style.display = 'none';
+    breakdown.style.display = 'none';
     netSub.style.display = '';
     netSub.style.color = '';
     const base = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
