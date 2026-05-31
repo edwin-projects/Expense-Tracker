@@ -745,6 +745,10 @@ select.finput option { background: white; color: var(--ink); }
    reads as a small table aligned with the bar segments. */
 .cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
 .cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 58px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 3px 4px; border-radius: 5px; box-sizing: border-box; }
+/* Account sub-rows under an expanded type — no dot column, no horizontal
+   padding, so long account names get as much room as possible before being
+   truncated. */
+.cf-bd-row.sub { grid-template-columns: minmax(0, 1fr) 58px 28px; padding: 3px 0; }
 .cf-bd-dot { width: 8px; height: 8px; border-radius: 50%; }
 .cf-bd-row > :nth-child(2) { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cf-bd-amt { font-weight: 600; color: var(--ink); text-align: right; }
@@ -3814,9 +3818,8 @@ function renderDash() {
             .sort((x, y) => y.bal - x.bal);
           const typeTotal = typeAccts.reduce((acc, x) => acc + x.bal, 0) || 1;
           html += typeAccts.map(({ a, bal }) =>
-            `<div class="cf-bd-row" onclick="setLogAccountFilter(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
-            + `<span></span>`
-            + `<span style="padding-left:4px;opacity:0.9">${escapeHtml(a.name)}</span>`
+            `<div class="cf-bd-row sub" onclick="setLogAccountFilter(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
+            + `<span>${escapeHtml(a.name)}</span>`
             + `<span class="cf-bd-amt">₹${fmt(Math.round(bal))}</span>`
             + `<span class="cf-bd-pct">${Math.round(bal / typeTotal * 100)}%</span>`
             + `</div>`).join('');
