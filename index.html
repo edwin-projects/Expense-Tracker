@@ -4400,8 +4400,18 @@ function parseAmount(str) {
 }
 
 function onAmountInput(el) {
-  const digitsBefore = el.value.slice(0, el.selectionStart).replace(/[^0-9]/g, '').length;
-  el.value = formatIndianNumber(el.value);
+  const oldVal = el.value;
+  const wasAtEnd = el.selectionStart === oldVal.length;
+  const digitsBefore = oldVal.slice(0, el.selectionStart).replace(/[^0-9]/g, '').length;
+  el.value = formatIndianNumber(oldVal);
+  // When typing at the end (the common case), keep the cursor at the end —
+  // otherwise the digit-counting restore lands before a trailing decimal
+  // point, so the next digit gets inserted in the integer part instead of
+  // after the dot. Mid-input edits still use the digit-count position.
+  if (wasAtEnd) {
+    el.setSelectionRange(el.value.length, el.value.length);
+    return;
+  }
   let pos = 0, count = 0;
   while (pos < el.value.length && count < digitsBefore) {
     if (el.value[pos] >= '0' && el.value[pos] <= '9') count++;
