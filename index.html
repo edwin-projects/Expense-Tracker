@@ -1418,6 +1418,7 @@ select.modal-input option { background: white; }
           <div class="spend-bar" id="d-spend-bar">
             <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
             <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
+            <div class="spend-fill" id="d-spend-fill-inv" style="display:none;background:#5b6ed8;border-radius:0;left:0;width:0"></div>
             <div class="spend-bracket"></div>
           </div>
           <div class="spend-overflow" id="d-spend-over"></div>
@@ -3463,6 +3464,14 @@ function renderDash() {
   const inc = filteredIncome();
   const incTotal = inc.reduce((s,i) => s + Number(i.amount), 0);
   const expTotal = es.reduce((s,e) => s + Number(e.amount), 0);
+  // Money parked into investments this period — transfers from an active
+  // account (not already Investment/Asset, so fund switches don't count) into
+  // an Investment or Asset account.
+  const acctType = id => (S.accounts.find(a => a.id === id) || {}).type;
+  const invTotal = S.transfers.filter(t => inPeriod(t.date)
+    && !['Investment','Asset'].includes(acctType(t.fromAccount))
+    && ['Investment','Asset'].includes(acctType(t.toAccount))
+  ).reduce((s,t) => s + Number(t.amount), 0);
   const net = incTotal - expTotal;
   document.getElementById('d-cf-income').textContent  = '₹' + fmt(incTotal);
   document.getElementById('d-cf-income-sub').textContent = inc.length + ' entries';
@@ -3476,11 +3485,12 @@ function renderDash() {
   const spendBar = document.getElementById('d-spend-bar');
   const spendFill = document.getElementById('d-spend-fill');
   const spendOver = document.getElementById('d-spend-over');
+  const invFill = document.getElementById('d-spend-fill-inv');
   if (incTotal > 0) {
     const spendPct = Math.round(expTotal / incTotal * 100);
+    const invPct   = Math.round(invTotal / incTotal * 100);
     const over = spendPct > 100;
     spendWrap.style.display = 'flex';
-    netSub.style.display = 'none';
     spendBar.classList.toggle('over', over);
     const label = spendPct + '% spent';
     document.getElementById('d-spend-label-bg').textContent = label;
@@ -3493,19 +3503,48 @@ function renderDash() {
       spendFill.style.borderRadius = '12px 0 0 12px';
       spendOver.style.display = 'block';
       spendOver.style.width = Math.min((spendPct - 100) / 100 * 172, 60) + 'px';
+      invFill.style.display = 'none';
     } else {
       // Spend ratio: green under 65%, amber 65–99%, red at 100%.
       spendFill.style.width = spendPct + '%';
       spendFill.style.background = spendPct < 65 ? 'var(--green)' : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
-      spendFill.style.borderRadius = '12px';
       spendOver.style.display = 'none';
+      const hasInv = invTotal > 0 && spendPct < 100;
+      spendFill.style.borderRadius = hasInv && spendPct > 0 ? '12px 0 0 12px' : '12px';
+      if (hasInv) {
+        // Invested segment sits right after spent; cap so the bar never exceeds 100%.
+        const shownInv = Math.max(0, Math.min(invPct, 100 - spendPct));
+        const reachesEnd = spendPct + shownInv >= 100;
+        const startsAtZero = spendPct === 0;
+        invFill.style.display = '';
+        invFill.style.left = spendPct + '%';
+        invFill.style.width = shownInv + '%';
+        invFill.style.borderRadius =
+          startsAtZero && reachesEnd ? '12px' :
+          startsAtZero ? '12px 0 0 12px' :
+          reachesEnd ? '0 12px 12px 0' : '0';
+      } else {
+        invFill.style.display = 'none';
+      }
+    }
+    if (invTotal > 0) {
+      const free = net - invTotal;
+      netSub.style.display = '';
+      netSub.style.color = free < 0 ? 'var(--red)' : '';
+      netSub.textContent = `Invested ₹${fmt(Math.round(invTotal))} · Free ${free < 0 ? '−' : ''}₹${fmt(Math.round(Math.abs(free)))}`;
+    } else {
+      netSub.style.display = 'none';
+      netSub.style.color = '';
     }
   } else {
     spendWrap.style.display = 'none';
     spendBar.classList.remove('over');
     spendOver.style.display = 'none';
+    invFill.style.display = 'none';
     netSub.style.display = '';
-    netSub.textContent = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
+    netSub.style.color = '';
+    const base = net >= 0 ? 'Surplus for this period' : 'Deficit for this period';
+    netSub.textContent = invTotal > 0 ? `${base} · Invested ₹${fmt(Math.round(invTotal))}` : base;
   }
   const netCard = document.getElementById('d-cf-net-card');
   netCard.style.background  = net >= 0 ? 'var(--green-bg)' : '#fff0f0';
