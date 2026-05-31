@@ -706,7 +706,11 @@ select.finput option { background: white; color: var(--ink); }
 }
 .spend-fill {
   position: absolute; left: 0; top: 0; height: 100%;
-  border-radius: 12px; overflow: hidden; transition: width .3s ease;
+  border-radius: 12px; overflow: hidden;
+  transition: width .3s ease, left .3s ease;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .sb-label {
   position: absolute; top: 0; left: 0; width: 172px; height: 24px;
@@ -1423,9 +1427,9 @@ select.modal-input option { background: white; }
         <div class="stat-val" id="d-cf-net">₹0</div>
         <div class="spend-wrap" id="d-spend-wrap" style="display:none">
           <div class="spend-bar" id="d-spend-bar">
-            <div class="sb-label sb-label-bg" id="d-spend-label-bg"></div>
-            <div class="spend-fill" id="d-spend-fill"><div class="sb-label sb-label-fg" id="d-spend-label-fg"></div></div>
-            <div class="spend-fill" id="d-spend-fill-inv" style="display:none;background:#5b6ed8;border-radius:0;left:0;width:0"></div>
+            <div class="spend-fill" id="d-spend-fill"></div>
+            <div class="spend-fill" id="d-spend-fill-inv" style="display:none;background:var(--amber);border-radius:0;left:0;width:0"></div>
+            <div class="spend-fill" id="d-spend-fill-sav" style="display:none;background:var(--green);border-radius:0;left:0;width:0"></div>
             <div class="spend-bracket"></div>
           </div>
           <div class="spend-overflow" id="d-spend-over"></div>
@@ -3494,70 +3498,65 @@ function renderDash() {
   const spendFill = document.getElementById('d-spend-fill');
   const spendOver = document.getElementById('d-spend-over');
   const invFill = document.getElementById('d-spend-fill-inv');
+  const savFill = document.getElementById('d-spend-fill-sav');
   const breakdown = document.getElementById('d-cf-breakdown');
+  // Position a bar segment and put its own % inside (hidden if too narrow).
+  const setSeg = (el, pct, leftPct, bg, radius) => {
+    if (pct <= 0) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.style.left = leftPct + '%';
+    el.style.width = pct + '%';
+    el.style.background = bg;
+    el.style.borderRadius = radius;
+    el.textContent = pct >= 12 ? pct + '%' : '';
+  };
   if (incTotal > 0) {
     const spendPct = Math.round(expTotal / incTotal * 100);
     const invPct   = Math.round(invTotal / incTotal * 100);
     const over = spendPct > 100;
     spendWrap.style.display = 'flex';
     spendBar.classList.toggle('over', over);
-    const label = spendPct + '% spent';
-    document.getElementById('d-spend-label-bg').textContent = label;
-    document.getElementById('d-spend-label-fg').textContent = label;
-    const spentColor = over ? '#d96459'
-      : spendPct < 65 ? 'var(--green)'
-      : spendPct < 100 ? 'var(--amber)' : 'var(--red)';
     if (over) {
-      // The 100% bar (light red) stays full; the excess overflows past the
-      // dashed 100% mark as a dark-red extension in the same bar.
-      spendFill.style.width = '100%';
-      spendFill.style.background = spentColor;
-      spendFill.style.borderRadius = '12px 0 0 12px';
+      // Spent overflowed income — fill the whole bar in dark red, extend a
+      // small overflow segment past the dashed 100% marker, and hide the
+      // invested/savings segments (no room).
+      setSeg(spendFill, 100, 0, 'var(--red)', '12px 0 0 12px');
+      spendFill.textContent = spendPct + '%';
       spendOver.style.display = 'block';
       spendOver.style.width = Math.min((spendPct - 100) / 100 * 172, 60) + 'px';
       invFill.style.display = 'none';
+      savFill.style.display = 'none';
     } else {
-      spendFill.style.width = spendPct + '%';
-      spendFill.style.background = spentColor;
       spendOver.style.display = 'none';
-      const hasInv = invTotal > 0 && spendPct < 100;
-      spendFill.style.borderRadius = hasInv && spendPct > 0 ? '12px 0 0 12px' : '12px';
-      if (hasInv) {
-        // Invested segment sits right after spent; cap so the bar never exceeds 100%.
-        const shownInv = Math.max(0, Math.min(invPct, 100 - spendPct));
-        const reachesEnd = spendPct + shownInv >= 100;
-        const startsAtZero = spendPct === 0;
-        invFill.style.display = '';
-        invFill.style.left = spendPct + '%';
-        invFill.style.width = shownInv + '%';
-        invFill.style.borderRadius =
-          startsAtZero && reachesEnd ? '12px' :
-          startsAtZero ? '12px 0 0 12px' :
-          reachesEnd ? '0 12px 12px 0' : '0';
-      } else {
-        invFill.style.display = 'none';
-      }
+      const shownInv = Math.max(0, Math.min(invPct, 100 - spendPct));
+      const shownSav = Math.max(0, 100 - spendPct - shownInv);
+      const visible = [spendPct, shownInv, shownSav].map(v => v > 0);
+      const firstIdx = visible.indexOf(true);
+      const lastIdx  = visible.lastIndexOf(true);
+      const r = (i) => firstIdx === i && lastIdx === i ? '12px'
+                     : firstIdx === i ? '12px 0 0 12px'
+                     : lastIdx === i ? '0 12px 12px 0' : '0';
+      setSeg(spendFill, spendPct, 0,                      'var(--red)',   r(0));
+      setSeg(invFill,   shownInv, spendPct,               'var(--amber)', r(1));
+      setSeg(savFill,   shownSav, spendPct + shownInv,    'var(--green)', r(2));
     }
-    // Spent / Invested / Free legend with both rupees and %.
-    const free = net - invTotal;
-    const freePct = 100 - spendPct - invPct;
+    // Legend rows — Spent / Invested / Savings — with ₹ amount and %.
+    const savAmt = net - invTotal;
+    const savPct = 100 - spendPct - invPct;
     const rows = [
-      { color: spentColor, label: 'Spent',    amt: expTotal, pct: spendPct },
-      ...(invTotal > 0 ? [{ color: '#5b6ed8', label: 'Invested', amt: invTotal, pct: invPct }] : []),
-      { color: null, label: 'Free', amt: free, pct: freePct, isFree: true },
+      { color: 'var(--red)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
+      ...(invTotal > 0 ? [{ color: 'var(--amber)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
+      { color: 'var(--green)', label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
     ];
-    breakdown.innerHTML = rows.map(r => {
-      const dotStyle = r.color
-        ? `background:${r.color}`
-        : `background:transparent;border:1.5px solid var(--ink3)`;
-      const sign = r.amt < 0 ? '−' : '';
-      const pctSign = r.pct < 0 ? '−' : '';
-      const valColor = r.isFree && r.amt < 0 ? 'color:var(--red)' : '';
+    breakdown.innerHTML = rows.map(rw => {
+      const sign    = rw.amt < 0 ? '−' : '';
+      const pctSign = rw.pct < 0 ? '−' : '';
+      const c = rw.isNeg ? 'color:var(--red)' : '';
       return `<div class="cf-bd-row">`
-        + `<span class="cf-bd-dot" style="${dotStyle}"></span>`
-        + `<span>${r.label}</span>`
-        + `<span class="cf-bd-amt" style="${valColor}">${sign}₹${fmt(Math.round(Math.abs(r.amt)))}</span>`
-        + `<span class="cf-bd-pct" style="${valColor}">${pctSign}${Math.abs(r.pct)}%</span>`
+        + `<span class="cf-bd-dot" style="background:${rw.color}"></span>`
+        + `<span>${rw.label}</span>`
+        + `<span class="cf-bd-amt" style="${c}">${sign}₹${fmt(Math.round(Math.abs(rw.amt)))}</span>`
+        + `<span class="cf-bd-pct" style="${c}">${pctSign}${Math.abs(rw.pct)}%</span>`
         + `</div>`;
     }).join('');
     breakdown.style.display = '';
@@ -3567,6 +3566,7 @@ function renderDash() {
     spendBar.classList.remove('over');
     spendOver.style.display = 'none';
     invFill.style.display = 'none';
+    savFill.style.display = 'none';
     breakdown.style.display = 'none';
     netSub.style.display = '';
     netSub.style.color = '';
