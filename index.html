@@ -740,11 +740,13 @@ select.finput option { background: white; color: var(--ink); }
 .tl-pct { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* Spent / Invested / Savings (and Spend-by-Type) breakdown — same format
-   as the spend bar, stacked rows that fit inside the 172px bar width. */
-.cf-breakdown { display: flex; flex-direction: column; gap: 4px; margin: 12px auto 0; width: 172px; }
-.cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 64px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+   as the spend bar, stacked rows that fit inside the 172px bar width.
+   Each row carries a subtle background tint of its accent colour so it
+   reads as a small table aligned with the bar segments. */
+.cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 12px auto 0; width: 172px; }
+.cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 58px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 3px 4px; border-radius: 5px; box-sizing: border-box; }
 .cf-bd-dot { width: 8px; height: 8px; border-radius: 50%; }
-.cf-bd-row > :nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cf-bd-row > :nth-child(2) { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cf-bd-amt { font-weight: 600; color: var(--ink); text-align: right; }
 .cf-bd-pct { font-weight: 700; color: var(--ink); text-align: right; }
 
@@ -3487,12 +3489,14 @@ function renderDash() {
     && ['Investment','Asset'].includes(acctType(t.toAccount))
   ).reduce((s,t) => s + Number(t.amount), 0);
   const net = incTotal - expTotal;
-  document.getElementById('d-cf-income').textContent  = '₹' + fmt(incTotal);
+  // Big cash-flow numbers are rounded — decimals are noise at this size.
+  // Smaller displays (legend amounts, splits) keep them.
+  document.getElementById('d-cf-income').textContent  = '₹' + fmt(Math.round(incTotal));
   document.getElementById('d-cf-income-sub').textContent = inc.length + ' entries';
-  document.getElementById('d-cf-expense').textContent = '₹' + fmt(expTotal);
+  document.getElementById('d-cf-expense').textContent = '₹' + fmt(Math.round(expTotal));
   document.getElementById('d-cf-expense-sub').textContent = es.length + ' entries';
   const netEl = document.getElementById('d-cf-net');
-  netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.abs(net));
+  netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.round(Math.abs(net)));
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
   const netSub = document.getElementById('d-cf-net-sub');
   const spendWrap = document.getElementById('d-spend-wrap');
@@ -3546,15 +3550,15 @@ function renderDash() {
     const savAmt = net - invTotal;
     const savPct = 100 - spendPct - invPct;
     const rows = [
-      { color: 'var(--red)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
-      ...(invTotal > 0 ? [{ color: 'var(--amber)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
-      { color: 'var(--green)', label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
+      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',  label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
+      ...(invTotal > 0 ? [{ color: 'var(--amber)', tint: 'rgba(193,127,42,0.08)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
+      { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',  label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
     ];
     breakdown.innerHTML = rows.map(rw => {
       const sign    = rw.amt < 0 ? '−' : '';
       const pctSign = rw.pct < 0 ? '−' : '';
       const c = rw.isNeg ? 'color:var(--red)' : '';
-      return `<div class="cf-bd-row">`
+      return `<div class="cf-bd-row" style="background:${rw.tint}">`
         + `<span class="cf-bd-dot" style="background:${rw.color}"></span>`
         + `<span>${rw.label}</span>`
         + `<span class="cf-bd-amt" style="${c}">${sign}₹${fmt(Math.round(Math.abs(rw.amt)))}</span>`
@@ -3594,8 +3598,13 @@ function renderDash() {
         const p = Math.round(s.pct);
         return `<div style="width:${s.pct}%;background:${s.color}">${p >= 12 ? p + '%' : ''}</div>`;
       }).join('');
+    const tintOf = hex => {
+      if (!hex || hex[0] !== '#' || hex.length < 7) return '';
+      const n = i => parseInt(hex.substr(1 + i*2, 2), 16);
+      return `rgba(${n(0)},${n(1)},${n(2)},0.08)`;
+    };
     document.getElementById('d-typesplit-legend').innerHTML =
-      segs.map(s => `<div class="cf-bd-row">`
+      segs.map(s => `<div class="cf-bd-row" style="background:${tintOf(s.color)}">`
         + `<span class="cf-bd-dot" style="background:${s.color}"></span>`
         + `<span>${escapeHtml(s.type)}</span>`
         + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
