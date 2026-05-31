@@ -1380,6 +1380,10 @@ select.modal-input option { background: white; }
       <span id="log-account-banner-text"></span>
       <button onclick="clearLogAccountFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
     </div>
+    <div id="log-accttype-banner" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;margin:0 0 10px;font-size:12.5px;color:var(--amber);align-items:center;gap:8px">
+      <span id="log-accttype-banner-text"></span>
+      <button onclick="clearLogAcctTypeFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
+    </div>
     <div id="log-period-banner" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;margin:0 0 10px;font-size:12.5px;color:var(--amber);align-items:center;gap:8px">
       <span id="log-period-banner-text"></span>
       <button onclick="clearLogPeriodFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
@@ -1449,11 +1453,15 @@ select.modal-input option { background: white; }
 
     <div class="sec-label">Net Worth</div>
     <div class="stat-grid">
-      <div class="stat-card full" style="background:#eef4fb;border-color:#bcd2e6;text-align:center">
+      <div class="stat-card full" id="d-networth-card" style="background:#eef4fb;border-color:#bcd2e6;text-align:center">
         <div class="stat-lbl" style="color:#1a4a7a">Active Net Worth (today)</div>
         <div class="stat-val" id="d-networth" style="color:#1a4a7a">₹0</div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
         <div class="card-split" id="d-networth-split"></div>
+        <div id="d-nw-typesplit" style="display:none;margin-top:14px">
+          <div class="typesplit-bar" id="d-nw-typebar"></div>
+          <div class="typesplit-legend" id="d-nw-typelegend"></div>
+        </div>
       </div>
     </div>
     <div class="stat-grid">
@@ -1932,6 +1940,7 @@ let S = {
   logType: 'All',
   logAddedBy: 'All',
   logAccountFilter: null,
+  logAcctTypeFilter: null,
   logPeriod: 'all',
   logReturnAnchor: null,
   pendingOps: [],
@@ -2363,6 +2372,15 @@ const TYPE_COLORS = {
 };
 const TYPE_FALLBACK = ['#6b8fb5', '#9b7bb8', '#b58a6b', '#7b9b8a'];
 
+// Colours for the "Where it's parked" net-worth-by-account-type split.
+const ASSET_TYPE_COLORS = {
+  'Bank':       '#5b6ed8',
+  'Cash':       '#6fae84',
+  'Investment': '#cba135',
+  'Asset':      '#a4724e',
+  'Receivable': '#9b7bb8',
+};
+
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
 // Account picker: grouped by category (type). Within each category the
@@ -2731,6 +2749,7 @@ function returnToSummary() {
 
 function setLogAccountFilter(id) {
   S.logAccountFilter = id;
+  S.logAcctTypeFilter = null;
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logType = 'All';
@@ -2759,6 +2778,7 @@ function clearAllLogFilters() {
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
+  S.logAcctTypeFilter = null;
   S.logPeriod = 'all';
   S.logSearch = '';
   const search = document.getElementById('log-search-input');
@@ -2774,6 +2794,26 @@ function setCategoryFilter(val) {
 }
 
 // Tapping a person row in a Summary split jumps to the Log filtered to them
+// Tap-driven Log filter used by Summary cards (cash-flow rows, net-worth
+// type rows). Resets every other Log filter so you land on a clean view.
+function gotoLog(kind, type, acctType, period, anchor) {
+  S.logKind = kind || 'All';
+  S.logType = type || 'All';
+  S.logAcctTypeFilter = acctType || null;
+  S.logFilter = 'All';
+  S.logCategoryFilter = 'All';
+  S.logAddedBy = 'All';
+  S.logAccountFilter = null;
+  S.logPeriod = period || 'all';
+  S.logReturnAnchor = anchor || null;
+  goToLog();
+}
+
+function clearLogAcctTypeFilter() {
+  S.logAcctTypeFilter = null;
+  renderLog();
+}
+
 function setLogPersonFilterGo(name, kind, type, anchor) {
   S.logFilter = name;
   S.logKind = kind || 'All';
@@ -2781,6 +2821,7 @@ function setLogPersonFilterGo(name, kind, type, anchor) {
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
+  S.logAcctTypeFilter = null;
   S.logPeriod = S.dashPeriod;
   S.logReturnAnchor = anchor || null;
   goToLog();
@@ -2794,6 +2835,7 @@ function setLogCategoryFilterGo(cat) {
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
+  S.logAcctTypeFilter = null;
   S.logPeriod = S.dashPeriod;
   S.logReturnAnchor = 'd-bars';
   goToLog();
@@ -3110,6 +3152,17 @@ function renderLog() {
     acctBanner.style.display = 'none';
   }
 
+  // Show/hide account-type filter banner (set when tapping a row in the
+  // Net Worth "where it's parked" breakdown or the Invested row).
+  const typeBanner = document.getElementById('log-accttype-banner');
+  if (S.logAcctTypeFilter) {
+    const label = ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter;
+    document.getElementById('log-accttype-banner-text').textContent = `Filtering by account type: ${label}`;
+    typeBanner.style.display = 'flex';
+  } else {
+    typeBanner.style.display = 'none';
+  }
+
   // Show/hide period-filter banner (inherited from a Summary breakdown tap)
   const periodBanner = document.getElementById('log-period-banner');
   if (S.logPeriod !== 'all') {
@@ -3135,6 +3188,12 @@ function renderLog() {
     items = items.filter(x => x._kind === 'transfer'
       ? (x.fromAccount === S.logAccountFilter || x.toAccount === S.logAccountFilter)
       : x.account === S.logAccountFilter);
+  }
+  if (S.logAcctTypeFilter) {
+    const ids = new Set(S.accounts.filter(a => a.type === S.logAcctTypeFilter).map(a => a.id));
+    items = items.filter(x => x._kind === 'transfer'
+      ? (ids.has(x.fromAccount) || ids.has(x.toAccount))
+      : ids.has(x.account));
   }
 
   if (S.logFilter !== 'All') {
@@ -3556,16 +3615,21 @@ function renderDash() {
     // on the row. Signals growth/wealth and stays clearly apart from the
     // red of Spent (which the flat amber was starting to mimic).
     const GOLD_DOT = 'radial-gradient(circle at 32% 28%, #f5e8c4 0%, #d8c082 50%, #b08949 100%)';
+    // Tapping a row filters the Log. Savings has no log analogue (residual),
+    // so it stays a read-only row.
+    const dp = S.dashPeriod;
     const rows = [
-      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over },
-      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: 'rgba(216,192,130,0.16)', label: 'Invested', amt: invTotal, pct: invPct }] : []),
+      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')` },
+      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: 'rgba(216,192,130,0.16)', label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')` }] : []),
       { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
     ];
     breakdown.innerHTML = rows.map(rw => {
       const sign    = rw.amt < 0 ? '−' : '';
       const pctSign = rw.pct < 0 ? '−' : '';
       const c = rw.isNeg ? 'color:var(--red)' : '';
-      return `<div class="cf-bd-row" style="background:${rw.tint}">`
+      const tapAttr = rw.tap ? ` onclick="${rw.tap}"` : '';
+      const cursor  = rw.tap ? 'cursor:pointer;' : '';
+      return `<div class="cf-bd-row"${tapAttr} style="${cursor}background:${rw.tint}">`
         + `<span class="cf-bd-dot" style="background:${rw.color}"></span>`
         + `<span>${rw.label}</span>`
         + `<span class="cf-bd-amt" style="${c}">${sign}₹${fmt(Math.round(Math.abs(rw.amt)))}</span>`
@@ -3610,8 +3674,9 @@ function renderDash() {
       const n = i => parseInt(hex.substr(1 + i*2, 2), 16);
       return `rgba(${n(0)},${n(1)},${n(2)},0.08)`;
     };
+    const dpTS = S.dashPeriod;
     document.getElementById('d-typesplit-legend').innerHTML =
-      segs.map(s => `<div class="cf-bd-row" style="background:${tintOf(s.color)}">`
+      segs.map(s => `<div class="cf-bd-row" onclick="gotoLog('Expense','${s.type.replace(/'/g, "\\'")}','','${dpTS}','d-cf-net-card')" style="cursor:pointer;background:${tintOf(s.color)}">`
         + `<span class="cf-bd-dot" style="background:${s.color}"></span>`
         + `<span>${escapeHtml(s.type)}</span>`
         + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
@@ -3669,6 +3734,45 @@ function renderDash() {
   const liabByOwner   = owners.map(o => [o, activeAccts.filter(a =>  a.isLiability && ownerOwns(a) === o).reduce((s,a) => s + accountBalance(a), 0)]);
   const ltByOwner     = owners.map(o => [o, longTermAccts.filter(a => ownerOwns(a) === o).reduce((s,a) => s + ownerNet(a), 0)]);
   document.getElementById('d-networth-split').innerHTML = cardSplitHTML([{pairs: nwByOwner}]);
+
+  // "Where it's parked" — active asset balances split by account type, with
+  // the same bar + tinted-legend style as the cash-flow card. Each row taps
+  // through to the Log filtered to that account type.
+  const nwTypeBox = document.getElementById('d-nw-typesplit');
+  const assetByType = {};
+  activeAccts.filter(a => !a.isLiability).forEach(a => {
+    const t = a.type || 'Other';
+    assetByType[t] = (assetByType[t] || 0) + accountBalance(a);
+  });
+  if (assetsTotal > 0 && Object.keys(assetByType).length) {
+    const tintOf = hex => {
+      if (!hex || hex[0] !== '#' || hex.length < 7) return '';
+      const n = i => parseInt(hex.substr(1 + i*2, 2), 16);
+      return `rgba(${n(0)},${n(1)},${n(2)},0.10)`;
+    };
+    let fb = 0;
+    const tsegs = Object.entries(assetByType)
+      .map(([t, amt]) => ({ type: t, amt, pct: amt / assetsTotal * 100 }))
+      .filter(s => s.amt > 0)
+      .sort((a, b) => b.amt - a.amt)
+      .map(s => ({ ...s, color: ASSET_TYPE_COLORS[s.type] || TYPE_FALLBACK[fb++ % TYPE_FALLBACK.length] }));
+    document.getElementById('d-nw-typebar').innerHTML =
+      tsegs.map(s => {
+        const p = Math.round(s.pct);
+        return `<div style="width:${s.pct}%;background:${s.color}">${p >= 12 ? p + '%' : ''}</div>`;
+      }).join('');
+    document.getElementById('d-nw-typelegend').innerHTML =
+      tsegs.map(s => `<div class="cf-bd-row" onclick="gotoLog('','','${s.type.replace(/'/g, "\\'")}','all','d-networth-card')" style="cursor:pointer;background:${tintOf(s.color)}">`
+        + `<span class="cf-bd-dot" style="background:${s.color}"></span>`
+        + `<span>${escapeHtml(s.type)}</span>`
+        + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
+        + `<span class="cf-bd-pct">${Math.round(s.pct)}%</span>`
+        + `</div>`).join('');
+    nwTypeBox.style.display = '';
+  } else {
+    nwTypeBox.style.display = 'none';
+  }
+
   document.getElementById('d-assets-split').innerHTML   = cardSplitHTML([{pairs: assetsByOwner}]);
   document.getElementById('d-liab-split').innerHTML     = cardSplitHTML([{pairs: liabByOwner}]);
   document.getElementById('d-longterm-split').innerHTML = cardSplitHTML([{pairs: ltByOwner}]);
