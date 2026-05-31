@@ -1457,10 +1457,11 @@ select.modal-input option { background: white; }
         <div class="stat-lbl" style="color:#1a4a7a">Active Net Worth (today)</div>
         <div class="stat-val" id="d-networth" style="color:#1a4a7a">₹0</div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
-        <div class="card-split" id="d-networth-split"></div>
+        <div class="card-split" id="d-networth-split" style="max-width:172px;margin:9px auto 0"></div>
         <div id="d-nw-typesplit" style="display:none;margin-top:14px">
           <div class="typesplit-bar" id="d-nw-typebar"></div>
           <div class="typesplit-legend" id="d-nw-typelegend"></div>
+          <div id="d-nw-typeaccounts" class="cf-breakdown" style="display:none;margin-top:4px"></div>
         </div>
       </div>
     </div>
@@ -1941,6 +1942,7 @@ let S = {
   logAddedBy: 'All',
   logAccountFilter: null,
   logAcctTypeFilter: null,
+  nwExpandedType: null,
   logPeriod: 'all',
   logReturnAnchor: null,
   pendingOps: [],
@@ -2381,6 +2383,13 @@ const ASSET_TYPE_COLORS = {
   'Receivable': '#9b7bb8',
 };
 
+// Champagne gold — used by Invested (cash-flow card) and Investment
+// (net-worth breakdown) so they reference the same metal everywhere.
+const GOLD_BAR  = 'linear-gradient(135deg, #b08949 0%, #d8c082 35%, #f0e2b6 50%, #d8c082 65%, #b08949 100%)';
+const GOLD_DOT  = 'radial-gradient(circle at 32% 28%, #f5e8c4 0%, #d8c082 50%, #b08949 100%)';
+const GOLD_TINT = 'rgba(216,192,130,0.16)';
+const GOLD_TEXT = '#5e4818';
+
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
 // Account picker: grouped by category (type). Within each category the
@@ -2812,6 +2821,13 @@ function gotoLog(kind, type, acctType, period, anchor) {
 function clearLogAcctTypeFilter() {
   S.logAcctTypeFilter = null;
   renderLog();
+}
+
+// Tap a "where it's parked" type row to expand/collapse the accounts of
+// that type right under the bar — no jump to the Log.
+function toggleNwType(type) {
+  S.nwExpandedType = S.nwExpandedType === type ? null : type;
+  renderDash();
 }
 
 function setLogPersonFilterGo(name, kind, type, anchor) {
@@ -3601,11 +3617,10 @@ function renderDash() {
       const r = (i) => firstIdx === i && lastIdx === i ? '12px'
                      : firstIdx === i ? '12px 0 0 12px'
                      : lastIdx === i ? '0 12px 12px 0' : '0';
-      const GOLD_BAR = 'linear-gradient(135deg, #b08949 0%, #d8c082 35%, #f0e2b6 50%, #d8c082 65%, #b08949 100%)';
       setSeg(spendFill, spendPct, 0,                      'var(--red)',   r(0));
       setSeg(invFill,   shownInv, spendPct,               GOLD_BAR,       r(1));
       // Champagne is too pale for white text — use a dark engraved brown.
-      invFill.style.color = '#5e4818';
+      invFill.style.color = GOLD_TEXT;
       setSeg(savFill,   shownSav, spendPct + shownInv,    'var(--green)', r(2));
     }
     // Legend rows — Spent / Invested / Savings — with ₹ amount and %.
@@ -3614,13 +3629,10 @@ function renderDash() {
     // Premium gold for Invested — gradient on the dot, faint warm-gold tint
     // on the row. Signals growth/wealth and stays clearly apart from the
     // red of Spent (which the flat amber was starting to mimic).
-    const GOLD_DOT = 'radial-gradient(circle at 32% 28%, #f5e8c4 0%, #d8c082 50%, #b08949 100%)';
-    // Tapping a row filters the Log. Savings has no log analogue (residual),
-    // so it stays a read-only row.
     const dp = S.dashPeriod;
     const rows = [
       { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')` },
-      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: 'rgba(216,192,130,0.16)', label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')` }] : []),
+      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: GOLD_TINT,                label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')` }] : []),
       { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
     ];
     breakdown.innerHTML = rows.map(rw => {
@@ -3756,21 +3768,53 @@ function renderDash() {
       .filter(s => s.amt > 0)
       .sort((a, b) => b.amt - a.amt)
       .map(s => ({ ...s, color: ASSET_TYPE_COLORS[s.type] || TYPE_FALLBACK[fb++ % TYPE_FALLBACK.length] }));
+    // Investment uses the same champagne gold gradient as the cash-flow
+    // Invested segment so the two read as the same metal.
+    const barBg = s => s.type === 'Investment' ? GOLD_BAR : s.color;
+    const dotBg = s => s.type === 'Investment' ? GOLD_DOT : s.color;
+    const rowTint = s => s.type === 'Investment' ? GOLD_TINT : tintOf(s.color);
     document.getElementById('d-nw-typebar').innerHTML =
       tsegs.map(s => {
         const p = Math.round(s.pct);
-        return `<div style="width:${s.pct}%;background:${s.color}">${p >= 12 ? p + '%' : ''}</div>`;
+        const textColor = s.type === 'Investment' ? `color:${GOLD_TEXT};` : '';
+        return `<div style="${textColor}width:${s.pct}%;background:${barBg(s)}">${p >= 12 ? p + '%' : ''}</div>`;
       }).join('');
     document.getElementById('d-nw-typelegend').innerHTML =
-      tsegs.map(s => `<div class="cf-bd-row" onclick="gotoLog('','','${s.type.replace(/'/g, "\\'")}','all','d-networth-card')" style="cursor:pointer;background:${tintOf(s.color)}">`
-        + `<span class="cf-bd-dot" style="background:${s.color}"></span>`
-        + `<span>${escapeHtml(s.type)}</span>`
-        + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
-        + `<span class="cf-bd-pct">${Math.round(s.pct)}%</span>`
+      tsegs.map(s => {
+        const exp = S.nwExpandedType === s.type;
+        const caret = exp ? '▾' : '▸';
+        return `<div class="cf-bd-row" onclick="toggleNwType('${s.type.replace(/'/g, "\\'")}')" style="cursor:pointer;background:${rowTint(s)}">`
+          + `<span class="cf-bd-dot" style="background:${dotBg(s)}"></span>`
+          + `<span>${caret} ${escapeHtml(s.type)}</span>`
+          + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
+          + `<span class="cf-bd-pct">${Math.round(s.pct)}%</span>`
+          + `</div>`;
+      }).join('');
+    // Inline expansion of accounts for the selected type — same row shape,
+    // no dot, slightly subdued. Tap a single account to filter the Log to it.
+    const acctBox = document.getElementById('d-nw-typeaccounts');
+    if (S.nwExpandedType && tsegs.some(s => s.type === S.nwExpandedType)) {
+      const typeAccts = activeAccts
+        .filter(a => !a.isLiability && a.type === S.nwExpandedType)
+        .map(a => ({ a, bal: accountBalance(a) }))
+        .filter(x => x.bal > 0)
+        .sort((x, y) => y.bal - x.bal);
+      const typeTotal = typeAccts.reduce((s, x) => s + x.bal, 0) || 1;
+      acctBox.innerHTML = typeAccts.map(({ a, bal }) =>
+        `<div class="cf-bd-row" onclick="setLogAccountFilter(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
+        + `<span></span>`
+        + `<span style="padding-left:4px;opacity:0.9">${escapeHtml(a.name)}</span>`
+        + `<span class="cf-bd-amt">₹${fmt(Math.round(bal))}</span>`
+        + `<span class="cf-bd-pct">${Math.round(bal / typeTotal * 100)}%</span>`
         + `</div>`).join('');
+      acctBox.style.display = '';
+    } else {
+      acctBox.style.display = 'none';
+    }
     nwTypeBox.style.display = '';
   } else {
     nwTypeBox.style.display = 'none';
+    document.getElementById('d-nw-typeaccounts').style.display = 'none';
   }
 
   document.getElementById('d-assets-split').innerHTML   = cardSplitHTML([{pairs: assetsByOwner}]);
