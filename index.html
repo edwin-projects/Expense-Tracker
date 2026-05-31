@@ -1356,6 +1356,11 @@ select.modal-input option { background: white; }
       <div class="log-chip" data-t="Fun" onclick="setLogTypeFilter(this)">Fun</div>
       <div class="log-chip" data-t="Saveable" onclick="setLogTypeFilter(this)">Saveable</div>
     </div>
+    <div class="log-bar">
+      <div class="log-chip active" data-by="All" onclick="setLogAddedBy(this)">Added by anyone</div>
+      <div class="log-chip" data-by="Edwin" onclick="setLogAddedBy(this)">Added by Edwin</div>
+      <div class="log-chip" data-by="Divya" onclick="setLogAddedBy(this)">Added by Divya</div>
+    </div>
     <div id="log-account-banner" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;margin:0 0 10px;font-size:12.5px;color:var(--amber);align-items:center;gap:8px">
       <span id="log-account-banner-text"></span>
       <button onclick="clearLogAccountFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
@@ -1908,6 +1913,7 @@ let S = {
   logSearch: '',
   logKind: 'All',
   logType: 'All',
+  logAddedBy: 'All',
   logAccountFilter: null,
   logPeriod: 'all',
   logReturnAnchor: null,
@@ -2680,6 +2686,13 @@ function setLogTypeFilter(el) {
   renderLog();
 }
 
+function setLogAddedBy(el) {
+  el.parentElement.querySelectorAll('.log-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  S.logAddedBy = el.dataset.by;
+  renderLog();
+}
+
 function goToLog() {
   const navItem = [...document.querySelectorAll('.nav-item')]
     .find(n => n.querySelector('.nav-label')?.textContent.trim() === 'LOG');
@@ -2704,6 +2717,7 @@ function setLogAccountFilter(id) {
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logType = 'All';
+  S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logPeriod = 'all';
   S.logReturnAnchor = 'd-accounts-card';
@@ -2725,6 +2739,7 @@ function clearAllLogFilters() {
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logType = 'All';
+  S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
   S.logPeriod = 'all';
@@ -2746,6 +2761,7 @@ function setLogPersonFilterGo(name, kind, type, anchor) {
   S.logFilter = name;
   S.logKind = kind || 'All';
   S.logType = type || 'All';
+  S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
   S.logPeriod = S.dashPeriod;
@@ -2759,6 +2775,7 @@ function setLogCategoryFilterGo(cat) {
   S.logKind = 'Expense';
   S.logFilter = 'All';
   S.logType = 'All';
+  S.logAddedBy = 'All';
   S.logAccountFilter = null;
   S.logPeriod = S.dashPeriod;
   S.logReturnAnchor = 'd-bars';
@@ -3055,6 +3072,7 @@ function renderLog() {
     if (c.dataset.k != null)      on = c.dataset.k === S.logKind;
     else if (c.dataset.f != null) on = c.dataset.f === S.logFilter;
     else if (c.dataset.t != null) on = c.dataset.t === S.logType;
+    else if (c.dataset.by != null) on = c.dataset.by === S.logAddedBy;
     c.classList.toggle('active', on);
   });
   const list = document.getElementById('log-list');
@@ -3115,6 +3133,9 @@ function renderLog() {
   if (S.logType !== 'All') {
     items = items.filter(x => x._kind === 'expense' &&
       (S.logType === 'Saveable' ? x.saving === 'Yes' : x.type === S.logType));
+  }
+  if (S.logAddedBy !== 'All') {
+    items = items.filter(x => x.addedBy === S.logAddedBy);
   }
   if (S.logPeriod !== 'all') {
     items = items.filter(x => inPeriod(x.date, S.logPeriod));
