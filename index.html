@@ -3730,17 +3730,26 @@ function renderDash() {
       spendOver.style.display = 'none';
       const shownInv = Math.max(0, Math.min(invPct, 100 - spendPct));
       const shownSav = Math.max(0, 100 - spendPct - shownInv);
-      const visible = [spendPct, shownInv, shownSav].map(v => v > 0);
-      const firstIdx = visible.indexOf(true);
-      const lastIdx  = visible.lastIndexOf(true);
-      const r = (i) => firstIdx === i && lastIdx === i ? '12px'
-                     : firstIdx === i ? '12px 0 0 12px'
-                     : lastIdx === i ? '0 12px 12px 0' : '0';
-      setSeg(spendFill, spendPct, 0,                      'var(--red)',   r(0));
-      setSeg(invFill,   shownInv, spendPct,               GOLD_BAR,       r(1));
-      // Champagne is too pale for white text — use a dark engraved brown.
-      invFill.style.color = GOLD_TEXT;
-      setSeg(savFill,   shownSav, spendPct + shownInv,    'var(--green)', r(2));
+      // Sort the visible segments by % descending so the biggest sits on
+      // the left — same rule the rest of the Summary follows.
+      const segs = [
+        { el: spendFill, pct: spendPct, color: 'var(--red)',   textColor: '' },
+        { el: invFill,   pct: shownInv, color: GOLD_BAR,       textColor: GOLD_TEXT },
+        { el: savFill,   pct: shownSav, color: 'var(--green)', textColor: '' },
+      ];
+      segs.filter(s => s.pct <= 0).forEach(s => { s.el.style.display = 'none'; });
+      const visible = segs.filter(s => s.pct > 0).sort((a, b) => b.pct - a.pct);
+      let cursor = 0;
+      visible.forEach((s, i) => {
+        const isFirst = i === 0;
+        const isLast  = i === visible.length - 1;
+        const radius  = isFirst && isLast ? '12px'
+                      : isFirst ? '12px 0 0 12px'
+                      : isLast ? '0 12px 12px 0' : '0';
+        setSeg(s.el, s.pct, cursor, s.color, radius);
+        s.el.style.color = s.textColor;
+        cursor += s.pct;
+      });
     }
     // Legend rows — Spent / Invested / Savings — with ₹ amount and %.
     const savAmt = net - invTotal;
@@ -3753,7 +3762,7 @@ function renderDash() {
       { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')` },
       ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: GOLD_TINT,                label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')` }] : []),
       { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
-    ];
+    ].sort((a, b) => b.amt - a.amt);
     breakdown.innerHTML = rows.map(rw => {
       const sign    = rw.amt < 0 ? '−' : '';
       const pctSign = rw.pct < 0 ? '−' : '';
