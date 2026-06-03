@@ -778,6 +778,13 @@ select.finput option { background: white; color: var(--ink); }
 }
 .voice-sheet .vo-mic { font-size: 36px; line-height: 1; margin-bottom: 6px; }
 .voice-sheet .vo-status { font-size: 13px; font-weight: 600; color: var(--ink2); margin-bottom: 12px; }
+.voice-sheet .vo-textarea {
+  width: 100%; min-height: 88px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 14px; font-size: 15px; font-family: inherit;
+  color: var(--ink); line-height: 1.4; resize: none; outline: none; box-sizing: border-box;
+}
+.voice-sheet .vo-textarea:focus { border-color: var(--ink2); }
 .voice-sheet .vo-transcript {
   font-size: 14px; color: var(--ink); min-height: 56px; padding: 10px 12px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
@@ -1913,8 +1920,8 @@ select.modal-input option { background: white; }
 <div class="voice-overlay" id="voice-overlay" onclick="if(event.target===this) stopVoiceCapture()">
   <div class="voice-sheet">
     <div class="vo-mic">🎤</div>
-    <div class="vo-status" id="vo-status">Listening… speak now</div>
-    <div class="vo-transcript" id="vo-transcript"></div>
+    <div class="vo-status" id="vo-status">Tap the 🎤 on your keyboard to dictate (or type). Hit Done when finished.</div>
+    <textarea class="vo-textarea" id="vo-textarea" placeholder="e.g. 1,200 rupees for petrol from HDFC savings, monthly, essentials" rows="4"></textarea>
     <div class="vo-actions">
       <button type="button" onclick="cancelVoiceCapture()">Cancel</button>
       <button type="button" class="primary" onclick="stopVoiceCapture()">Done</button>
@@ -4969,72 +4976,42 @@ function parseVoice(text) {
   return { kind, amount, accountId: acct?.id, accountName: acct?.name, type, freq, category, saving, desc, transcript: text };
 }
 
-let voiceRecognition = null;
-let voiceFinalTranscript = '';
-let voiceCancelled = false;
-
+// We use a focused <textarea> so iOS pops the system keyboard — the user
+// taps the mic key on the keyboard and gets Apple's full Siri-quality
+// dictation (much better than the Web Speech API on iOS). On Android the
+// keyboard's own mic does the same; on desktop they can type. Same parser
+// runs against whatever lands in the textarea when they hit Done.
 function toggleVoiceCapture() {
-  if (voiceRecognition) stopVoiceCapture();
+  const overlay = document.getElementById('voice-overlay');
+  if (overlay.classList.contains('show')) cancelVoiceCapture();
   else startVoiceCapture();
 }
 
 function startVoiceCapture() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { toast('Voice input not supported on this browser', 'err'); return; }
-  voiceRecognition = new SR();
-  voiceRecognition.lang = 'en-IN';
-  voiceRecognition.continuous = true;
-  voiceRecognition.interimResults = true;
-  voiceFinalTranscript = '';
-  voiceCancelled = false;
   const fab = document.getElementById('voice-fab');
   const overlay = document.getElementById('voice-overlay');
-  const transcriptEl = document.getElementById('vo-transcript');
-  const statusEl = document.getElementById('vo-status');
-  transcriptEl.textContent = '';
-  statusEl.textContent = 'Listening… tap Done when you\'re finished';
+  const ta = document.getElementById('vo-textarea');
+  ta.value = '';
   fab.classList.add('listening');
   overlay.classList.add('show');
-  voiceRecognition.onresult = (event) => {
-    let interim = '', final = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const tr = event.results[i][0].transcript;
-      if (event.results[i].isFinal) final += tr;
-      else interim += tr;
-    }
-    if (final) voiceFinalTranscript += final;
-    transcriptEl.textContent = (voiceFinalTranscript + interim).trim();
-  };
-  voiceRecognition.onerror = (e) => {
-    if (e.error !== 'aborted' && e.error !== 'no-speech') toast('Mic error: ' + e.error, 'err');
-    closeVoiceOverlay();
-    voiceRecognition = null;
-  };
-  voiceRecognition.onend = () => {
-    closeVoiceOverlay();
-    const t = (voiceFinalTranscript || transcriptEl.textContent || '').trim();
-    voiceRecognition = null;
-    if (voiceCancelled || !t) return;
-    applyVoiceToForm(parseVoice(t));
-  };
-  try { voiceRecognition.start(); }
-  catch (e) { toast('Couldn’t start mic: ' + e.message, 'err'); closeVoiceOverlay(); voiceRecognition = null; }
+  // Defer focus so the overlay transition completes and iOS reliably
+  // brings up the keyboard.
+  setTimeout(() => ta.focus(), 60);
 }
 
 function stopVoiceCapture() {
-  if (voiceRecognition) { try { voiceRecognition.stop(); } catch(_) {} }
-  else closeVoiceOverlay();
+  const ta = document.getElementById('vo-textarea');
+  const text = (ta.value || '').trim();
+  closeVoiceOverlay();
+  if (text) applyVoiceToForm(parseVoice(text));
 }
 
-function cancelVoiceCapture() {
-  voiceCancelled = true;
-  if (voiceRecognition) { try { voiceRecognition.abort(); } catch(_) {} }
-  closeVoiceOverlay();
-}
+function cancelVoiceCapture() { closeVoiceOverlay(); }
 
 function closeVoiceOverlay() {
   document.getElementById('voice-fab').classList.remove('listening');
   document.getElementById('voice-overlay').classList.remove('show');
+  document.getElementById('vo-textarea').blur();
 }
 
 function applyVoiceToForm(p) {
@@ -5087,11 +5064,6 @@ window.addEventListener('online', () => {
   });
 });
 initSetup();
-// Hide the voice FAB if the browser doesn't support speech recognition.
-if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-  const fab = document.getElementById('voice-fab');
-  if (fab) fab.style.display = 'none';
-}
 </script>
 </body>
 </html>
