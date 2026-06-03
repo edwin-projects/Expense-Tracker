@@ -4983,7 +4983,7 @@ function startVoiceCapture() {
   if (!SR) { toast('Voice input not supported on this browser', 'err'); return; }
   voiceRecognition = new SR();
   voiceRecognition.lang = 'en-IN';
-  voiceRecognition.continuous = false;
+  voiceRecognition.continuous = true;
   voiceRecognition.interimResults = true;
   voiceFinalTranscript = '';
   voiceCancelled = false;
@@ -4992,7 +4992,7 @@ function startVoiceCapture() {
   const transcriptEl = document.getElementById('vo-transcript');
   const statusEl = document.getElementById('vo-status');
   transcriptEl.textContent = '';
-  statusEl.textContent = 'Listening… speak now';
+  statusEl.textContent = 'Listening… tap Done when you\'re finished';
   fab.classList.add('listening');
   overlay.classList.add('show');
   voiceRecognition.onresult = (event) => {
