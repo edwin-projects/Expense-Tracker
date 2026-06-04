@@ -755,7 +755,12 @@ select.finput option { background: white; color: var(--ink); }
   flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--border2);
   border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; font-size: 15px;
   letter-spacing: 4px; text-align: center; background: var(--surface);
+  color: var(--ink);
 }
+/* The 4px tracking above is for password dots — reset it for the placeholder
+   so 'Tap to set' / 'PIN set — tap to change' don't render with huge gaps
+   and overflow the narrow field next to the Save button. */
+.pin-set-row input::placeholder { letter-spacing: 0; font-size: 13px; color: var(--ink3); }
 .pin-set-row button {
   flex-shrink: 0; padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--ink);
   background: var(--ink); color: white; font-family: 'Inter', system-ui, sans-serif;
@@ -4368,7 +4373,7 @@ function renderCfg() {
   document.getElementById('cfg-sb-status').style.color = hasSb ? 'var(--green)' : 'var(--red)';
   ['Edwin','Divya'].forEach(w => {
     const inp = document.getElementById('pin-set-' + w);
-    if (inp) inp.placeholder = S.pins[w] ? 'PIN set — tap to change' : 'Tap to set';
+    if (inp) inp.placeholder = S.pins[w] ? 'Tap to change' : 'Tap to set';
   });
   const bs = document.getElementById('cfg-backup-status');
   if (bs) bs.textContent = S.lastBackupAt ? `Last backup: ${daysAgo(S.lastBackupAt)}` : 'No backup taken yet';
