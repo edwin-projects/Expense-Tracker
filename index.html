@@ -2740,17 +2740,19 @@ function buildSelects() {
 
   // Expense/Income account selects get the "add new" shortcut; the edit modal doesn't.
   // Pre-select last-used account so the next entry defaults to it (saves two taps).
+  // Placeholder is 'Select account' — account is now required on save, so we
+  // don't pretend '— None —' is a valid choice.
   ['f-account','i-account'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const prev = el.value;
-    el.innerHTML = accountOptionsHTML('— None —') + addOpt('account');
+    el.innerHTML = accountOptionsHTML('Select account') + addOpt('account');
     const fallback = id === 'f-account' ? S.lastAccountExp : S.lastAccountInc;
     const next = prev || (accountStillExists(fallback) ? String(fallback) : '');
     if (next) el.value = next;
   });
   const editAcct = document.getElementById('edit-account');
-  if (editAcct) editAcct.innerHTML = accountOptionsHTML('— None —');
+  if (editAcct) editAcct.innerHTML = accountOptionsHTML('Select account');
 
   // Transfer form selects need their own placeholder (— Select —); the edit
   // modal's edit-from/edit-to are populated on open by openEditTransferModal.
@@ -2868,6 +2870,7 @@ async function submitExpense() {
   if (!type) return toast('Select expense type', 'err');
   if (!freq) return toast('Select frequency', 'err');
   if (!date) return toast('Select a date', 'err');
+  if (!account) return toast('Pick an account', 'err');
 
   const entry = {
     id: newId(),
@@ -2920,6 +2923,7 @@ async function submitIncome() {
   if (!source) return toast('Select a source', 'err');
   if (!date) return toast('Select a date', 'err');
   if (!receivedBy) return toast('Pick who received it', 'err');
+  if (!account) return toast('Pick an account', 'err');
 
   const entry = {
     id: newId(),
@@ -3353,6 +3357,7 @@ async function saveEdit() {
     if (idx === -1) return;
     const amount = parseAmount(document.getElementById('edit-amount').value);
     if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
+    if (!account) return toast('Pick an account', 'err');
     const updated = {
       ...S.income[idx],
       amount,
@@ -3382,6 +3387,7 @@ async function saveEdit() {
   if (idx === -1) return;
   const amount = parseAmount(document.getElementById('edit-amount').value);
   if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
+  if (!account) return toast('Pick an account', 'err');
   const updated = {
     ...S.entries[idx],
     amount,
