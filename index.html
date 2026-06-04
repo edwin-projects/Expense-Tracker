@@ -316,6 +316,13 @@ body {
 /* ── PAGES ── */
 .page { display: none; padding: 0 16px; animation: fadeIn 0.2s ease; }
 .page.active { display: block; }
+/* Subtle background tint on the entry pages so you can see at a glance
+   which one you're on: red-ish for Expense, green-ish for Income,
+   blue-ish for Move. Other pages keep the default cream. */
+body { transition: background 0.25s ease; }
+body:has(#page-add.active)      { background: #fbeeea; }
+body:has(#page-income.active)   { background: #eaf3ec; }
+body:has(#page-transfer.active) { background: #eaf0f7; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── SECTION LABEL ── */
