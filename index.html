@@ -520,6 +520,8 @@ select.finput option { background: white; color: var(--ink); }
 .pill.active.p-divya { background: var(--pink); border-color: var(--pink); }
 .pill.active.p-aj { background: var(--teal); border-color: var(--teal); }
 .pill.active.p-both { background: var(--amber); border-color: var(--amber); color: #1a1200; }
+.pill.active[data-g="saving"][data-v="Yes"] { background: var(--red); border-color: var(--red); color: #fff; }
+.pill.active[data-g="saving"][data-v="No"]  { background: var(--green); border-color: var(--green); color: #fff; }
 
 /* ── SUBMIT ── */
 .btn-submit {
@@ -1201,6 +1203,8 @@ select.modal-input option { background: white; }
 .modal-pill.active.mp-divya { background: var(--pink); border-color: var(--pink); }
 .modal-pill.active.mp-aj { background: var(--teal); border-color: var(--teal); }
 .modal-pill.active.mp-both { background: var(--amber); border-color: var(--amber); color: #1a1200; }
+.modal-pill.active[data-mg="saving"][data-mv="Yes"] { background: var(--red); border-color: var(--red); color: #fff; }
+.modal-pill.active[data-mg="saving"][data-mv="No"]  { background: var(--green); border-color: var(--green); color: #fff; }
 .btn-modal-save {
   width: 100%;
   padding: 15px;
@@ -1473,7 +1477,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
     </div>
 
-    <button class="btn-submit" onclick="runSave(this, submitExpense)">Save Expense</button>
+    <button class="btn-submit" style="background:var(--red)" onclick="runSave(this, submitExpense)">Save Expense</button>
   </div>
 
   <!-- INCOME PAGE -->
