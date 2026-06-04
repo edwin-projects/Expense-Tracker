@@ -85,6 +85,7 @@
   --btn-dark-text: #ffffff;
   /* Modal scrim */
   --scrim: rgba(0,0,0,0.5);
+  --divider: rgba(0,0,0,0.05);
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 2px 12px rgba(0,0,0,0.07);
@@ -154,6 +155,7 @@
   --longterm-ink: #c4ad7c;
   --btn-dark-text: #141416;
   --scrim: rgba(0,0,0,0.7);
+  --divider: rgba(255,255,255,0.05);
   --shadow: 0 2px 14px rgba(0,0,0,0.55);
   --shadow-md: 0 6px 28px rgba(0,0,0,0.65);
 }
@@ -378,7 +380,7 @@ body {
   z-index: 50;
   border-bottom: 1px solid var(--border);
 }
-.topbar-left { display: flex; flex-direction: column; }
+.topbar-left { display: flex; flex-direction: column; min-width: 0; }
 .topbar-title {
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 18px;
@@ -386,8 +388,9 @@ body {
   color: var(--ink);
   line-height: 1.1;
   letter-spacing: -0.02em;
+  white-space: nowrap;
 }
-.topbar-sub { font-size: 11px; color: var(--ink3); margin-top: 1px; }
+.topbar-sub { font-size: 11px; color: var(--ink3); margin-top: 2px; white-space: nowrap; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .user-pill {
   background: var(--amber-bg);
@@ -439,11 +442,16 @@ body {
   align-items: center;
   gap: 3px;
   cursor: pointer;
-  padding: 2px 0;
+  padding: 4px 4px 2px;
+  margin: 0 4px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
 }
-.nav-icon { font-size: 22px; }
+.nav-icon { font-size: 22px; transition: transform 0.15s ease; }
 .nav-label { font-size: 10px; color: var(--ink3); font-weight: 500; letter-spacing: 0.04em; }
-.nav-item.active .nav-label { color: var(--amber); }
+.nav-item.active { background: var(--amber-bg); }
+.nav-item.active .nav-icon { transform: scale(1.05); }
+.nav-item.active .nav-label { color: var(--amber); font-weight: 600; }
 .nav-active-bar {
   width: 28px; height: 3px;
   background: var(--amber);
@@ -489,10 +497,21 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
   display: flex;
   align-items: center;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--divider);
   gap: 12px;
 }
 .frow:last-child { border-bottom: none; }
+
+/* Inline collapsible help text — used under forms where context is optional. */
+.inline-help { padding: 4px 4px 12px; font-size: 12px; color: var(--ink3); line-height: 1.5; }
+.inline-help summary {
+  cursor: pointer; color: var(--ink2); list-style: none;
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 0;
+}
+.inline-help summary::-webkit-details-marker { display: none; }
+.inline-help summary::before { content: 'ⓘ'; font-size: 13px; color: var(--ink3); }
+.inline-help[open] summary { color: var(--ink); }
+.inline-help > div { margin-top: 6px; padding-left: 19px; }
 .flabel { font-size: 13px; color: var(--ink2); min-width: 105px; flex-shrink: 0; }
 .finput {
   flex: 1;
@@ -510,7 +529,7 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 .finput::placeholder { color: var(--ink3); }
 select.finput { cursor: pointer; }
 select.finput option { background: white; color: var(--ink); }
-.amt-sym { font-size: 22px; color: var(--amber); font-weight: 300; }
+.amt-sym { font-size: 22px; color: var(--ink3); font-weight: 300; }
 
 /* ── PILLS ── */
 .pill-group {
@@ -776,13 +795,17 @@ select.finput option { background: white; color: var(--ink); }
   background: none;
   border: 1px solid var(--btn-del-border);
   color: var(--red);
-  padding: 5px 14px;
+  padding: 5px 10px;
   border-radius: 8px;
   font-size: 12px;
   font-family: 'Inter', system-ui, sans-serif;
   cursor: pointer;
   display: inline-block;
+  white-space: nowrap;
 }
+/* Log entry action row — Edit / Repeat / Delete share one line equally. */
+.entry-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: nowrap; }
+.entry-actions .btn-del-entry { flex: 1 1 0; margin-top: 0; padding: 6px 6px; text-align: center; }
 .entry-right { text-align: right; flex-shrink: 0; }
 .entry-amount {
   font-family: 'Inter', system-ui, sans-serif;
@@ -987,6 +1010,7 @@ select.finput option { background: white; color: var(--ink); }
 .trend-net.pos { color: var(--green); font-weight: 600; }
 .trend-net.neg { color: var(--red); font-weight: 600; }
 .trend-nw { color: var(--card-networth-ink); font-weight: 600; white-space: nowrap; }
+.trend-nw.neg { color: var(--red); }
 .trend-nw-pct { font-size: 10px; font-weight: 600; }
 .trend-nw-pct.pos { color: var(--green); }
 .trend-nw-pct.neg { color: var(--red); }
@@ -1169,7 +1193,9 @@ select.finput option { background: white; color: var(--ink); }
   max-width: 480px;
   max-height: 85vh;
   overflow-y: auto;
-  padding: 20px;
+  padding: 20px 20px 40px;
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
+          mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
 }
 .modal-title {
   font-family: 'Inter', system-ui, sans-serif;
@@ -1408,7 +1434,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title">D & E Finance</div>
+      <div class="topbar-title">D & E</div>
       <div class="topbar-sub">FY 2026–27</div>
     </div>
     <div class="topbar-right">
@@ -1584,9 +1610,10 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
     </div>
 
-    <div style="padding:0 4px 12px;font-size:12px;color:var(--ink3);line-height:1.5">
-      Transfers move money between your own accounts (e.g. paying a credit-card bill from a bank account). They don't count as Income or Expense in the cash-flow view.
-    </div>
+    <details class="inline-help">
+      <summary>What's a transfer?</summary>
+      <div>Transfers move money between your own accounts (e.g. paying a credit-card bill from a bank account). They don't count as Income or Expense in the cash-flow view.</div>
+    </details>
 
     <button class="btn-submit" style="background:var(--transfer-ink)" onclick="runSave(this, submitTransfer)">Save Transfer</button>
   </div>
@@ -1802,7 +1829,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <span style="font-size:12px">To change, tap Exit and re-enter credentials.</span>
       </div>
       <div style="padding:14px 16px">
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2)" onclick="runSave(this, syncNow, 'Syncing…')">↻ Force Sync Now</button>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2)" onclick="runSave(this, syncNow, 'Syncing…')">↻ Sync Now</button>
       </div>
     </div>
 
@@ -2216,7 +2243,11 @@ let S = {
   logPeriod: 'all',
   logReturnAnchor: null,
   pendingOps: [],
-  dashOwner: 'All'
+  dashOwner: 'All',
+  // Remember the last account picked per form so the next entry defaults to it.
+  // Cuts two taps off every save once the user has a routine account.
+  lastAccountExp: null,
+  lastAccountInc: null
 };
 let currentUser = '';
 let pinBuffer = '';
@@ -2456,7 +2487,7 @@ async function syncNow() {
     if (document.getElementById('page-cfg').classList.contains('active')) renderCfg();
   } else {
     setSyncState('offline');
-    toast('Offline — showing local data', '');
+    // Offline state is shown in the topbar sync pill — no floating toast.
   }
 }
 
@@ -2703,9 +2734,15 @@ function buildSelects() {
   frq.innerHTML = '<option value="">Select…</option>' + S.frequencies.map(f => `<option>${f}</option>`).join('') + addOpt('frequency');
 
   // Expense/Income account selects get the "add new" shortcut; the edit modal doesn't.
+  // Pre-select last-used account so the next entry defaults to it (saves two taps).
   ['f-account','i-account'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = accountOptionsHTML('— None —') + addOpt('account');
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = accountOptionsHTML('— None —') + addOpt('account');
+    const fallback = id === 'f-account' ? S.lastAccountExp : S.lastAccountInc;
+    const next = prev || (accountStillExists(fallback) ? String(fallback) : '');
+    if (next) el.value = next;
   });
   const editAcct = document.getElementById('edit-account');
   if (editAcct) editAcct.innerHTML = accountOptionsHTML('— None —');
@@ -2836,6 +2873,7 @@ async function submitExpense() {
   };
 
   S.entries.unshift(entry);
+  S.lastAccountExp = account;
   queueOp('expenses', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     category: entry.category, type: entry.type, freq: entry.freq,
@@ -2855,7 +2893,8 @@ function resetForm() {
   document.getElementById('f-type').value = '';
   document.getElementById('f-freq').value = '';
   document.getElementById('f-desc').value = '';
-  const acct = document.getElementById('f-account'); if (acct) acct.value = '';
+  const acct = document.getElementById('f-account');
+  if (acct) acct.value = accountStillExists(S.lastAccountExp) ? String(S.lastAccountExp) : '';
   setDefaultDate();
   const me = currentUser || 'Edwin';
   document.querySelectorAll('.pill[data-g="for"]').forEach(p => p.classList.toggle('active', p.dataset.v === me));
@@ -2884,6 +2923,7 @@ async function submitIncome() {
     addedBy: currentUser
   };
   S.income.unshift(entry);
+  S.lastAccountInc = account;
   queueOp('income', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
@@ -2895,11 +2935,17 @@ async function submitIncome() {
   resetIncomeForm();
 }
 
+function accountStillExists(id) {
+  if (id == null) return false;
+  const a = S.accounts.find(x => x.id === id);
+  return !!a && !a.archived;
+}
+
 function resetIncomeForm() {
   document.getElementById('i-amount').value = '';
   document.getElementById('i-source').value = '';
   document.getElementById('i-desc').value = '';
-  document.getElementById('i-account').value = '';
+  document.getElementById('i-account').value = accountStillExists(S.lastAccountInc) ? String(S.lastAccountInc) : '';
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
   document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === (currentUser || 'Edwin')));
 }
@@ -3595,9 +3641,9 @@ function renderExpenseCard(e, q) {
           ${an ? `<div class="echip acct">⊟ ${hl(an, q)}</div>` : ''}
         </div>
         ${e.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(e.addedBy, q)}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--btn-edit-border);color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Inter',system-ui,sans-serif;cursor:pointer" onclick="openEditModal(${e.id})">✏ Edit</button>
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Inter',system-ui,sans-serif;cursor:pointer" onclick="runSave(this, () => repeatEntry(${e.id}), 'Repeating…')">↻ Repeat</button>
+        <div class="entry-actions">
+          <button class="btn-del-entry" style="border-color:var(--btn-edit-border);color:var(--blue)" onclick="openEditModal(${e.id})">✏ Edit</button>
+          <button class="btn-del-entry" style="border-color:var(--amber-border);color:var(--amber)" onclick="runSave(this, () => repeatEntry(${e.id}), 'Repeating…')">↻ Repeat</button>
           <button class="btn-del-entry" onclick="runSave(this, () => deleteEntry(${e.id}), 'Deleting…')">🗑 Delete</button>
         </div>
       </div>
@@ -3621,9 +3667,9 @@ function renderIncomeCard(i, q) {
           ${an ? `<div class="echip acct">⊞ ${hl(an, q)}</div>` : ''}
         </div>
         ${i.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(i.addedBy, q)}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--btn-edit-border);color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Inter',system-ui,sans-serif;cursor:pointer" onclick="openEditIncomeModal(${i.id})">✏ Edit</button>
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Inter',system-ui,sans-serif;cursor:pointer" onclick="runSave(this, () => repeatIncome(${i.id}), 'Repeating…')">↻ Repeat</button>
+        <div class="entry-actions">
+          <button class="btn-del-entry" style="border-color:var(--btn-edit-border);color:var(--blue)" onclick="openEditIncomeModal(${i.id})">✏ Edit</button>
+          <button class="btn-del-entry" style="border-color:var(--amber-border);color:var(--amber)" onclick="runSave(this, () => repeatIncome(${i.id}), 'Repeating…')">↻ Repeat</button>
           <button class="btn-del-entry" onclick="runSave(this, () => deleteIncome(${i.id}), 'Deleting…')">🗑 Delete</button>
         </div>
       </div>
@@ -3646,9 +3692,9 @@ function renderTransferCard(t, q) {
           <div class="echip transfer">⇄ Transfer</div>
         </div>
         ${t.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(t.addedBy, q)}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--btn-edit-border);color:var(--blue);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Inter',system-ui,sans-serif;cursor:pointer" onclick="openEditTransferModal(${t.id})">✏ Edit</button>
-          <button class="btn-del-entry" style="background:none;border:1px solid var(--amber-border);color:var(--amber);padding:5px 14px;border-radius:8px;font-size:12px;font-family:'Inter',system-ui,sans-serif;cursor:pointer" onclick="runSave(this, () => repeatTransfer(${t.id}), 'Repeating…')">↻ Repeat</button>
+        <div class="entry-actions">
+          <button class="btn-del-entry" style="border-color:var(--btn-edit-border);color:var(--blue)" onclick="openEditTransferModal(${t.id})">✏ Edit</button>
+          <button class="btn-del-entry" style="border-color:var(--amber-border);color:var(--amber)" onclick="runSave(this, () => repeatTransfer(${t.id}), 'Repeating…')">↻ Repeat</button>
           <button class="btn-del-entry" onclick="runSave(this, () => deleteTransfer(${t.id}), 'Deleting…')">🗑 Delete</button>
         </div>
       </div>
@@ -4293,12 +4339,14 @@ function renderDash() {
       const nc = t.net >= 0 ? 'pos' : 'neg';
       const pct = t.nwPct == null ? ''
         : ` <span class="trend-nw-pct ${t.nwPct >= 0 ? 'pos' : 'neg'}">(${t.nwPct >= 0 ? '+' : '−'}${Math.abs(Math.round(t.nwPct))}%)</span>`;
-      const nwTxt = t.nw == null ? '—' : '₹' + fmtShort(t.nw);
+      const nwTxt = t.nw == null ? '—'
+        : (t.nw < 0 ? '−₹' + fmtShort(Math.abs(t.nw)) : '₹' + fmtShort(t.nw));
+      const nwClass = (t.nw != null && t.nw < 0) ? ' neg' : '';
       return `<div class="trend-row${cur}"><span class="trend-month">${t.label}</span>`
         + `<span class="trend-in">₹${fmtShort(t.inc)}</span>`
         + `<span class="trend-out">₹${fmtShort(t.exp)}</span>`
         + `<span class="trend-net ${nc}">${t.net>=0?'+':'−'}₹${fmtShort(Math.abs(t.net))}</span>`
-        + `<span class="trend-nw">${nwTxt}${pct}</span></div>`;
+        + `<span class="trend-nw${nwClass}">${nwTxt}${pct}</span></div>`;
     }).join('');
 }
 
@@ -4320,7 +4368,7 @@ function renderCfg() {
   document.getElementById('cfg-sb-status').style.color = hasSb ? 'var(--green)' : 'var(--red)';
   ['Edwin','Divya'].forEach(w => {
     const inp = document.getElementById('pin-set-' + w);
-    if (inp) inp.placeholder = S.pins[w] ? '•••• (set — enter to change)' : 'Not set';
+    if (inp) inp.placeholder = S.pins[w] ? 'PIN set — tap to change' : 'Tap to set';
   });
   const bs = document.getElementById('cfg-backup-status');
   if (bs) bs.textContent = S.lastBackupAt ? `Last backup: ${daysAgo(S.lastBackupAt)}` : 'No backup taken yet';
