@@ -898,20 +898,24 @@ select.finput option { background: white; color: var(--ink); }
   color: var(--ink);
   line-height: 1;
   letter-spacing: -0.02em;
+  display: inline-block;
+  vertical-align: middle;
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
 
-/* Period-over-period delta chip — sits below stat-sub on each headline
-   card. Colour shows sentiment (good/bad), arrow shows direction of the
-   actual change. Empty chips collapse so cards stay tidy. */
+/* Period-over-period delta chip — sits inline-right of the headline value
+   on each card, baseline-aligned with it. (Was below stat-sub; user moved
+   it up next to the number for a more compact, premium read.) Empty chips
+   collapse so cards stay tidy when there's no prior data to compare. */
 .stat-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ink3);
@@ -981,11 +985,12 @@ select.finput option { background: white; color: var(--ink); }
    reads as a small table aligned with the bar segments. */
 .cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
 .cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 58px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 3px 4px; border-radius: 5px; box-sizing: border-box; }
-/* When a row hosts a delta, drop the percentage column entirely — the bar
-   directly above already shows the same proportion, so repeating it in the
-   row is redundant. Frees room for the amount + delta to breathe inside
-   the 172px bar width. Layout: dot | label | amount | delta. */
-.cf-bd-row.with-delta { grid-template-columns: 8px minmax(0, 1fr) auto auto; gap: 5px; }
+/* When a row hosts a delta, both the amount and delta cells get fixed
+   widths so amounts column up across rows even when one of them has no
+   delta to show. Bar above already inscribes the segment %, so we drop
+   the redundant % cell. Layout: dot | label | amount | delta. */
+.cf-bd-row.with-delta { grid-template-columns: 8px minmax(0, 1fr) 60px 36px; gap: 5px; }
+.cf-bd-row.with-delta .cf-bd-amt { text-align: right; }
 /* Account sub-rows under an expanded type — no dot column, no horizontal
    padding, so long account names get as much room as possible before being
    truncated. */
@@ -1738,24 +1743,21 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green">
         <div class="stat-lbl">Income</div>
-        <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div>
+        <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span>
         <div class="stat-sub" id="d-cf-income-sub">0 entries</div>
-        <span class="stat-chip" id="d-cf-income-chip"></span>
         <div class="card-split" id="d-cf-income-split"></div>
       </div>
       <div class="stat-card red">
         <div class="stat-lbl">Expenses</div>
-        <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div>
+        <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span>
         <div class="stat-sub" id="d-cf-expense-sub">0 entries</div>
-        <span class="stat-chip" id="d-cf-expense-chip"></span>
         <div class="card-split" id="d-cf-expense-split"></div>
       </div>
     </div>
     <div class="stat-grid">
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
-        <div class="stat-val" id="d-cf-net">₹0</div>
-        <span class="stat-chip" id="d-cf-net-chip"></span>
+        <div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span>
         <div class="spend-wrap" id="d-spend-wrap" style="display:none">
           <div class="spend-bar" id="d-spend-bar">
             <div class="spend-fill" id="d-spend-fill"></div>
@@ -1778,9 +1780,8 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card full networth" id="d-networth-card" style="text-align:center">
         <div class="stat-lbl">Active Net Worth (today)</div>
-        <div class="stat-val" id="d-networth">₹0</div>
+        <div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
-        <span class="stat-chip" id="d-networth-chip"></span>
         <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
         <div id="d-nw-typesplit" style="display:none;margin-top:10px">
           <div class="typesplit-bar" id="d-nw-typebar"></div>
@@ -1822,41 +1823,36 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card amber full">
         <div class="stat-lbl">Total Spent</div>
-        <div class="stat-val" id="d-total">₹0</div>
+        <div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span>
         <div class="stat-sub" id="d-entries-sub">0 entries</div>
-        <span class="stat-chip" id="d-total-chip"></span>
         <div class="card-split" id="d-total-split"></div>
       </div>
     </div>
     <div class="stat-grid">
       <div class="stat-card green">
         <div class="stat-lbl">Saveable</div>
-        <div class="stat-val" id="d-save">₹0</div>
+        <div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span>
         <div class="stat-sub" id="d-save-pct">0% of total</div>
-        <span class="stat-chip" id="d-save-chip"></span>
         <div class="card-split" id="d-save-split"></div>
       </div>
       <div class="stat-card noness">
         <div class="stat-lbl">Non-Essentials</div>
-        <div class="stat-val" id="d-noness">₹0</div>
+        <div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span>
         <div class="stat-sub" id="d-noness-pct">0% of total</div>
-        <span class="stat-chip" id="d-noness-chip"></span>
         <div class="card-split" id="d-noness-split"></div>
       </div>
     </div>
     <div class="stat-grid">
       <div class="stat-card ess">
         <div class="stat-lbl">Essentials</div>
-        <div class="stat-val" id="d-ess">₹0</div>
+        <div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span>
         <div class="stat-sub" id="d-ess-pct">0% of total</div>
-        <span class="stat-chip" id="d-ess-chip"></span>
         <div class="card-split" id="d-ess-split"></div>
       </div>
       <div class="stat-card fun">
         <div class="stat-lbl">Fun</div>
-        <div class="stat-val" id="d-fun">₹0</div>
+        <div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span>
         <div class="stat-sub" id="d-fun-pct">0% of total</div>
-        <span class="stat-chip" id="d-fun-chip"></span>
         <div class="card-split" id="d-fun-split"></div>
       </div>
     </div>
