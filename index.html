@@ -2314,8 +2314,6 @@ let S = {
   logAddedBy: 'All',
   logAccountFilter: null,
   logAcctTypeFilter: null,
-  nwExpandedType: null,
-  ltExpandedType: null,
   logPeriod: 'all',
   logReturnAnchor: null,
   pendingOps: [],
@@ -3376,14 +3374,19 @@ function clearLogAcctTypeFilter() {
 }
 
 // Tap a "where it's parked" type row to expand/collapse the accounts of
-// that type right under the bar — no jump to the Log.
+// that type right under the bar — no jump to the Log. Module-level (not
+// in S) so the expansion is ephemeral UI state — every session starts with
+// every group collapsed, matching the other collapsible groups on the page.
+let nwExpandedType = null;
+let ltExpandedType = null;
+
 function toggleNwType(type) {
-  S.nwExpandedType = S.nwExpandedType === type ? null : type;
+  nwExpandedType = nwExpandedType === type ? null : type;
   renderDash();
 }
 
 function toggleLtType(type) {
-  S.ltExpandedType = S.ltExpandedType === type ? null : type;
+  ltExpandedType = ltExpandedType === type ? null : type;
   renderDash();
 }
 
@@ -4589,7 +4592,7 @@ function renderDash() {
 
   // "Where it's parked" — active asset balances split by account type.
   renderTypeBreakdown('d-nw-typesplit', 'd-nw-typebar', 'd-nw-typelegend',
-    activeAccts.filter(a => !a.isLiability), assetsTotal, S.nwExpandedType, 'toggleNwType');
+    activeAccts.filter(a => !a.isLiability), assetsTotal, nwExpandedType, 'toggleNwType');
 
   document.getElementById('d-assets-split').innerHTML   = cardSplitHTML([{pairs: assetsByOwner}]);
   document.getElementById('d-liab-split').innerHTML     = cardSplitHTML([{pairs: liabByOwner}]);
@@ -4598,7 +4601,7 @@ function renderDash() {
   const ltAssetAccts  = longTermAccts.filter(a => !a.isLiability);
   const ltAssetsTotal = ltAssetAccts.reduce((s, a) => s + accountBalance(a), 0);
   renderTypeBreakdown('d-lt-typesplit', 'd-lt-typebar', 'd-lt-typelegend',
-    ltAssetAccts, ltAssetsTotal, S.ltExpandedType, 'toggleLtType');
+    ltAssetAccts, ltAssetsTotal, ltExpandedType, 'toggleLtType');
 
   const acctCard = document.getElementById('d-accounts-card');
   const acctList = document.getElementById('d-accounts-list');
