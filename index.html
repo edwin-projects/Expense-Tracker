@@ -1121,6 +1121,11 @@ select.finput option { background: white; color: var(--ink); }
   display: flex; align-items: center; gap: 8px;
 }
 .acct-group-total.liab { color: var(--red); }
+/* Right-side column wrap so a group head can stack a small secondary line
+   (e.g. 'of X limit' on Credit Cards) under the total amount without
+   nudging the chevron's vertical alignment with the amount. */
+.acct-group-total-col { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.acct-group-sub { font-size: 11px; font-weight: 500; color: var(--ink3); font-variant-numeric: tabular-nums; }
 .acct-group-chevron { font-size: 11px; color: var(--ink3); transition: transform .15s ease; }
 .acct-group.collapsed .acct-group-chevron { transform: rotate(-90deg); }
 .acct-group.collapsed .acct-group-body { display: none; }
@@ -4662,20 +4667,28 @@ function renderDash() {
               <div style="text-align:right;flex-shrink:0"><div class="split-amt" style="${isLiab?'color:var(--red)':''}">₹${fmt(Math.round(bal))}</div>${util}</div>
             </div>`;
           }).join('');
-          // Overall utilization for the Credit Cards group (cards with a limit set)
+          // Overall utilization for the Credit Cards group + a sub-line under
+          // the outstanding balance showing the combined credit limit (the
+          // ceiling the % is computed against). Useful at a glance: 'you owe
+          // ₹1.3L of ₹35L total credit'.
           let headUtil = '';
+          let totalSub = '';
           if (isCC) {
             const withLimit = g.accts.filter(a => a.creditLimit > 0);
             const limTot = withLimit.reduce((s,a) => s + a.creditLimit, 0);
             if (limTot > 0) {
               const pct = Math.round(withLimit.reduce((s,a) => s + accountBalance(a), 0) / limTot * 100);
               headUtil = ` <span class="split-util" style="color:${utilColor(pct)}">${pct}% used</span>`;
+              totalSub = `of ₹${fmt(Math.round(limTot))} limit`;
             }
           }
           return `<div class="acct-group collapsed">
             <div class="acct-group-head" onclick="toggleAcctGroup(this)">
               <div class="acct-group-label">${escapeHtml(label)}<span class="acct-group-count">${g.accts.length}</span>${headUtil}</div>
-              <div class="acct-group-total ${isLiab?'liab':''}">₹${fmt(Math.round(g.total))}<span class="acct-group-chevron">▾</span></div>
+              <div class="acct-group-total-col">
+                <div class="acct-group-total ${isLiab?'liab':''}">₹${fmt(Math.round(g.total))}<span class="acct-group-chevron">▾</span></div>
+                ${totalSub ? `<div class="acct-group-sub">${totalSub}</div>` : ''}
+              </div>
             </div>
             <div class="acct-group-body">${items}</div>
           </div>`;
