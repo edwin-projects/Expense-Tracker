@@ -4049,26 +4049,45 @@ function getDashRange() {
   return null;
 }
 
-// "Same window, shifted backward by one comparable unit." For month-to-date
-// that means shifting both endpoints back one calendar month (so today's
-// position in the month carries over: Jun 5 → May 5). Multi-month and
-// full-year shifts use the matching unit so periods stay calendar-aligned.
+// Prior comparison window. Earlier this was the same-length window shifted
+// back (Jun 1–5 vs May 1–5), but day-level proportional comparisons were
+// noisy on a sparse expense feed. New behaviour: compare the current
+// running period to the FULL closing of the previous comparable period.
+//   'month'     → MTD vs last calendar month (full)
+//   'lastmonth' → last month (full) vs month before (full)
+//   'year'      → FY-to-date vs prior FY (full)
+//   'months'    → N selected months vs prior N months (full)
 function getPriorRange() {
   const cur = getDashRange();
   if (!cur) return null;
   const ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  const shiftMonths = n => {
-    const s = new Date(cur.start + 'T00:00:00'); s.setMonth(s.getMonth() - n);
-    const e = new Date(cur.end   + 'T00:00:00'); e.setMonth(e.getMonth() - n);
+  const fullMonthBefore = (yr, mo) => {
+    // Returns the calendar month that is `1` slot before the given (yr,mo).
+    const s = new Date(yr, mo - 1, 1);
+    const e = new Date(yr, mo, 0);
     return { start: ymd(s), end: ymd(e) };
   };
-  if (S.dashPeriod === 'month' || S.dashPeriod === 'lastmonth') return shiftMonths(1);
-  if (S.dashPeriod === 'year') {
-    const s = new Date(cur.start + 'T00:00:00'); s.setFullYear(s.getFullYear() - 1);
-    const e = new Date(cur.end   + 'T00:00:00'); e.setFullYear(e.getFullYear() - 1);
-    return { start: ymd(s), end: ymd(e) };
+  if (S.dashPeriod === 'month') {
+    const now = new Date();
+    return fullMonthBefore(now.getFullYear(), now.getMonth());
   }
-  if (S.dashPeriod === 'months') return shiftMonths((S.dashMonths || []).length || 1);
+  if (S.dashPeriod === 'lastmonth') {
+    const sD = new Date(cur.start + 'T00:00:00');
+    return fullMonthBefore(sD.getFullYear(), sD.getMonth());
+  }
+  if (S.dashPeriod === 'year') {
+    const sD = new Date(cur.start + 'T00:00:00');
+    const ps = new Date(sD.getFullYear() - 1, 3, 1);   // prior FY: April 1
+    const pe = new Date(sD.getFullYear(),     2, 31);  // prior FY: March 31 (year before April)
+    return { start: ymd(ps), end: ymd(pe) };
+  }
+  if (S.dashPeriod === 'months') {
+    const n = (S.dashMonths || []).length || 1;
+    const sD = new Date(cur.start + 'T00:00:00');
+    const pe = new Date(sD.getFullYear(), sD.getMonth(), 0);          // day before earliest selected
+    const ps = new Date(pe.getFullYear(), pe.getMonth() - (n - 1), 1); // n months back
+    return { start: ymd(ps), end: ymd(pe) };
+  }
   return null;
 }
 
@@ -4099,18 +4118,26 @@ function aggregatesInRange(start, end) {
   };
 }
 
-// Human-readable label for a date range — used in chip tooltips.
+// Human-readable label for a date range — used in chip tooltips. Full-month
+// ranges collapse to 'May 26' / 'Apr–May 26'; partial month ranges keep the
+// day boundaries so the user sees what's actually being compared.
 function rangeLabel(start, end) {
   if (!start || !end) return '';
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end   + 'T00:00:00');
   const mon = d => d.toLocaleDateString('en-IN', { month: 'short' });
+  const yy  = d => d.getFullYear() % 100;
   const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
-  if (sameMonth) {
-    const lastDay = new Date(e.getFullYear(), e.getMonth()+1, 0).getDate();
-    if (s.getDate() === 1 && e.getDate() === lastDay) return `${mon(s)} ${s.getFullYear() % 100}`;
-    return `${mon(s)} ${s.getDate()}–${e.getDate()}`;
+  const sameYear  = s.getFullYear() === e.getFullYear();
+  const lastDay   = new Date(e.getFullYear(), e.getMonth()+1, 0).getDate();
+  const isFullStart = s.getDate() === 1;
+  const isFullEnd   = e.getDate() === lastDay;
+  if (isFullStart && isFullEnd) {
+    if (sameMonth) return `${mon(s)} ${yy(s)}`;
+    if (sameYear)  return `${mon(s)}–${mon(e)} ${yy(e)}`;
+    return `${mon(s)} ${yy(s)} – ${mon(e)} ${yy(e)}`;
   }
+  if (sameMonth) return `${mon(s)} ${s.getDate()}–${e.getDate()}`;
   return `${mon(s)} ${s.getDate()} – ${mon(e)} ${e.getDate()}`;
 }
 
