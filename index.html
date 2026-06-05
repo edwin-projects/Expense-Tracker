@@ -900,6 +900,39 @@ select.finput option { background: white; color: var(--ink); }
   letter-spacing: -0.02em;
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
+
+/* Period-over-period delta chip — sits below stat-sub on each headline
+   card. Colour shows sentiment (good/bad), arrow shows direction of the
+   actual change. Empty chips collapse so cards stay tidy. */
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink3);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.stat-chip.pos  { color: var(--green); background: rgba(95,166,114,0.12); border-color: transparent; }
+.stat-chip.neg  { color: var(--red);   background: rgba(220,120,120,0.12); border-color: transparent; }
+.stat-chip.flat { color: var(--ink3);  background: var(--bg2); }
+.stat-chip.new  { color: var(--ink2);  background: var(--bg2); }
+.stat-chip:empty { display: none; }
+/* On dark, the tinted backgrounds need to ride on top of the card colour. */
+[data-theme="dark"] .stat-chip.pos { background: rgba(95,166,114,0.18); }
+[data-theme="dark"] .stat-chip.neg { background: rgba(220,120,120,0.18); }
+
+/* Compact inline delta inside breakdown rows — no pill, just the arrow + %
+   tinted by sentiment. Pairs with the label so the row stays a single line. */
+.mini-delta { font-size: 9.5px; font-weight: 700; color: var(--ink3); letter-spacing: 0; margin-left: 3px; }
+.mini-delta.pos { color: var(--green); }
+.mini-delta.neg { color: var(--red); }
 .spend-bar {
   width: 172px; height: 24px; flex-shrink: 0;
   background: var(--border); border-radius: 12px;
@@ -935,7 +968,7 @@ select.finput option { background: white; color: var(--ink); }
 /* Spend split by type ("Where it goes") */
 .typesplit-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: var(--border); width: 172px; margin: 0 auto; }
 .typesplit-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
-.typesplit-legend { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
+.typesplit-legend { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 100%; max-width: 260px; }
 .tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
 .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .tl-pct { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -945,7 +978,14 @@ select.finput option { background: white; color: var(--ink); }
    Each row carries a subtle background tint of its accent colour so it
    reads as a small table aligned with the bar segments. */
 .cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
+/* .cf-breakdown.wide gives the Net card's Spent/Invested/Savings + type
+   split rows extra room for a 5th delta column without breaking the
+   tight 172px alignment used by owner splits elsewhere. */
+.cf-breakdown.wide { width: 100%; max-width: 260px; }
 .cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 58px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 3px 4px; border-radius: 5px; box-sizing: border-box; }
+/* When the row needs to host a delta, the grid grows by one auto column
+   placed between the label and amount. Empty delta cells collapse cleanly. */
+.cf-bd-row.with-delta { grid-template-columns: 8px minmax(0, 1fr) auto 60px 28px; }
 /* Account sub-rows under an expanded type — no dot column, no horizontal
    padding, so long account names get as much room as possible before being
    truncated. */
@@ -1700,12 +1740,14 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div class="stat-lbl">Income</div>
         <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div>
         <div class="stat-sub" id="d-cf-income-sub">0 entries</div>
+        <span class="stat-chip" id="d-cf-income-chip"></span>
         <div class="card-split" id="d-cf-income-split"></div>
       </div>
       <div class="stat-card red">
         <div class="stat-lbl">Expenses</div>
         <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div>
         <div class="stat-sub" id="d-cf-expense-sub">0 entries</div>
+        <span class="stat-chip" id="d-cf-expense-chip"></span>
         <div class="card-split" id="d-cf-expense-split"></div>
       </div>
     </div>
@@ -1713,6 +1755,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
         <div class="stat-val" id="d-cf-net">₹0</div>
+        <span class="stat-chip" id="d-cf-net-chip"></span>
         <div class="spend-wrap" id="d-spend-wrap" style="display:none">
           <div class="spend-bar" id="d-spend-bar">
             <div class="spend-fill" id="d-spend-fill"></div>
@@ -1722,7 +1765,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
           </div>
           <div class="spend-overflow" id="d-spend-over"></div>
         </div>
-        <div class="cf-breakdown" id="d-cf-breakdown" style="display:none"></div>
+        <div class="cf-breakdown wide" id="d-cf-breakdown" style="display:none"></div>
         <div class="stat-sub" id="d-cf-net-sub">—</div>
         <div id="d-typesplit" style="display:none;margin-top:16px">
           <div class="typesplit-bar" id="d-typesplit-bar"></div>
@@ -1737,6 +1780,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div class="stat-lbl">Active Net Worth (today)</div>
         <div class="stat-val" id="d-networth">₹0</div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
+        <span class="stat-chip" id="d-networth-chip"></span>
         <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
         <div id="d-nw-typesplit" style="display:none;margin-top:10px">
           <div class="typesplit-bar" id="d-nw-typebar"></div>
@@ -1780,6 +1824,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div class="stat-lbl">Total Spent</div>
         <div class="stat-val" id="d-total">₹0</div>
         <div class="stat-sub" id="d-entries-sub">0 entries</div>
+        <span class="stat-chip" id="d-total-chip"></span>
         <div class="card-split" id="d-total-split"></div>
       </div>
     </div>
@@ -1788,12 +1833,14 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div class="stat-lbl">Saveable</div>
         <div class="stat-val" id="d-save">₹0</div>
         <div class="stat-sub" id="d-save-pct">0% of total</div>
+        <span class="stat-chip" id="d-save-chip"></span>
         <div class="card-split" id="d-save-split"></div>
       </div>
       <div class="stat-card noness">
         <div class="stat-lbl">Non-Essentials</div>
         <div class="stat-val" id="d-noness">₹0</div>
         <div class="stat-sub" id="d-noness-pct">0% of total</div>
+        <span class="stat-chip" id="d-noness-chip"></span>
         <div class="card-split" id="d-noness-split"></div>
       </div>
     </div>
@@ -1802,12 +1849,14 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div class="stat-lbl">Essentials</div>
         <div class="stat-val" id="d-ess">₹0</div>
         <div class="stat-sub" id="d-ess-pct">0% of total</div>
+        <span class="stat-chip" id="d-ess-chip"></span>
         <div class="card-split" id="d-ess-split"></div>
       </div>
       <div class="stat-card fun">
         <div class="stat-lbl">Fun</div>
         <div class="stat-val" id="d-fun">₹0</div>
         <div class="stat-sub" id="d-fun-pct">0% of total</div>
+        <span class="stat-chip" id="d-fun-chip"></span>
         <div class="card-split" id="d-fun-split"></div>
       </div>
     </div>
@@ -3791,6 +3840,145 @@ function inPeriod(dateStr, period = S.dashPeriod) {
 
 const PERIOD_LABELS = { month: 'This Month', lastmonth: 'Last Month', months: 'Selected Months', year: 'Full Year' };
 
+// ── Period-over-period comparison ─────────────────────────────────────
+// Returns the date range covered by the active dashboard filter, capped at
+// today for any in-flight period (you can't compare June 1–30 in early June).
+function getDashRange() {
+  const now = new Date();
+  const ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const period = S.dashPeriod;
+  if (period === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { start: ymd(start), end: ymd(now) };
+  }
+  if (period === 'lastmonth') {
+    const lm  = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { start: ymd(lm), end: ymd(end) };
+  }
+  if (period === 'year') {
+    const start = new Date(fyStartYear(now), 3, 1);
+    return { start: ymd(start), end: ymd(now) };
+  }
+  if (period === 'months') {
+    const ms = (S.dashMonths || []).slice().sort();
+    if (!ms.length) return null;
+    const [fy, fm] = ms[0].split('-').map(Number);
+    const [ly, lm] = ms[ms.length-1].split('-').map(Number);
+    const start = new Date(fy, fm-1, 1);
+    const endLast = new Date(ly, lm, 0);
+    const isCur = ly === now.getFullYear() && lm-1 === now.getMonth();
+    return { start: ymd(start), end: ymd(isCur ? now : endLast) };
+  }
+  return null;
+}
+
+// "Same window, shifted backward by one comparable unit." For month-to-date
+// that means shifting both endpoints back one calendar month (so today's
+// position in the month carries over: Jun 5 → May 5). Multi-month and
+// full-year shifts use the matching unit so periods stay calendar-aligned.
+function getPriorRange() {
+  const cur = getDashRange();
+  if (!cur) return null;
+  const ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const shiftMonths = n => {
+    const s = new Date(cur.start + 'T00:00:00'); s.setMonth(s.getMonth() - n);
+    const e = new Date(cur.end   + 'T00:00:00'); e.setMonth(e.getMonth() - n);
+    return { start: ymd(s), end: ymd(e) };
+  };
+  if (S.dashPeriod === 'month' || S.dashPeriod === 'lastmonth') return shiftMonths(1);
+  if (S.dashPeriod === 'year') {
+    const s = new Date(cur.start + 'T00:00:00'); s.setFullYear(s.getFullYear() - 1);
+    const e = new Date(cur.end   + 'T00:00:00'); e.setFullYear(e.getFullYear() - 1);
+    return { start: ymd(s), end: ymd(e) };
+  }
+  if (S.dashPeriod === 'months') return shiftMonths((S.dashMonths || []).length || 1);
+  return null;
+}
+
+// Compute the same metric set on any date range — used for both the current
+// window (the dashboard) and the prior window (the delta chips).
+function aggregatesInRange(start, end) {
+  if (!start || !end) return null;
+  const acctType = id => (S.accounts.find(a => a.id === id) || {}).type;
+  const inRange = d => d && d >= start && d <= end;
+  const es  = S.entries.filter(e => inRange(e.date));
+  const inc = S.income .filter(i => inRange(i.date));
+  const inv = S.transfers.filter(t => inRange(t.date)
+    && !['Investment','Asset'].includes(acctType(t.fromAccount))
+    && ['Investment','Asset'].includes(acctType(t.toAccount))
+  ).reduce((s,t) => s + Number(t.amount), 0);
+  const sum = arr => arr.reduce((s,x) => s + Number(x.amount), 0);
+  const expTotal = sum(es), incTotal = sum(inc);
+  return {
+    income: incTotal,
+    expense: expTotal,
+    net: incTotal - expTotal,
+    invested: inv,
+    savings: (incTotal - expTotal) - inv,
+    saveable: sum(es.filter(e => e.saving === 'Yes')),
+    essentials:    sum(es.filter(e => e.type === 'Essentials')),
+    nonEssentials: sum(es.filter(e => e.type === 'Non-Essentials')),
+    fun:           sum(es.filter(e => e.type === 'Fun')),
+  };
+}
+
+// Human-readable label for a date range — used in chip tooltips.
+function rangeLabel(start, end) {
+  if (!start || !end) return '';
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end   + 'T00:00:00');
+  const mon = d => d.toLocaleDateString('en-IN', { month: 'short' });
+  const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+  if (sameMonth) {
+    const lastDay = new Date(e.getFullYear(), e.getMonth()+1, 0).getDate();
+    if (s.getDate() === 1 && e.getDate() === lastDay) return `${mon(s)} ${s.getFullYear() % 100}`;
+    return `${mon(s)} ${s.getDate()}–${e.getDate()}`;
+  }
+  return `${mon(s)} ${s.getDate()} – ${mon(e)} ${e.getDate()}`;
+}
+
+// Compact inline delta — used inside breakdown rows (Spent/Invested/Savings
+// and the type split) where a full chip would crowd the layout. Returns a
+// span ('▲5%' / '▼8%') sized by sentiment, or an empty span when no prior
+// data exists (so the grid cell collapses cleanly).
+function miniDeltaHTML(curr, prev, polarity, priorLabel) {
+  if (prev == null || prev === 0 || curr === prev) return '<span class="mini-delta"></span>';
+  const up    = curr > prev;
+  const pct   = Math.round((curr - prev) / Math.abs(prev) * 100);
+  if (Math.abs(pct) < 1) return '<span class="mini-delta"></span>';
+  const arrow = up ? '▲' : '▼';
+  const cls   = polarity === 'up-good' ? (up ? 'pos' : 'neg')
+              : polarity === 'up-bad'  ? (up ? 'neg' : 'pos')
+              : '';
+  const ttl   = priorLabel ? ` title="vs ${priorLabel}"` : '';
+  return `<span class="mini-delta ${cls}"${ttl}>${arrow}${Math.abs(pct)}%</span>`;
+}
+
+// polarity: 'up-good' (more is better), 'up-bad' (less is better), 'neutral'
+// Mutates the chip element in place — sets className for the colour/state
+// and innerHTML for the arrow/text. Empty chips collapse via :empty.
+function setStatChip(id, curr, prev, polarity, priorLabel) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const reset = (cls, html) => {
+    el.className = 'stat-chip' + (cls ? ' ' + cls : '');
+    el.innerHTML = html;
+    if (priorLabel) el.title = 'vs ' + priorLabel; else el.removeAttribute('title');
+  };
+  if (prev == null || (prev === 0 && curr === 0)) { reset('', ''); el.removeAttribute('title'); return; }
+  if (prev === 0)       return reset('new',  `new vs ${priorLabel}`);
+  if (curr === prev)    return reset('flat', `— same as ${priorLabel}`);
+  const up    = curr > prev;
+  const pct   = Math.round((curr - prev) / Math.abs(prev) * 100);
+  const arrow = up ? '▲' : '▼';
+  const sign  = up ? '+' : '−';
+  const cls   = polarity === 'up-good' ? (up ? 'pos' : 'neg')
+              : polarity === 'up-bad'  ? (up ? 'neg' : 'pos')
+              : '';
+  reset(cls, `${arrow} ${sign}${Math.abs(pct)}%`);
+}
+
 function filteredEntries() { return S.entries.filter(e => inPeriod(e.date)); }
 function filteredIncome()  { return S.income .filter(i => inPeriod(i.date)); }
 
@@ -3988,6 +4176,17 @@ function renderTypeBreakdown(boxId, barId, legendId, accts, total, expandedType,
 }
 
 function renderDash() {
+  // Period-over-period comparison — computed once up front and threaded
+  // into the cards as they render. Each call to setChip below carries a
+  // polarity hint ('up-good' = more is better, 'up-bad' = less is better)
+  // so the chip colours sentiment, not raw direction.
+  const priorRange = getPriorRange();
+  const prior      = priorRange ? aggregatesInRange(priorRange.start, priorRange.end) : null;
+  const priorLbl   = priorRange ? rangeLabel(priorRange.start, priorRange.end) : '';
+  const setChip = (id, curr, polarity, prevKey) => {
+    setStatChip(id, curr, prior ? prior[prevKey] : null, polarity, priorLbl);
+  };
+
   // ── Cash Flow (period-aware) ──
   const es = filteredEntries();
   const inc = filteredIncome();
@@ -4006,8 +4205,11 @@ function renderDash() {
   // Smaller displays (legend amounts, splits) keep them.
   document.getElementById('d-cf-income').textContent  = '₹' + fmt(Math.round(incTotal));
   document.getElementById('d-cf-income-sub').textContent = inc.length + ' entries';
+  setChip('d-cf-income-chip',  incTotal, 'up-good', 'income');
   document.getElementById('d-cf-expense').textContent = '₹' + fmt(Math.round(expTotal));
   document.getElementById('d-cf-expense-sub').textContent = es.length + ' entries';
+  setChip('d-cf-expense-chip', expTotal, 'up-bad',  'expense');
+  setChip('d-cf-net-chip',     net,      'up-good', 'net');
   const netEl = document.getElementById('d-cf-net');
   netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.round(Math.abs(net)));
   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
@@ -4078,9 +4280,9 @@ function renderDash() {
     // red of Spent (which the flat amber was starting to mimic).
     const dp = S.dashPeriod;
     const rows = [
-      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')` },
-      ...(invTotal > 0 ? [{ color: GOLD_DOT,        tint: GOLD_TINT,                label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')` }] : []),
-      { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0 },
+      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')`, prevKey: 'expense',  polarity: 'up-bad'  },
+      ...(invTotal > 0 ? [{ color: GOLD_DOT, tint: GOLD_TINT, label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')`, prevKey: 'invested', polarity: 'up-good' }] : []),
+      { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0, prevKey: 'savings', polarity: 'up-good' },
     ].sort((a, b) => b.amt - a.amt);
     breakdown.innerHTML = rows.map(rw => {
       const sign    = rw.amt < 0 ? '−' : '';
@@ -4088,9 +4290,10 @@ function renderDash() {
       const c = rw.isNeg ? 'color:var(--red)' : '';
       const tapAttr = rw.tap ? ` onclick="${rw.tap}"` : '';
       const cursor  = rw.tap ? 'cursor:pointer;' : '';
-      return `<div class="cf-bd-row"${tapAttr} style="${cursor}background:${rw.tint}">`
+      return `<div class="cf-bd-row with-delta"${tapAttr} style="${cursor}background:${rw.tint}">`
         + `<span class="cf-bd-dot" style="background:${rw.color}"></span>`
         + `<span>${rw.label}</span>`
+        + miniDeltaHTML(rw.amt, prior?.[rw.prevKey], rw.polarity, priorLbl)
         + `<span class="cf-bd-amt" style="${c}">${sign}₹${fmt(Math.round(Math.abs(rw.amt)))}</span>`
         + `<span class="cf-bd-pct" style="${c}">${pctSign}${Math.abs(rw.pct)}%</span>`
         + `</div>`;
@@ -4136,10 +4339,15 @@ function renderDash() {
       return `rgba(${n(0)},${n(1)},${n(2)},0.08)`;
     };
     const dpTS = S.dashPeriod;
+    // Maps the segment label to its key on the prior-aggregates object so
+    // each row can show its own delta against the same period last cycle.
+    const typeKey = { 'Essentials': 'essentials', 'Non-Essentials': 'nonEssentials', 'Fun': 'fun' };
+    const typePol = { 'Essentials': 'up-bad',     'Non-Essentials': 'up-bad',        'Fun': 'neutral' };
     document.getElementById('d-typesplit-legend').innerHTML =
-      segs.map(s => `<div class="cf-bd-row" onclick="gotoLog('Expense','${s.type.replace(/'/g, "\\'")}','','${dpTS}','d-cf-net-card')" style="cursor:pointer;background:${tintOf(s.color)}">`
+      segs.map(s => `<div class="cf-bd-row with-delta" onclick="gotoLog('Expense','${s.type.replace(/'/g, "\\'")}','','${dpTS}','d-cf-net-card')" style="cursor:pointer;background:${tintOf(s.color)}">`
         + `<span class="cf-bd-dot" style="background:${s.color}"></span>`
         + `<span>${escapeHtml(s.type)}</span>`
+        + miniDeltaHTML(s.amt, prior?.[typeKey[s.type]], typePol[s.type] || 'neutral', priorLbl)
         + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
         + `<span class="cf-bd-pct">${Math.round(s.pct)}%</span>`
         + `</div>`).join('');
@@ -4170,6 +4378,9 @@ function renderDash() {
   const nw = assetsTotal - liabTotal;
   document.getElementById('d-networth').textContent = (nw >= 0 ? '₹' : '−₹') + fmt(Math.abs(Math.round(nw)));
   document.getElementById('d-networth-sub').textContent = active.length ? `Across ${activeAccts.length} active accounts` : 'Add accounts in Config to start';
+  // Net worth chip compares to the end of the prior window, not aggregates.
+  const priorNw = priorRange ? netWorthAsOf(priorRange.end) : null;
+  setStatChip('d-networth-chip', nw, priorNw, 'up-good', priorLbl);
   document.getElementById('d-assets').textContent = '₹' + fmt(Math.round(assetsTotal));
   document.getElementById('d-assets-sub').textContent = activeAccts.filter(a => !a.isLiability).length + ' accounts';
   document.getElementById('d-liab').textContent = '₹' + fmt(Math.round(liabTotal));
@@ -4279,14 +4490,19 @@ function renderDash() {
 
   document.getElementById('d-total').textContent = '₹' + fmt(total);
   document.getElementById('d-entries-sub').textContent = es.length + ' entries';
+  setChip('d-total-chip',  total,    'up-bad', 'expense');
   document.getElementById('d-save').textContent = '₹' + fmt(saveable);
   document.getElementById('d-save-pct').textContent = pct(saveable);
+  setChip('d-save-chip',   saveable, 'up-good', 'saveable');
   document.getElementById('d-ess').textContent = '₹' + fmt(ess);
   document.getElementById('d-ess-pct').textContent = pct(ess);
+  setChip('d-ess-chip',    ess,      'up-bad',  'essentials');
   document.getElementById('d-noness').textContent = '₹' + fmt(noness);
   document.getElementById('d-noness-pct').textContent = pct(noness);
+  setChip('d-noness-chip', noness,   'up-bad',  'nonEssentials');
   document.getElementById('d-fun').textContent = '₹' + fmt(fun);
   document.getElementById('d-fun-pct').textContent = pct(fun);
+  setChip('d-fun-chip',    fun,      'neutral', 'fun');
 
   // Each expense-type card gets a "For" split
   const forSplit = subset => ['Edwin','Divya','Both','AJ'].map(n => [n, sumBy(subset, 'forWhom', n, e => e.amount)]);
