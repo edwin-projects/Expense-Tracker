@@ -339,6 +339,24 @@ body {
 }
 .pin-key:active { background: #3a3528; transform: scale(0.95); }
 .pin-key.del { font-size: 18px; color: #9c9282; }
+/* Face ID prompt button — shown on the PIN screen when a WebAuthn
+   credential is stored for the selected user. Acts as a fallback to the
+   auto-trigger (which fires on the user-tile click); user can re-tap to
+   retry biometric if they cancelled the first prompt. */
+.faceid-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 12px 14px; margin: 6px 0 14px;
+  background: rgba(212,184,112,0.12);
+  border: 1px solid var(--amber-border);
+  border-radius: 12px;
+  color: var(--amber);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+}
+.faceid-btn:active { transform: scale(0.98); background: rgba(212,184,112,0.18); }
+.faceid-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .setup-who {
   display: flex;
   gap: 10px;
@@ -905,15 +923,13 @@ select.finput option { background: white; color: var(--ink); }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
 
 /* Period-over-period delta chip — sits inline-right of the headline value,
-   baseline-aligned with it. Kept tight (10px font, 1px 6px padding, 5px
-   margin) so the value + chip combination still fits on the half-width
-   cards (Income, Expenses, etc.) without wrapping. */
+   baseline-aligned with it. Kept tight (10px font, 1px 6px padding) so the
+   value + chip combination still fits on the half-width cards (Income,
+   Expenses, etc.) without wrapping. */
 .stat-chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin-left: 5px;
-  vertical-align: middle;
   padding: 1px 6px;
   border-radius: 8px;
   font-size: 10px;
@@ -923,6 +939,17 @@ select.finput option { background: white; color: var(--ink); }
   background: var(--bg2);
   border: 1px solid var(--border);
   white-space: nowrap;
+}
+/* Wrapping value + chip in a flex line with nowrap forces them onto a
+   single row regardless of iOS Safari rendering nuances — without this,
+   tiny rendering differences in the value's intrinsic width were enough
+   to push the chip below the value on the narrow half-cards. */
+.val-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: nowrap;
+  vertical-align: middle;
 }
 .stat-chip.pos  { color: var(--green); background: rgba(95,166,114,0.12); border-color: transparent; }
 .stat-chip.neg  { color: var(--red);   background: rgba(220,120,120,0.12); border-color: transparent; }
@@ -1453,6 +1480,10 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <button class="who-btn" data-who="Divya" onclick="selectWho(this)">Divya</button>
     </div>
     <div class="setup-label" id="pin-entry-label">Enter your PIN</div>
+    <button id="faceid-btn" class="faceid-btn" style="display:none" onclick="tryFaceIdUnlock(getWho(), true)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M4 16v2a2 2 0 0 0 2 2h2"/><path d="M16 20h2a2 2 0 0 0 2-2v-2"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/><circle cx="15" cy="10" r="0.5" fill="currentColor"/><path d="M9 15c1 1 4 1 6 0"/></svg>
+      Use Face ID
+    </button>
     <div class="pin-dots" id="pin-dots">
       <div class="pin-dot"></div>
       <div class="pin-dot"></div>
@@ -1744,13 +1775,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green">
         <div class="stat-lbl">Income</div>
-        <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span></div>
         <div class="stat-sub" id="d-cf-income-sub">0 entries</div>
         <div class="card-split" id="d-cf-income-split"></div>
       </div>
       <div class="stat-card red">
         <div class="stat-lbl">Expenses</div>
-        <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span></div>
         <div class="stat-sub" id="d-cf-expense-sub">0 entries</div>
         <div class="card-split" id="d-cf-expense-split"></div>
       </div>
@@ -1758,7 +1789,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
-        <div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span></div>
         <div class="spend-wrap" id="d-spend-wrap" style="display:none">
           <div class="spend-bar" id="d-spend-bar">
             <div class="spend-fill" id="d-spend-fill"></div>
@@ -1781,7 +1812,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card full networth" id="d-networth-card" style="text-align:center">
         <div class="stat-lbl">Active Net Worth (today)</div>
-        <div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span></div>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
         <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
         <div id="d-nw-typesplit" style="display:none;margin-top:10px">
@@ -1824,7 +1855,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card amber full">
         <div class="stat-lbl">Total Spent</div>
-        <div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span></div>
         <div class="stat-sub" id="d-entries-sub">0 entries</div>
         <div class="card-split" id="d-total-split"></div>
       </div>
@@ -1832,13 +1863,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green">
         <div class="stat-lbl">Saveable</div>
-        <div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span></div>
         <div class="stat-sub" id="d-save-pct">0% of total</div>
         <div class="card-split" id="d-save-split"></div>
       </div>
       <div class="stat-card noness">
         <div class="stat-lbl">Non-Essentials</div>
-        <div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span></div>
         <div class="stat-sub" id="d-noness-pct">0% of total</div>
         <div class="card-split" id="d-noness-split"></div>
       </div>
@@ -1846,13 +1877,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card ess">
         <div class="stat-lbl">Essentials</div>
-        <div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span></div>
         <div class="stat-sub" id="d-ess-pct">0% of total</div>
         <div class="card-split" id="d-ess-split"></div>
       </div>
       <div class="stat-card fun">
         <div class="stat-lbl">Fun</div>
-        <div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span>
+        <div class="val-line"><div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span></div>
         <div class="stat-sub" id="d-fun-pct">0% of total</div>
         <div class="card-split" id="d-fun-split"></div>
       </div>
@@ -2298,7 +2329,11 @@ let S = {
   // Remember the last account picked per form so the next entry defaults to it.
   // Cuts two taps off every save once the user has a routine account.
   lastAccountExp: null,
-  lastAccountInc: null
+  lastAccountInc: null,
+  // Face ID / WebAuthn — keyed by user name. Storing the platform credential
+  // ID locally is enough for unlock; the device handles the actual biometric.
+  webAuthn: {},
+  webAuthnDeclined: {}
 };
 let currentUser = '';
 let pinBuffer = '';
@@ -2583,6 +2618,7 @@ function showPinStep() {
   const who = getWho();
   document.getElementById('pin-entry-label').textContent = S.pins[who] ? `Enter ${who}'s PIN` : `Set ${who}'s PIN`;
   renderPinDots();
+  refreshFaceIdButton(who);
 }
 
 function selectWho(btn) {
@@ -2595,6 +2631,115 @@ function selectWho(btn) {
   document.getElementById('pin-entry-label').textContent = S.pins[who] ? `Enter ${who}'s PIN` : `Set ${who}'s PIN`;
   document.getElementById('pin-hint').textContent = '';
   renderPinDots();
+  refreshFaceIdButton(who);
+  // Auto-fire Face ID if this user has a credential — the tile tap counts
+  // as the required user gesture for navigator.credentials.get() on iOS.
+  // PIN keypad stays visible as a fallback if biometric is cancelled.
+  if (S.pins[who] && S.webAuthn?.[who]) tryFaceIdUnlock(who, false);
+}
+
+// ── Face ID / WebAuthn ─────────────────────────────────────────────
+// Local-only biometric unlock: a platform authenticator credential is
+// registered against each user and stored in S.webAuthn keyed by name.
+// On subsequent logins, tapping the user tile fires navigator.credentials
+// .get() with that credential ID — iOS shows the Face ID sheet, and any
+// successful assertion is treated as a verified unlock. The PIN keypad
+// stays visible the whole time as fallback. There's no server to verify
+// the assertion signature, so we trust the device's user-verification bit.
+function isFaceIdSupported() {
+  return !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+}
+async function isPlatformAuthAvailable() {
+  if (!isFaceIdSupported()) return false;
+  try { return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }
+  catch (e) { return false; }
+}
+function bufToB64(buf) {
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+}
+function b64ToBuf(b64) {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+async function enableFaceId(who) {
+  if (!isFaceIdSupported()) return false;
+  try {
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: 'D & E Finance' },
+        user: {
+          id: new TextEncoder().encode(who + ':' + Date.now()),
+          name: who,
+          displayName: who
+        },
+        pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+          residentKey: 'preferred'
+        },
+        timeout: 60000
+      }
+    });
+    if (!cred) return false;
+    S.webAuthn = S.webAuthn || {};
+    S.webAuthn[who] = bufToB64(cred.rawId);
+    saveLocal();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+// hardFail=true means show an error toast if biometric fails — used when the
+// user taps the Face ID button directly. false = silent (auto-trigger path).
+async function tryFaceIdUnlock(who, hardFail) {
+  if (!isFaceIdSupported()) return false;
+  const credIdB64 = S.webAuthn?.[who];
+  if (!credIdB64) return false;
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: b64ToBuf(credIdB64), type: 'public-key', transports: ['internal'] }],
+        userVerification: 'required',
+        timeout: 60000
+      }
+    });
+    if (!assertion) return false;
+    // Successful biometric verification — treat the same as a correct PIN.
+    document.querySelector(`.who-btn[data-who="${who}"]`)?.classList.add('active');
+    document.querySelectorAll('.who-btn').forEach(b => b.classList.toggle('active', b.dataset.who === who));
+    enterApp();
+    return true;
+  } catch (e) {
+    if (hardFail) toast('Face ID unavailable — use PIN', 'err');
+    return false;
+  }
+}
+function refreshFaceIdButton(who) {
+  const btn = document.getElementById('faceid-btn');
+  if (!btn) return;
+  btn.style.display = (S.pins[who] && S.webAuthn?.[who]) ? 'flex' : 'none';
+}
+async function maybeOfferFaceIdEnrollment() {
+  // Asks the user once per device whether to enable Face ID for the just-
+  // logged-in person. Declines are remembered so we don't pester them.
+  if (!currentUser) return;
+  if (S.webAuthn?.[currentUser]) return;
+  if (S.webAuthnDeclined?.[currentUser]) return;
+  if (!await isPlatformAuthAvailable()) return;
+  // Wait a beat so the app finishes its first paint before the prompt.
+  await new Promise(r => setTimeout(r, 600));
+  const yes = confirm(`Enable Face ID for ${currentUser}?\n\nNext time on this device you can skip the PIN.`);
+  if (!yes) {
+    S.webAuthnDeclined = S.webAuthnDeclined || {};
+    S.webAuthnDeclined[currentUser] = true;
+    saveLocal();
+    return;
+  }
+  const ok = await enableFaceId(currentUser);
+  if (ok) toast('✓ Face ID enabled', 'ok');
+  else    toast('Face ID enrollment cancelled', '');
 }
 
 function getWho() {
@@ -2669,6 +2814,7 @@ function enterApp() {
   document.getElementById('month-picker').style.display = 'none';
   checkBackupReminder();
   syncNow();
+  maybeOfferFaceIdEnrollment();
 }
 
 function logout() {
@@ -3973,6 +4119,8 @@ function setStatChip(id, curr, prev, polarity, priorLabel) {
   if (prev === 0) return reset('new', 'new', `New vs ${priorLabel}`);
   const up    = curr > prev;
   const pct   = Math.round((curr - prev) / Math.abs(prev) * 100);
+  // Sub-1% drift rounds to '0%' which reads as noise — suppress.
+  if (Math.abs(pct) < 1) return reset('', '', '');
   const arrow = up ? '▲' : '▼';
   const sign  = up ? '+' : '−';
   const cls   = polarity === 'up-good' ? (up ? 'pos' : 'neg')
