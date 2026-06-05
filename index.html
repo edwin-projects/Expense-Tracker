@@ -922,11 +922,16 @@ select.finput option { background: white; color: var(--ink); }
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
 
-/* Period-over-period delta chip — sits inline-right of the headline value,
-   baseline-aligned with it. Kept tight (10px font, 1px 6px padding) so the
-   value + chip combination still fits on the half-width cards (Income,
-   Expenses, etc.) without wrapping. */
+/* Period-over-period delta chip — anchored to the top-right corner of the
+   card so it's "tucked to the side" of the value without affecting flow.
+   Inline placement was overflowing the half-width cards on iOS Safari,
+   making the whole page scroll sideways. Absolute placement is reliable
+   regardless of card width. Chip text is kept short (<= 6 chars: 'arrow
+   +5%' / 'new') so it never overlaps the card's top-left label. */
 .stat-chip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -939,17 +944,6 @@ select.finput option { background: white; color: var(--ink); }
   background: var(--bg2);
   border: 1px solid var(--border);
   white-space: nowrap;
-}
-/* Wrapping value + chip in a flex line with nowrap forces them onto a
-   single row regardless of iOS Safari rendering nuances — without this,
-   tiny rendering differences in the value's intrinsic width were enough
-   to push the chip below the value on the narrow half-cards. */
-.val-line {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  flex-wrap: nowrap;
-  vertical-align: middle;
 }
 .stat-chip.pos  { color: var(--green); background: rgba(95,166,114,0.12); border-color: transparent; }
 .stat-chip.neg  { color: var(--red);   background: rgba(220,120,120,0.12); border-color: transparent; }
@@ -1775,13 +1769,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green">
         <div class="stat-lbl">Income</div>
-        <div class="val-line"><div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span></div>
+        <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span>
         <div class="stat-sub" id="d-cf-income-sub">0 entries</div>
         <div class="card-split" id="d-cf-income-split"></div>
       </div>
       <div class="stat-card red">
         <div class="stat-lbl">Expenses</div>
-        <div class="val-line"><div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span></div>
+        <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span>
         <div class="stat-sub" id="d-cf-expense-sub">0 entries</div>
         <div class="card-split" id="d-cf-expense-split"></div>
       </div>
@@ -1789,7 +1783,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
         <div class="stat-lbl">Net (Income − Expenses)</div>
-        <div class="val-line"><div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span></div>
+        <div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span>
         <div class="spend-wrap" id="d-spend-wrap" style="display:none">
           <div class="spend-bar" id="d-spend-bar">
             <div class="spend-fill" id="d-spend-fill"></div>
@@ -1812,7 +1806,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card full networth" id="d-networth-card" style="text-align:center">
         <div class="stat-lbl">Active Net Worth (today)</div>
-        <div class="val-line"><div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span></div>
+        <div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span>
         <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
         <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
         <div id="d-nw-typesplit" style="display:none;margin-top:10px">
@@ -1855,7 +1849,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card amber full">
         <div class="stat-lbl">Total Spent</div>
-        <div class="val-line"><div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span></div>
+        <div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span>
         <div class="stat-sub" id="d-entries-sub">0 entries</div>
         <div class="card-split" id="d-total-split"></div>
       </div>
@@ -1863,13 +1857,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green">
         <div class="stat-lbl">Saveable</div>
-        <div class="val-line"><div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span></div>
+        <div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span>
         <div class="stat-sub" id="d-save-pct">0% of total</div>
         <div class="card-split" id="d-save-split"></div>
       </div>
       <div class="stat-card noness">
         <div class="stat-lbl">Non-Essentials</div>
-        <div class="val-line"><div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span></div>
+        <div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span>
         <div class="stat-sub" id="d-noness-pct">0% of total</div>
         <div class="card-split" id="d-noness-split"></div>
       </div>
@@ -1877,13 +1871,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card ess">
         <div class="stat-lbl">Essentials</div>
-        <div class="val-line"><div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span></div>
+        <div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span>
         <div class="stat-sub" id="d-ess-pct">0% of total</div>
         <div class="card-split" id="d-ess-split"></div>
       </div>
       <div class="stat-card fun">
         <div class="stat-lbl">Fun</div>
-        <div class="val-line"><div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span></div>
+        <div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span>
         <div class="stat-sub" id="d-fun-pct">0% of total</div>
         <div class="card-split" id="d-fun-split"></div>
       </div>
@@ -2333,7 +2327,10 @@ let S = {
   // Face ID / WebAuthn — keyed by user name. Storing the platform credential
   // ID locally is enough for unlock; the device handles the actual biometric.
   webAuthn: {},
-  webAuthnDeclined: {}
+  webAuthnDeclined: {},
+  // Last logged-in user on this device. Used to pre-select the right tile
+  // on the PIN screen and auto-fire Face ID without an explicit user pick.
+  lastUser: ''
 };
 let currentUser = '';
 let pinBuffer = '';
@@ -2615,10 +2612,41 @@ function showPinStep() {
   document.getElementById('pin-hint').textContent = '';
   pinBuffer = '';
   pendingPin = '';
-  const who = getWho();
-  document.getElementById('pin-entry-label').textContent = S.pins[who] ? `Enter ${who}'s PIN` : `Set ${who}'s PIN`;
+  // Restore the last logged-in user on this device — frictionless return.
+  // The tile selection is what gates which PIN/credential we'll check, so
+  // pre-activating it means a returning user can immediately enter their
+  // PIN or pass Face ID without first tapping their own name.
+  const remembered = S.lastUser && ['Edwin','Divya'].includes(S.lastUser) ? S.lastUser : 'Edwin';
+  document.querySelectorAll('.who-btn').forEach(b => b.classList.toggle('active', b.dataset.who === remembered));
+  document.getElementById('pin-entry-label').textContent = S.pins[remembered] ? `Enter ${remembered}'s PIN` : `Set ${remembered}'s PIN`;
   renderPinDots();
-  refreshFaceIdButton(who);
+  refreshFaceIdButton(remembered);
+  // Auto-fire Face ID for the remembered user. On iOS PWAs the launch
+  // counts as transient user activation in many cases; if it doesn't,
+  // get() throws NotAllowedError and we wire up a one-shot tap handler
+  // so the next interaction (anywhere) re-triggers biometric.
+  scheduleAutoFaceId(remembered);
+}
+
+function scheduleAutoFaceId(who) {
+  if (!(S.pins[who] && S.webAuthn?.[who])) return;
+  // Try immediately. If transient activation is missing on iOS, we attach
+  // a one-shot pointerdown listener so the next tap (including a tap on
+  // the keypad) fires biometric — user can still ignore it and type PIN.
+  const attempt = () => tryFaceIdUnlock(who, false);
+  setTimeout(async () => {
+    const ok = await attempt();
+    if (ok) return;
+    const onFirstTap = (ev) => {
+      // Skip the deliberate-PIN path: if the user tapped a digit, let it
+      // through and don't hijack their flow with a biometric prompt.
+      const tappedKey = ev.target.closest('.pin-key, .who-btn');
+      if (tappedKey) return;
+      document.removeEventListener('pointerdown', onFirstTap, true);
+      attempt();
+    };
+    document.addEventListener('pointerdown', onFirstTap, { capture: true, once: false });
+  }, 250);
 }
 
 function selectWho(btn) {
@@ -2800,6 +2828,8 @@ function checkPin() {
 
 function enterApp() {
   currentUser = getWho();
+  S.lastUser = currentUser;
+  saveLocal();
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   document.getElementById('user-pill').textContent = currentUser;
