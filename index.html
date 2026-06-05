@@ -865,6 +865,7 @@ select.finput option { background: white; color: var(--ink); }
   border-radius: 14px;
   padding: 14px 16px;
   box-shadow: var(--shadow);
+  position: relative;
 }
 .stat-card.full { grid-column: 1/-1; }
 .stat-card.amber { background: var(--amber-bg); border-color: var(--amber-border); }
@@ -903,16 +904,17 @@ select.finput option { background: white; color: var(--ink); }
 }
 .stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
 
-/* Period-over-period delta chip — sits inline-right of the headline value
-   on each card, baseline-aligned with it. (Was below stat-sub; user moved
-   it up next to the number for a more compact, premium read.) Empty chips
-   collapse so cards stay tidy when there's no prior data to compare. */
+/* Period-over-period delta chip — anchored in the top-right corner of the
+   card so it's "tucked to the side" of the value regardless of card width.
+   Small (10px) and tabular so it reads as quiet metadata, not headline
+   noise. Empty chips collapse so cards stay tidy when no prior data. */
 .stat-chip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin-left: 6px;
-  vertical-align: middle;
   padding: 1px 6px;
   border-radius: 8px;
   font-size: 10px;
@@ -3953,18 +3955,23 @@ function miniDeltaHTML(curr, prev, polarity, priorLabel) {
 
 // polarity: 'up-good' (more is better), 'up-bad' (less is better), 'neutral'
 // Mutates the chip element in place — sets className for the colour/state
-// and innerHTML for the arrow/text. Empty chips collapse via :empty.
+// and innerHTML for the arrow/text. Chip text is kept to <= ~6 chars so it
+// always fits in the top-right corner of every card without overlapping
+// the label. Hidden for the no-change case (clutter, no useful signal).
 function setStatChip(id, curr, prev, polarity, priorLabel) {
   const el = document.getElementById(id);
   if (!el) return;
-  const reset = (cls, html) => {
+  const reset = (cls, html, ttl) => {
     el.className = 'stat-chip' + (cls ? ' ' + cls : '');
     el.innerHTML = html;
-    if (priorLabel) el.title = 'vs ' + priorLabel; else el.removeAttribute('title');
+    if (ttl) el.title = ttl; else el.removeAttribute('title');
   };
-  if (prev == null || (prev === 0 && curr === 0)) { reset('', ''); el.removeAttribute('title'); return; }
-  if (prev === 0)       return reset('new',  `new vs ${priorLabel}`);
-  if (curr === prev)    return reset('flat', `— same as ${priorLabel}`);
+  // Suppress chip when no useful comparison: missing prior, both zero, or
+  // identical values. These add chrome without telling the user anything.
+  if (prev == null || (prev === 0 && curr === 0) || curr === prev) {
+    return reset('', '', '');
+  }
+  if (prev === 0) return reset('new', 'new', `New vs ${priorLabel}`);
   const up    = curr > prev;
   const pct   = Math.round((curr - prev) / Math.abs(prev) * 100);
   const arrow = up ? '▲' : '▼';
@@ -3972,7 +3979,7 @@ function setStatChip(id, curr, prev, polarity, priorLabel) {
   const cls   = polarity === 'up-good' ? (up ? 'pos' : 'neg')
               : polarity === 'up-bad'  ? (up ? 'neg' : 'pos')
               : '';
-  reset(cls, `${arrow} ${sign}${Math.abs(pct)}%`);
+  reset(cls, `${arrow} ${sign}${Math.abs(pct)}%`, `vs ${priorLabel}`);
 }
 
 function filteredEntries() { return S.entries.filter(e => inPeriod(e.date)); }
