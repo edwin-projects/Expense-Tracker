@@ -4321,10 +4321,14 @@ function renderOwnerSplit(elId, ownerAmounts, denom) {
       .map(([name, amt]) => {
         const disp = name === 'Both' ? 'Joint' : name;
         const pct = Math.round(amt / d * 100);
+        // Net-worth amounts can run into crores — use the compact format
+        // (k / L / Cr) so the amount stays inside its 58px cell and the
+        // gap to the % column survives. Tooltip carries the exact value.
+        const exact = '₹' + fmt(Math.abs(Math.round(amt)));
         return `<div class="cf-bd-row" style="background:${OWNER_TINTS[name] || 'transparent'}">`
           + `<span class="cf-bd-dot" style="background:${OWNER_COLORS[name] || '#999'}"></span>`
           + `<span>${disp}</span>`
-          + `<span class="cf-bd-amt">${amt < 0 ? '−' : ''}₹${fmt(Math.abs(Math.round(amt)))}</span>`
+          + `<span class="cf-bd-amt" title="${exact}">${amt < 0 ? '−' : ''}₹${fmtShort(Math.abs(amt))}</span>`
           + `<span class="cf-bd-pct">${pct}%</span>`
           + `</div>`;
       }).join('');
@@ -4365,10 +4369,14 @@ function renderTypeBreakdown(boxId, barId, legendId, accts, total, expandedType,
     tsegs.map(s => {
       const exp = expandedType === s.type;
       const caret = exp ? '▾' : '▸';
+      // Same compact-format rule as renderOwnerSplit — type breakdown rows
+      // for net worth can hit crore-scale and would otherwise blow past
+      // the 58px amount cell into the % column.
+      const exactAmt = '₹' + fmt(Math.round(s.amt));
       let html = `<div class="cf-bd-row" onclick="${toggleFn}('${s.type.replace(/'/g, "\\'")}')" style="cursor:pointer;background:${rowTint(s)}">`
         + `<span class="cf-bd-dot" style="background:${dotBg(s)}"></span>`
         + `<span>${caret} ${escapeHtml(s.type)}</span>`
-        + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
+        + `<span class="cf-bd-amt" title="${exactAmt}">₹${fmtShort(s.amt)}</span>`
         + `<span class="cf-bd-pct">${Math.round(s.pct)}%</span>`
         + `</div>`;
       if (exp) {
@@ -4381,7 +4389,7 @@ function renderTypeBreakdown(boxId, barId, legendId, accts, total, expandedType,
         html += typeAccts.map(({ a, bal }) =>
           `<div class="cf-bd-row sub" onclick="gotoAccount(${a.id})" style="cursor:pointer;background:rgba(0,0,0,0.03)">`
           + `<span>${escapeHtml(a.name)}</span>`
-          + `<span class="cf-bd-amt">₹${fmt(Math.round(bal))}</span>`
+          + `<span class="cf-bd-amt" title="₹${fmt(Math.round(bal))}">₹${fmtShort(bal)}</span>`
           + `<span class="cf-bd-pct">${Math.round(bal / typeTotal * 100)}%</span>`
           + `</div>`).join('');
       }
