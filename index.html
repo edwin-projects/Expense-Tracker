@@ -2327,6 +2327,10 @@ let S = {
   // Cuts two taps off every save once the user has a routine account.
   lastAccountExp: null,
   lastAccountInc: null,
+  // Same for the Transfer form — From + To both persist so repeat moves
+  // (e.g. monthly CC bill payment from a specific bank) are one-tap.
+  lastTransferFrom: null,
+  lastTransferTo: null,
   // Face ID / WebAuthn — keyed by user name. Storing the platform credential
   // ID locally is enough for unlock; the device handles the actual biometric.
   webAuthn: {},
@@ -2981,9 +2985,15 @@ function buildSelects() {
 
   // Transfer form selects need their own placeholder (— Select —); the edit
   // modal's edit-from/edit-to are populated on open by openEditTransferModal.
+  // Pre-select last-used From/To so app reopens default to the previous pair.
   ['t-from','t-to'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = accountOptionsHTML('— Select —');
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = accountOptionsHTML('— Select —');
+    const fallback = id === 't-from' ? S.lastTransferFrom : S.lastTransferTo;
+    const next = prev || (accountStillExists(fallback) ? String(fallback) : '');
+    if (next) el.value = next;
   });
 
   const srcSel = document.getElementById('i-source');
@@ -3232,6 +3242,8 @@ async function submitTransfer() {
     addedBy: currentUser
   };
   S.transfers.unshift(xfer);
+  S.lastTransferFrom = xfer.fromAccount;
+  S.lastTransferTo   = xfer.toAccount;
   queueOp('transfers', 'POST', xfer.id, {
     id: xfer.id, date: xfer.date, amount: xfer.amount,
     from_account: xfer.fromAccount, to_account: xfer.toAccount,
@@ -3244,8 +3256,10 @@ async function submitTransfer() {
 
 function resetTransferForm() {
   document.getElementById('t-amount').value = '';
-  document.getElementById('t-from').value = '';
-  document.getElementById('t-to').value = '';
+  // Restore last-used From/To so the next transfer of the same kind
+  // (e.g. monthly CC bill payment) doesn't need both picked again.
+  document.getElementById('t-from').value = accountStillExists(S.lastTransferFrom) ? String(S.lastTransferFrom) : '';
+  document.getElementById('t-to').value   = accountStillExists(S.lastTransferTo)   ? String(S.lastTransferTo)   : '';
   document.getElementById('t-desc').value = '';
   document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
 }
