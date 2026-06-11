@@ -2489,6 +2489,12 @@ let S = {
   logAddedBy: 'All',
   logAccountFilter: null,
   logAcctTypeFilter: null,
+  // When true, filter transfers to those that match the dashboard's
+  // 'Invested' definition: a transfer FROM a non-Investment/Asset account
+  // INTO an Investment or Asset account. Set by gotoInvested() so tapping
+  // the dashboard's Invested row lands on entries totalling exactly that
+  // amount; cleared by every other goto/filter setter.
+  logInvestedOnly: false,
   logPeriod: 'all',
   logReturnAnchor: null,
   pendingOps: [],
@@ -3508,6 +3514,7 @@ function setLogAccountFilter(id) {
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
+  S.logInvestedOnly = false;
   S.logPeriod = 'all';
   S.logReturnAnchor = 'd-accounts-card';
   goToLog();
@@ -3532,6 +3539,7 @@ function clearAllLogFilters() {
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
   S.logAcctTypeFilter = null;
+  S.logInvestedOnly = false;
   S.logPeriod = 'all';
   S.logSearch = '';
   const search = document.getElementById('log-search-input');
@@ -3557,6 +3565,26 @@ function gotoLog(kind, type, acctType, period, anchor) {
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
+  S.logInvestedOnly = false;
+  S.logPeriod = period || 'all';
+  S.logReturnAnchor = anchor || null;
+  goToLog();
+}
+
+// Mirrors the dashboard's 'Invested' definition (transfer FROM a
+// non-Investment/Asset account INTO an Investment or Asset account) as a
+// dedicated log filter, so tapping the Invested row lands on exactly those
+// transfers. A generic acctType=Investment filter caught the wrong
+// direction (sells) AND missed Asset-typed destinations (land, gold, etc).
+function gotoInvested(period, anchor) {
+  S.logKind = 'Transfer';
+  S.logType = 'All';
+  S.logFilter = 'All';
+  S.logCategoryFilter = 'All';
+  S.logAddedBy = 'All';
+  S.logAccountFilter = null;
+  S.logAcctTypeFilter = null;
+  S.logInvestedOnly = true;
   S.logPeriod = period || 'all';
   S.logReturnAnchor = anchor || null;
   goToLog();
@@ -3564,6 +3592,9 @@ function gotoLog(kind, type, acctType, period, anchor) {
 
 function clearLogAcctTypeFilter() {
   S.logAcctTypeFilter = null;
+  // Banner is also used for the Invested-only filter — clear both here so
+  // the × button always dismisses the visible chip regardless of source.
+  S.logInvestedOnly = false;
   renderLog();
 }
 
@@ -3613,6 +3644,7 @@ function setLogPersonFilterGo(name, kind, type, anchor) {
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
   S.logAcctTypeFilter = null;
+  S.logInvestedOnly = false;
   S.logPeriod = S.dashPeriod;
   S.logReturnAnchor = anchor || null;
   goToLog();
@@ -3627,6 +3659,7 @@ function setLogCategoryFilterGo(cat) {
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
   S.logAcctTypeFilter = null;
+  S.logInvestedOnly = false;
   S.logPeriod = S.dashPeriod;
   S.logReturnAnchor = 'd-bars';
   goToLog();
@@ -3950,9 +3983,15 @@ function renderLog() {
   }
 
   // Show/hide account-type filter banner (set when tapping a row in the
-  // Net Worth "where it's parked" breakdown or the Invested row).
+  // Net Worth "where it's parked" breakdown). The Invested-mode banner
+  // takes priority — same DOM slot, different label so the user knows
+  // they're seeing the precise 'money invested this period' subset and
+  // not just every transfer touching an investment account.
   const typeBanner = document.getElementById('log-accttype-banner');
-  if (S.logAcctTypeFilter) {
+  if (S.logInvestedOnly) {
+    document.getElementById('log-accttype-banner-text').textContent = 'Filtering: money invested (transfers into investments/assets)';
+    typeBanner.style.display = 'flex';
+  } else if (S.logAcctTypeFilter) {
     const label = ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter;
     document.getElementById('log-accttype-banner-text').textContent = `Filtering by account type: ${label}`;
     typeBanner.style.display = 'flex';
@@ -3991,6 +4030,15 @@ function renderLog() {
     items = items.filter(x => x._kind === 'transfer'
       ? (ids.has(x.fromAccount) || ids.has(x.toAccount))
       : ids.has(x.account));
+  }
+  if (S.logInvestedOnly) {
+    // Matches the dashboard's 'Invested' total exactly: transfer FROM a
+    // non-Investment/Asset account INTO an Investment or Asset account.
+    const investSet = new Set(['Investment','Asset']);
+    const tof = id => (S.accounts.find(a => a.id === id) || {}).type;
+    items = items.filter(x => x._kind === 'transfer'
+      && !investSet.has(tof(x.fromAccount))
+      &&  investSet.has(tof(x.toAccount)));
   }
 
   if (S.logFilter !== 'All') {
@@ -4697,7 +4745,7 @@ function renderDash() {
     const dp = S.dashPeriod;
     const rows = [
       { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')`, prevKey: 'expense',  polarity: 'up-bad'  },
-      ...(invTotal > 0 ? [{ color: GOLD_DOT, tint: GOLD_TINT, label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoLog('Transfer','','Investment','${dp}','d-cf-net-card')`, prevKey: 'invested', polarity: 'up-good' }] : []),
+      ...(invTotal > 0 ? [{ color: GOLD_DOT, tint: GOLD_TINT, label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoInvested('${dp}','d-cf-net-card')`, prevKey: 'invested', polarity: 'up-good' }] : []),
       { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0, prevKey: 'savings', polarity: 'up-good' },
     ].sort((a, b) => b.amt - a.amt);
     breakdown.innerHTML = rows.map(rw => {
