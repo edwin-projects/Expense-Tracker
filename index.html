@@ -1262,6 +1262,116 @@ select.finput option { background: white; color: var(--ink); }
   justify-content: center;
 }
 .modal-overlay.show { display: flex; }
+
+/* ── Searchable select picker ────────────────────────────────────
+   Replaces the native dropdown on iOS (no search, scroll-only) with
+   a bottom-sheet overlay carrying a search input + filtered list.
+   Triggered by a .pick-btn that visually mirrors the original
+   .finput; the underlying <select> stays in the DOM as the state
+   source so existing onchange handlers continue to fire. */
+.picker-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 400;
+  background: var(--scrim);
+  padding: 16px;
+  align-items: flex-end; justify-content: center;
+}
+.picker-overlay.show { display: flex; }
+.picker-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: 100%; max-width: 480px;
+  max-height: 75vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.picker-head {
+  display: flex; gap: 8px; padding: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.picker-search {
+  flex: 1; min-width: 0;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  outline: none;
+}
+.picker-search:focus { border-color: var(--amber); }
+.picker-close {
+  background: var(--bg2); border: 1px solid var(--border);
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  color: var(--ink2); font-size: 22px;
+  cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.picker-list {
+  flex: 1; overflow-y: auto;
+  padding: 6px 0 12px;
+}
+.picker-item {
+  padding: 12px 18px;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border-bottom: 1px solid var(--divider);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.picker-item:last-child { border-bottom: none; }
+.picker-item:active { background: var(--bg2); }
+.picker-item.selected { background: var(--amber-bg); color: var(--amber); font-weight: 600; }
+.picker-item.add-new { color: var(--amber); font-weight: 600; }
+.picker-empty {
+  text-align: center; color: var(--ink3); padding: 24px;
+  font-size: 14px;
+}
+.picker-group {
+  padding: 14px 18px 6px;
+  font-size: 11px; font-weight: 600;
+  color: var(--ink3);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+/* Trigger button — visually mirrors .finput so the form layout
+   doesn't shift when we swap from native select. */
+.pick-btn {
+  flex: 1; min-width: 0; width: 100%;
+  background: none; border: none;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  text-align: right;
+  outline: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pick-btn.placeholder { color: var(--ink3); }
+/* When the trigger replaces a .finput inside an .frow, inherit any
+   inline-style font size the original carried (e.g. f-amount input). */
+.pick-btn.modal-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  text-align: left;
+  font-size: 15px;
+}
+/* Account editor select replacements need their own styling — they
+   live in .frow but pre-existed as raw selects without .finput. */
+.acct-editor .pick-btn {
+  flex: 1; padding: 8px 10px;
+  border: 1px solid var(--border2); border-radius: 8px;
+  background: var(--surface); color: var(--ink);
+  text-align: left; font-size: 13px;
+}
 .modal-box {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2226,6 +2336,19 @@ body { transition: background 0.25s ease, color 0.25s ease; }
   </div>
 </div>
 
+<!-- Searchable select picker — single overlay reused for every <select>
+     enhanced via enhanceSearchableSelect(). The active target is tracked
+     in window.__pickerTarget; selection writes back to that select and
+     dispatches a change event so existing onchange handlers fire. -->
+<div class="picker-overlay" id="picker-overlay" onclick="if(event.target===this) closePicker()">
+  <div class="picker-card">
+    <div class="picker-head">
+      <input class="picker-search" id="picker-search" placeholder="Search…" autocomplete="off" oninput="filterPickerOptions(this.value)">
+      <button class="picker-close" type="button" onclick="closePicker()" aria-label="Close">×</button>
+    </div>
+    <div class="picker-list" id="picker-list"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2998,6 +3121,11 @@ function buildSelects() {
 
   const srcSel = document.getElementById('i-source');
   if (srcSel) srcSel.innerHTML = '<option value="">Select…</option>' + S.incomeSources.map(s => `<option>${s}</option>`).join('') + addOpt('source');
+
+  // Replace native dropdowns with searchable pickers after option lists
+  // are populated. enhance is idempotent — already-enhanced selects just
+  // get their button text re-synced.
+  enhanceAllSearchableSelects();
 }
 
 // When "＋ Add new…" is chosen in a form dropdown, reset the select and
@@ -3467,6 +3595,7 @@ function renderCategoryBar() {
     usedCats.map(c => `<option value="${c}"${S.logCategoryFilter === c ? ' selected' : ''}>${c}</option>`).join('');
   sel.value = S.logCategoryFilter;
   sel.className = 'cat-filter-select' + (S.logCategoryFilter !== 'All' ? ' active' : '');
+  enhanceSearchableSelect(sel);
 }
 
 // HTML-escapes text, then wraps search matches. Escaping first means any
@@ -3512,6 +3641,7 @@ function openEditModal(id) {
       p.classList.toggle('active', p.dataset.mv === map[g]);
     });
   });
+  enhanceAllSearchableSelects(document.getElementById('edit-modal'));
   document.getElementById('edit-modal').classList.add('show');
 }
 
@@ -3528,6 +3658,7 @@ function openEditIncomeModal(id) {
   document.querySelectorAll('.modal-pill[data-mg="received"]').forEach(p => {
     p.classList.toggle('active', p.dataset.mv === i.receivedBy);
   });
+  enhanceAllSearchableSelects(document.getElementById('edit-modal'));
   document.getElementById('edit-modal').classList.add('show');
 }
 
@@ -3541,6 +3672,7 @@ function openEditTransferModal(id) {
   document.getElementById('edit-amount').value = formatIndianNumber(t.amount);
   document.getElementById('edit-date').value = t.date;
   document.getElementById('edit-desc').value = t.desc || '';
+  enhanceAllSearchableSelects(document.getElementById('edit-modal'));
   document.getElementById('edit-modal').classList.add('show');
 }
 
@@ -5066,6 +5198,7 @@ function openAccountEditor(id) {
   document.getElementById('acct-notes').value        = a ? (a.notes || '') : '';
   document.getElementById('acct-longterm').checked   = a ? !!a.longTerm : false;
   onAccountTypeChange();
+  enhanceAllSearchableSelects(document.getElementById('acct-editor'));
 
   // Anchor the editor right under the row being edited (or back to its
   // home spot inside the cfg-card when adding a new account).
@@ -5542,6 +5675,148 @@ function toast(msg, type='') {
   t.textContent = msg;
   t.className = 'toast show' + (type ? ' '+type : '');
   setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ══════════════════════════════════════════════════
+//  SEARCHABLE PICKER — replaces native <select> dropdowns
+// ══════════════════════════════════════════════════
+// iOS Safari opens the native picker on tap and gives no search. With long
+// account lists the user has to scroll to find an entry. Replacement: a
+// bottom-sheet overlay with a search input + filtered option list.
+//
+// Each <select.searchable-source> stays in the DOM as the source of truth.
+// We render a <button.pick-btn> in front of it that mirrors the selected
+// option's text. Tapping the button opens the overlay; selecting an option
+// writes the value back to the original select and dispatches a 'change'
+// event so all existing onchange handlers (handleAddNew / onPickAccount /
+// setCategoryFilter / etc.) fire untouched.
+
+let __pickerTarget = null;
+
+function openSearchablePicker(selectEl) {
+  __pickerTarget = selectEl;
+  document.getElementById('picker-search').value = '';
+  renderPickerOptions('');
+  document.getElementById('picker-overlay').classList.add('show');
+  // Auto-focus search after the overlay paints so iOS keyboard appears.
+  setTimeout(() => {
+    const s = document.getElementById('picker-search');
+    if (s) s.focus();
+  }, 80);
+}
+
+function renderPickerOptions(query) {
+  if (!__pickerTarget) return;
+  const q = (query || '').toLowerCase().trim();
+  const allOpts = [...__pickerTarget.options];
+  // Walk the select's direct children so we can preserve <optgroup>
+  // headers (Bank Accounts, Cash, etc.) - flat .options drops them.
+  const html = [];
+  let anyMatch = false;
+  const matches = o => !q || o.text.toLowerCase().includes(q);
+  for (const node of __pickerTarget.children) {
+    if (node.tagName === 'OPTGROUP') {
+      const inner = [...node.children].filter(matches);
+      if (!inner.length) continue;
+      html.push(`<div class="picker-group">${escapeHtml(node.label || '')}</div>`);
+      for (const o of inner) {
+        anyMatch = true;
+        html.push(renderPickerItem(o, allOpts.indexOf(o)));
+      }
+    } else if (node.tagName === 'OPTION') {
+      if (!matches(node)) continue;
+      anyMatch = true;
+      html.push(renderPickerItem(node, allOpts.indexOf(node)));
+    }
+  }
+  const list = document.getElementById('picker-list');
+  list.innerHTML = anyMatch ? html.join('') : '<div class="picker-empty">No matches</div>';
+}
+
+function renderPickerItem(o, idx) {
+  const selected = o.value === __pickerTarget.value;
+  const isAddNew = o.value === '__add__' || /^add new/i.test(o.text);
+  return `<div class="picker-item${selected ? ' selected' : ''}${isAddNew ? ' add-new' : ''}" data-idx="${idx}" onclick="selectPickerOption(${idx})">${escapeHtml(o.text)}</div>`;
+}
+
+function filterPickerOptions(q) { renderPickerOptions(q); }
+
+function selectPickerOption(optIdx) {
+  if (!__pickerTarget) return;
+  const opt = __pickerTarget.options[optIdx];
+  if (!opt) { closePicker(); return; }
+  __pickerTarget.value = opt.value;
+  // Sync the trigger button text immediately — the change event handler
+  // might re-render and re-enhance, but in case it doesn't, this catches it.
+  const btn = document.querySelector(`.pick-btn[data-target="${__pickerTarget.id}"]`);
+  if (btn) syncPickBtnText(btn, __pickerTarget);
+  __pickerTarget.dispatchEvent(new Event('change', { bubbles: true }));
+  closePicker();
+}
+
+function closePicker() {
+  document.getElementById('picker-overlay').classList.remove('show');
+  __pickerTarget = null;
+}
+
+function syncPickBtnText(btn, selectEl) {
+  const opt = selectEl.options[selectEl.selectedIndex];
+  // Empty value with options.length > 0 → use the first option's text as the
+  // placeholder (e.g. '— Select —'). When the user actually picks the
+  // empty placeholder option, treat it as 'no value' too.
+  const isPlaceholder = !selectEl.value || (opt && !opt.value);
+  btn.classList.toggle('placeholder', isPlaceholder);
+  btn.textContent = opt ? opt.text : '';
+}
+
+function enhanceSearchableSelect(selectEl) {
+  if (!selectEl || selectEl.dataset.searchable === 'on') {
+    // Already enhanced — just sync text in case options/value changed.
+    if (selectEl?.dataset.searchable === 'on') {
+      const btn = selectEl.previousElementSibling;
+      if (btn?.classList.contains('pick-btn')) syncPickBtnText(btn, selectEl);
+    }
+    return;
+  }
+  selectEl.dataset.searchable = 'on';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'pick-btn ' + (selectEl.className || '');
+  btn.dataset.target = selectEl.id;
+  if (selectEl.getAttribute('style')) btn.setAttribute('style', selectEl.getAttribute('style'));
+  syncPickBtnText(btn, selectEl);
+  btn.addEventListener('click', () => openSearchablePicker(selectEl));
+
+  // Hide the underlying select but keep it in the DOM as state holder.
+  selectEl.style.display = 'none';
+  selectEl.parentNode.insertBefore(btn, selectEl);
+
+  // Watch for option list rebuilds (buildSelects rewrites .innerHTML) and
+  // class changes (e.g. cat-filter-select toggling .active), keeping the
+  // visible trigger button in sync with the underlying select.
+  new MutationObserver(() => {
+    syncPickBtnText(btn, selectEl);
+    btn.className = 'pick-btn ' + (selectEl.className || '');
+  }).observe(selectEl, { childList: true, attributes: true, attributeFilter: ['class'] });
+
+  // Programmatic value assignments don't fire 'change', so override the
+  // setter on this instance to also resync the button text.
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  Object.defineProperty(selectEl, 'value', {
+    configurable: true,
+    get() { return desc.get.call(this); },
+    set(v) {
+      desc.set.call(this, v);
+      syncPickBtnText(btn, this);
+    }
+  });
+}
+
+function enhanceAllSearchableSelects(root) {
+  const scope = root || document;
+  scope.querySelectorAll('select.finput, select.modal-input, .acct-editor select, #cat-filter-select')
+    .forEach(enhanceSearchableSelect);
 }
 
 
