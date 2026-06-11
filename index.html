@@ -1281,23 +1281,31 @@ select.finput option { background: white; color: var(--ink); }
 .picker-card {
   position: absolute;
   /* top / left / width / max-height are set per-open in positionPicker() */
-  border-radius: 14px;
+  border-radius: 13px;
   display: flex; flex-direction: column;
   overflow: hidden;
-  /* Frosted-glass material — translucent fill + heavy backdrop blur,
-     the hallmark of the iOS menu/popover look. Fill is fairly opaque so
-     it reads as a clean material rather than picking up the backdrop.
-     Base = light theme (the app's default :root); dark overrides below. */
-  background: rgba(252,252,254,0.86);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-          backdrop-filter: blur(40px) saturate(180%);
-  border: 0.5px solid rgba(0,0,0,0.08);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  /* Frosted-glass material tuned to Apple's UIMenu / context-menu popover
+     (systemThinMaterial). Translucent fill + strong wide-radius blur +
+     saturation lift = the characteristic 'real glass' look; a faint inset
+     highlight on the top edge gives it the lit appearance Apple uses.
+     Base rule is the light/default :root style; [data-theme=dark]
+     overrides below (the app uses no data-theme=light attribute). */
+  background: rgba(255,255,255,0.72);
+  -webkit-backdrop-filter: blur(50px) saturate(180%);
+          backdrop-filter: blur(50px) saturate(180%);
+  border: 0.5px solid rgba(0,0,0,0.06);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255,255,255,0.6),
+    0 10px 30px rgba(0,0,0,0.18),
+    0 0 0 0.5px rgba(0,0,0,0.04);
 }
 [data-theme="dark"] .picker-card {
-  background: rgba(44,44,48,0.82);
-  border: 0.5px solid rgba(255,255,255,0.14);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  background: rgba(38,38,40,0.70);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255,255,255,0.08),
+    0 10px 36px rgba(0,0,0,0.55),
+    0 0 0 0.5px rgba(0,0,0,0.5);
 }
 /* Fallback when backdrop-filter isn't supported — use a solid surface so
    the card never renders see-through-unblurred. */
@@ -1306,7 +1314,7 @@ select.finput option { background: white; color: var(--ink); }
 }
 .picker-head {
   display: flex; gap: 8px; padding: 10px;
-  border-bottom: 0.5px solid rgba(128,128,128,0.25);
+  border-bottom: 0.5px solid rgba(128,128,128,0.18);
   flex-shrink: 0;
   align-items: center;
 }
@@ -1345,16 +1353,16 @@ select.finput option { background: white; color: var(--ink); }
   padding: 4px 0 8px;
 }
 .picker-item {
-  padding: 13px 16px;
+  padding: 12px 16px;
   font-size: 16px;
   color: var(--ink);
   cursor: pointer;
   display: flex; align-items: center; gap: 12px;
-  border-bottom: 0.5px solid rgba(128,128,128,0.18);
+  border-bottom: 0.5px solid rgba(128,128,128,0.14);
   font-family: 'Inter', system-ui, sans-serif;
 }
 .picker-item:last-child { border-bottom: none; }
-.picker-item:active { background: rgba(128,128,128,0.18); }
+.picker-item:active { background: rgba(128,128,128,0.14); }
 /* iOS-style: selected row shows an amber checkmark, no fill. */
 .picker-item .picker-check {
   width: 18px; flex-shrink: 0;
@@ -5771,16 +5779,17 @@ function openSearchablePicker(selectEl, triggerEl) {
   const overlay = document.getElementById('picker-overlay');
   const search = document.getElementById('picker-search');
   search.value = '';
+  search.blur();   // never start with keyboard up
   renderPickerOptions('');
   overlay.classList.add('show');
   positionPicker(triggerEl || document.querySelector(`.pick-btn[data-target="${selectEl.id}"]`));
   // Bring the currently-selected row into view (may be far down a long list).
   const sel = document.querySelector('.picker-item.selected');
   if (sel) sel.scrollIntoView({ block: 'center' });
-  // Focus SYNCHRONOUSLY, still inside the user-tap call stack — iOS only
-  // raises the keyboard for programmatic focus during a user gesture. A
-  // setTimeout breaks that chain (the old code needed a second tap).
-  search.focus({ preventScroll: true });
+  // Note: we deliberately do NOT focus the search field. The user wanted to
+  // see the full list first (with their current selection visible) and only
+  // pop the keyboard when they actually tap the search bar — feels closer
+  // to a native iOS menu than the search-first behaviour we had before.
 }
 
 function renderPickerOptions(query) {
