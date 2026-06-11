@@ -1264,38 +1264,49 @@ select.finput option { background: white; color: var(--ink); }
 .modal-overlay.show { display: flex; }
 
 /* ── Searchable select picker ────────────────────────────────────
-   Replaces the native dropdown on iOS (no search, scroll-only) with
-   an overlay styled like the iOS contact/list picker: a rounded card
-   carrying a lens-prefixed search field and a clean checkmark list.
-   The card anchors to the TOP of the screen so when the keyboard
-   slides up it never covers the search field or the results — the
-   earlier bottom-sheet sat under the keyboard. The underlying
-   <select> stays in the DOM as the state source so existing onchange
-   handlers continue to fire. */
+   Native-iOS-style dropdown: a frosted-glass popover that drops from
+   wherever the trigger was tapped (position set in JS), carrying a
+   lens-prefixed search field and a checkmark list. Vertical position
+   is clamped so the card never sits under the keyboard. The
+   underlying <select> stays in the DOM as the state source so
+   existing onchange handlers continue to fire. */
 .picker-overlay {
   display: none;
   position: fixed; inset: 0; z-index: 400;
-  background: var(--scrim);
-  padding: 10px 12px;
-  align-items: flex-start; justify-content: center;
+  /* Very light dim — native popovers barely darken the backdrop, and a
+     heavy scrim tints the frosted card behind it gray. */
+  background: rgba(0,0,0,0.12);
 }
-.picker-overlay.show { display: flex; }
+.picker-overlay.show { display: block; }
 .picker-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  width: 100%; max-width: 480px;
-  /* Stay in the upper portion so the list sits above the keyboard.
-     50vh leaves room for the keyboard (~45vh) plus a margin. */
-  max-height: 50vh;
-  margin-top: 6px;
+  position: absolute;
+  /* top / left / width / max-height are set per-open in positionPicker() */
+  border-radius: 14px;
   display: flex; flex-direction: column;
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  /* Frosted-glass material — translucent fill + heavy backdrop blur,
+     the hallmark of the iOS menu/popover look. Fill is fairly opaque so
+     it reads as a clean material rather than picking up the backdrop.
+     Base = light theme (the app's default :root); dark overrides below. */
+  background: rgba(252,252,254,0.86);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+          backdrop-filter: blur(40px) saturate(180%);
+  border: 0.5px solid rgba(0,0,0,0.08);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+[data-theme="dark"] .picker-card {
+  background: rgba(44,44,48,0.82);
+  border: 0.5px solid rgba(255,255,255,0.14);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+/* Fallback when backdrop-filter isn't supported — use a solid surface so
+   the card never renders see-through-unblurred. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .picker-card { background: var(--surface); }
 }
 .picker-head {
   display: flex; gap: 8px; padding: 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid rgba(128,128,128,0.25);
   flex-shrink: 0;
   align-items: center;
 }
@@ -1313,15 +1324,14 @@ select.finput option { background: white; color: var(--ink); }
 .picker-search {
   flex: 1; min-width: 0; width: 100%;
   padding: 10px 14px 10px 36px;
-  background: var(--bg2);
-  border: 1px solid var(--border2);
+  background: rgba(128,128,128,0.18);
+  border: none;
   border-radius: 10px;
   color: var(--ink);
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 16px;
   outline: none;
 }
-.picker-search:focus { border-color: var(--amber); }
 .picker-close {
   background: none; border: none;
   padding: 6px 4px;
@@ -1340,11 +1350,11 @@ select.finput option { background: white; color: var(--ink); }
   color: var(--ink);
   cursor: pointer;
   display: flex; align-items: center; gap: 12px;
-  border-bottom: 1px solid var(--divider);
+  border-bottom: 0.5px solid rgba(128,128,128,0.18);
   font-family: 'Inter', system-ui, sans-serif;
 }
 .picker-item:last-child { border-bottom: none; }
-.picker-item:active { background: var(--bg2); }
+.picker-item:active { background: rgba(128,128,128,0.18); }
 /* iOS-style: selected row shows an amber checkmark, no fill. */
 .picker-item .picker-check {
   width: 18px; flex-shrink: 0;
@@ -5722,22 +5732,55 @@ function toast(msg, type='') {
 
 let __pickerTarget = null;
 
-function openSearchablePicker(selectEl) {
+// Positions the popover card relative to the trigger that opened it, so it
+// "drops" from where the user tapped — not pinned to the top. Vertical
+// extent is clamped to stay above the on-screen keyboard (which we reserve
+// ~310px for); if the trigger is low on screen the card lifts up so its
+// full height remains visible. Called on open and on resize.
+function positionPicker(triggerEl) {
+  const card = document.querySelector('.picker-card');
+  if (!card || !triggerEl) return;
+  const r = triggerEl.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const KB = 310;                 // reserved keyboard height
+  const margin = 8;
+  const availBottom = vh - KB - margin;   // lowest the card may extend to
+
+  // Horizontal: align to the trigger's row, full-width-ish with margins,
+  // clamped to a comfortable max so long lists don't stretch edge-to-edge.
+  const width = Math.min(vw - margin * 2, 480);
+  let left = r.left + r.width / 2 - width / 2;        // centre on trigger
+  left = Math.max(margin, Math.min(left, vw - width - margin));
+
+  // Vertical: drop just below the trigger. If that leaves too little room
+  // above the keyboard, lift the card up so it keeps a usable height.
+  let top = r.bottom + 6;
+  let maxH = availBottom - top;
+  if (maxH < 240) {
+    top = Math.max(margin, availBottom - 340);
+    maxH = availBottom - top;
+  }
+  card.style.left = left + 'px';
+  card.style.width = width + 'px';
+  card.style.top = top + 'px';
+  card.style.maxHeight = maxH + 'px';
+}
+
+function openSearchablePicker(selectEl, triggerEl) {
   __pickerTarget = selectEl;
-  document.getElementById('picker-search').value = '';
+  const overlay = document.getElementById('picker-overlay');
+  const search = document.getElementById('picker-search');
+  search.value = '';
   renderPickerOptions('');
-  document.getElementById('picker-overlay').classList.add('show');
-  // Bring the currently-selected row into view (it may be far down a long
-  // list). Done before focusing so the jump isn't visible to the user.
+  overlay.classList.add('show');
+  positionPicker(triggerEl || document.querySelector(`.pick-btn[data-target="${selectEl.id}"]`));
+  // Bring the currently-selected row into view (may be far down a long list).
   const sel = document.querySelector('.picker-item.selected');
   if (sel) sel.scrollIntoView({ block: 'center' });
-  // Auto-focus search after the overlay paints so iOS keyboard appears
-  // and the user can type immediately. Search sits at the top of the
-  // card, results below it — both stay above the keyboard.
-  setTimeout(() => {
-    const s = document.getElementById('picker-search');
-    if (s) s.focus();
-  }, 80);
+  // Focus SYNCHRONOUSLY, still inside the user-tap call stack — iOS only
+  // raises the keyboard for programmatic focus during a user gesture. A
+  // setTimeout breaks that chain (the old code needed a second tap).
+  search.focus({ preventScroll: true });
 }
 
 function renderPickerOptions(query) {
@@ -5824,7 +5867,7 @@ function enhanceSearchableSelect(selectEl) {
   btn.dataset.target = selectEl.id;
   if (selectEl.getAttribute('style')) btn.setAttribute('style', selectEl.getAttribute('style'));
   syncPickBtnText(btn, selectEl);
-  btn.addEventListener('click', () => openSearchablePicker(selectEl));
+  btn.addEventListener('click', () => openSearchablePicker(selectEl, btn));
 
   // Hide the underlying select but keep it in the DOM as state holder.
   selectEl.style.display = 'none';
