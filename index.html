@@ -3943,6 +3943,16 @@ async function saveEdit() {
 async function deleteEntry(id) {
   if (!confirm('Delete this entry?')) return;
   S.entries = S.entries.filter(e => e.id !== id);
+  // Clear any reimbursement-income links that pointed at this expense, so
+  // the income side doesn't quietly carry dead references. The income
+  // entries themselves stay — the user can re-link or change their source
+  // later. PATCH each one so the cleared link syncs to Supabase too.
+  S.income.forEach(i => {
+    if (i.reimbursesEntryId === id) {
+      i.reimbursesEntryId = null;
+      queueOp('income', 'PATCH', i.id, { reimburses_entry_id: null });
+    }
+  });
   queueOp('expenses', 'DELETE', id);
   saveLocal();
   await pushChanges('Entry deleted');
@@ -4448,26 +4458,34 @@ function aggregatesInRange(start, end) {
   ).reduce((s,t) => s + Number(t.amount), 0);
   const sum = arr => arr.reduce((s,x) => s + Number(x.amount), 0);
   const expTotal = sum(es), incTotal = sum(inc);
-  // Reimbursements (e.g. cousin paying you back after a split CC bill) aren't
-  // earnings; they offset a previously-recorded expense. To keep both the
-  // account balances real AND the dashboard showing your true out-of-pocket
-  // spend, we net the reimbursement total out of BOTH sides — real income
-  // strips it out, real expense subtracts it. Net is mathematically the
-  // same (gross income minus gross expense) but each side now reflects
-  // genuine activity instead of an inflated wash.
-  const reimbursed = sum(inc.filter(i => isReimbursementSource(i.source)));
+  // Per-expense reimbursement map built from ALL income (across periods), so
+  // a reimbursement that lands in a later month still reduces the original
+  // expense's effective amount in the month the expense lives in. effAmt is
+  // floored at 0 — an over-reimbursement never turns an expense negative.
+  // The income side meanwhile excludes only the reimbursements that fall
+  // inside *this* range (because the user's rule is 'reimbursement isn't
+  // income'); reimbursements outside the range don't appear in this range's
+  // income to begin with.
+  const linked = new Map();
+  S.income.filter(i => isReimbursementSource(i.source) && i.reimbursesEntryId != null)
+    .forEach(i => linked.set(Number(i.reimbursesEntryId),
+      (linked.get(Number(i.reimbursesEntryId)) || 0) + Number(i.amount)));
+  const effAmt = e => Math.max(0, Number(e.amount) - (linked.get(e.id) || 0));
+  const reimbursedInRange = sum(inc.filter(i => isReimbursementSource(i.source)));
+  const realIncome  = incTotal - reimbursedInRange;
+  const realExpense = es.reduce((s, e) => s + effAmt(e), 0);
   return {
-    income: incTotal - reimbursed,           // real earnings (no reimbursements)
-    expense: expTotal - reimbursed,          // real out-of-pocket spend
-    net: incTotal - expTotal,                // unchanged: both sides shifted equally
+    income: realIncome,
+    expense: realExpense,
+    net: realIncome - realExpense,
     invested: inv,
-    savings: (incTotal - expTotal) - inv,
-    saveable: sum(es.filter(e => e.saving === 'Yes')),
-    essentials:    sum(es.filter(e => e.type === 'Essentials')),
-    nonEssentials: sum(es.filter(e => e.type === 'Non-Essentials')),
-    fun:           sum(es.filter(e => e.type === 'Fun')),
-    reimbursed,
-    grossIncome:  incTotal,                  // kept for display sub-lines
+    savings: realIncome - realExpense - inv,
+    saveable:      es.filter(e => e.saving === 'Yes').reduce((s,e) => s + effAmt(e), 0),
+    essentials:    es.filter(e => e.type === 'Essentials').reduce((s,e) => s + effAmt(e), 0),
+    nonEssentials: es.filter(e => e.type === 'Non-Essentials').reduce((s,e) => s + effAmt(e), 0),
+    fun:           es.filter(e => e.type === 'Fun').reduce((s,e) => s + effAmt(e), 0),
+    reimbursed: reimbursedInRange,
+    grossIncome:  incTotal,
     grossExpense: expTotal,
   };
 }
@@ -4842,25 +4860,21 @@ function renderDash() {
   const inc = filteredIncome();
   const incTotal = inc.reduce((s,i) => s + Number(i.amount), 0);
   const expTotal = es.reduce((s,e) => s + Number(e.amount), 0);
-  // Reimbursement income (e.g. friend paying you back for a split bill that
-  // hit your card) isn't real earnings — it offsets a previously-recorded
-  // expense. Net it out of both income AND expense so the headline cards
-  // show your true out-of-pocket position. Mathematically: net stays the
-  // same (both sides reduced by the same amount). Account balances are
-  // untouched — the CC still owes its full charge, savings still has the
-  // real deposit. We just display the activity honestly.
-  const reimbursed = inc.filter(i => isReimbursementSource(i.source))
-                        .reduce((s,i) => s + Number(i.amount), 0);
-  const realIncome  = incTotal - reimbursed;
-  const realExpense = expTotal - reimbursed;
-  // Per-expense reimbursement map for the period — used by every sum that
-  // groups by category / type / saving-flag below. Only reimbursements
-  // that are linked (reimbursesEntryId set) reduce a specific expense;
-  // unlinked ones still net globally (via realExpense above) but won't
-  // attribute to a category. Capped at the expense amount so an
-  // over-reimbursement never turns a positive bill negative.
+  // Reimbursement handling — see aggregatesInRange() for the full rationale.
+  // Quick summary of the rule:
+  //   - The linked-reimbursement map is built from ALL income (every
+  //     period), so a reimbursement that lands later still reduces the
+  //     original expense in the month it lives in. effAmt is floored at 0
+  //     so an over-reimbursement never makes an expense go negative.
+  //   - The Income card subtracts only reimbursements that fall inside
+  //     the current period filter (because reimbursements aren't income).
+  //   - The Expense card / Spent row / per-category / per-type sums all
+  //     run through effAmt, so they all agree: 'this is what you really
+  //     spent on this entry'. Unlinked reimbursements don't net (the user
+  //     must tag to net; this also keeps Cash-Flow numbers consistent
+  //     with the Expense Breakdown card).
   const linkedReimb = new Map();
-  inc.filter(i => isReimbursementSource(i.source) && i.reimbursesEntryId != null)
+  S.income.filter(i => isReimbursementSource(i.source) && i.reimbursesEntryId != null)
      .forEach(i => {
        const k = Number(i.reimbursesEntryId);
        linkedReimb.set(k, (linkedReimb.get(k) || 0) + Number(i.amount));
@@ -4869,6 +4883,10 @@ function renderDash() {
     const r = linkedReimb.get(e.id) || 0;
     return Math.max(0, Number(e.amount) - r);
   };
+  const reimbursed = inc.filter(i => isReimbursementSource(i.source))
+                        .reduce((s,i) => s + Number(i.amount), 0);
+  const realIncome  = incTotal - reimbursed;
+  const realExpense = es.reduce((s, e) => s + effAmt(e), 0);
   // Money parked into investments this period — transfers from an active
   // account (not already Investment/Asset, so fund switches don't count) into
   // an Investment or Asset account.
@@ -5264,12 +5282,16 @@ function renderDash() {
     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
     const monthInc = S.income.filter(i => (i.date||'').slice(0,7) === key);
-    const mIncGross = monthInc.reduce((s,i)=>s+Number(i.amount),0);
-    const mReimb    = monthInc.filter(i => isReimbursementSource(i.source)).reduce((s,i)=>s+Number(i.amount),0);
-    const mExpGross = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
-    // Reimbursements net out of both columns (see aggregatesInRange comment).
-    const mInc = mIncGross - mReimb;
-    const mExp = mExpGross - mReimb;
+    const monthEs  = S.entries.filter(e => (e.date||'').slice(0,7) === key);
+    const mReimb   = monthInc.filter(i => isReimbursementSource(i.source)).reduce((s,i)=>s+Number(i.amount),0);
+    // Income for the month strips out reimbursement income. Expense for the
+    // month uses effAmt (linked-aware) so the row matches what the Summary
+    // would show if you scoped it to this single month — and cross-period
+    // reimbursements (May dinner, June reimbursement) reduce May's row
+    // even though the cash arrived in June. effAmt was defined above for
+    // the current period; reuse it for trend so the math agrees.
+    const mInc = monthInc.reduce((s,i)=>s+Number(i.amount),0) - mReimb;
+    const mExp = monthEs.reduce((s,e)=>s+effAmt(e),0);
     if (key === curKey) curIdx = k;
     trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp });
   }
@@ -5817,11 +5839,15 @@ function dismissBackupReminder() {
 }
 
 function exportIncomeCSV() {
-  const headers = ['Date','Amount (INR)','Source','Received By','Account','Description','Added By','Month'];
+  // Reimbursement linkage shown as a column so a re-import or external
+  // analysis can reconstruct the netting. Value is the linked expense
+  // entry id (matches the id column of an expense row in the expenses CSV).
+  const headers = ['Date','Amount (INR)','Source','Received By','Account','Description','Reimburses Entry','Added By','Month'];
   const acctName = id => (S.accounts.find(a => a.id === id) || {}).name || '';
   const rows = S.income.map(i => [
     i.date, i.amount, i.source, i.receivedBy, acctName(i.account),
     '"' + (i.desc || '').replace(/"/g,'""') + '"',
+    i.reimbursesEntryId ?? '',
     i.addedBy, i.month
   ].join(','));
   const csv = '﻿' + [headers.join(','), ...rows].join('\n');
