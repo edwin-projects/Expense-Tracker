@@ -2532,6 +2532,18 @@ function loadLocal() {
   if (!S.types.length) S.types = [...DEFAULTS.types];
   if (!S.frequencies.length) S.frequencies = [...DEFAULTS.frequencies];
   if (!Array.isArray(S.incomeSources) || !S.incomeSources.length) S.incomeSources = [...DEFAULTS.incomeSources];
+  // Ensure 'Reimbursement' is present for existing users — it gates the
+  // friend-paid-me-back-on-savings workflow that the Summary now nets out
+  // (commit c32e1f4). The default list above is only applied to brand-new
+  // installs, so without this migration the dropdown wouldn't offer it
+  // until the user added it themselves.
+  if (!S.incomeSources.includes('Reimbursement')) {
+    // Insert before 'Other' if present, else append, so the natural list
+    // order is preserved (Salary / Business / … / Reimbursement / Other).
+    const otherIdx = S.incomeSources.indexOf('Other');
+    if (otherIdx >= 0) S.incomeSources.splice(otherIdx, 0, 'Reimbursement');
+    else               S.incomeSources.push('Reimbursement');
+  }
   if (!Array.isArray(S.income)) S.income = [];
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
