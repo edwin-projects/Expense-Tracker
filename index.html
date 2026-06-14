@@ -4177,15 +4177,21 @@ function renderLog() {
 function renderExpenseCard(e, q) {
   const fc = 'for-' + (e.forWhom || 'both').toLowerCase();
   const an = (S.accounts.find(a => a.id === e.account) || {}).name;
-  // If this expense has any tagged reimbursements pointing at it, show the
-  // net effective amount under the gross. Gross stays prominent because
-  // that's the real charge on the card / account; the netted figure is the
-  // sub-line so the user always sees both.
+  // If this expense has tagged reimbursements pointing at it, show the NET
+  // (post-reimbursement) figure as the prominent headline and tuck the
+  // gross + reimbursed total into a muted sub-line. The net is what the
+  // user actually spent out-of-pocket on this entry — that's the
+  // emphasis they want. The CC was still really charged the gross, but
+  // that detail lives in the sub-line and on the account-balance view.
   const reimbAmt = S.income
     .filter(i => i.reimbursesEntryId === e.id && isReimbursementSource(i.source))
     .reduce((s, i) => s + Number(i.amount), 0);
-  const effLine = reimbAmt > 0
-    ? `<div class="entry-date" style="color:var(--green)">−₹${fmt(Math.round(reimbAmt))} reimbursed · net ₹${fmt(Math.max(0, Math.round(Number(e.amount) - reimbAmt)))}</div>`
+  const gross = Number(e.amount);
+  const net   = Math.max(0, gross - reimbAmt);
+  const headlineAmt  = reimbAmt > 0 ? net : gross;
+  const headlineStr  = '₹' + headlineAmt.toLocaleString('en-IN');
+  const reimbSubLine = reimbAmt > 0
+    ? `<div class="entry-date" style="color:var(--ink3)">gross ₹${fmt(Math.round(gross))} · ₹${fmt(Math.round(reimbAmt))} reimbursed</div>`
     : '';
   return `
     <div class="entry-card" id="entry-${e.id}">
@@ -4208,9 +4214,9 @@ function renderExpenseCard(e, q) {
         </div>
       </div>
       <div class="entry-right">
-        <div class="entry-amount">₹${Number(e.amount).toLocaleString('en-IN')}</div>
+        <div class="entry-amount">${headlineStr}</div>
         <div class="entry-date">${fmtDate(e.date)}</div>
-        ${effLine}
+        ${reimbSubLine}
       </div>
     </div>`;
 }
@@ -4874,14 +4880,17 @@ function renderDash() {
   const net = realIncome - realExpense;     // == incTotal - expTotal
   // Big cash-flow numbers are rounded — decimals are noise at this size.
   // Smaller displays (legend amounts, splits) keep them.
-  // Sub-line on each card calls out reimbursements when present so the
-  // user can see the relationship between gross activity and net figure.
-  const reimburseSub = reimbursed > 0 ? ` · ₹${fmt(Math.round(reimbursed))} reimbursed` : '';
+  // Headlines and entry counts both exclude reimbursement income from the
+  // 'Income' card — reimbursements aren't earnings, so they shouldn't
+  // inflate either the value or the count. Reimbursement attribution
+  // lives on the individual Log entry now (gross + reimbursed sub-line
+  // beneath each affected expense), so we don't repeat that note here.
+  const realIncomeCount = inc.filter(i => !isReimbursementSource(i.source)).length;
   document.getElementById('d-cf-income').textContent  = '₹' + fmt(Math.round(realIncome));
-  document.getElementById('d-cf-income-sub').textContent = inc.length + ' entries' + reimburseSub;
+  document.getElementById('d-cf-income-sub').textContent = realIncomeCount + ' entries';
   setChip('d-cf-income-chip',  realIncome, 'up-good', 'income');
   document.getElementById('d-cf-expense').textContent = '₹' + fmt(Math.round(realExpense));
-  document.getElementById('d-cf-expense-sub').textContent = es.length + ' entries' + reimburseSub;
+  document.getElementById('d-cf-expense-sub').textContent = es.length + ' entries';
   setChip('d-cf-expense-chip', realExpense, 'up-bad',  'expense');
   setChip('d-cf-net-chip',     net,      'up-good', 'net');
   const netEl = document.getElementById('d-cf-net');
