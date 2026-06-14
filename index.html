@@ -1777,7 +1777,15 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="fcard">
       <div class="frow">
         <span class="flabel">Source</span>
-        <select class="finput" id="i-source" onchange="handleAddNew(this,'src')"></select>
+        <select class="finput" id="i-source" onchange="if(!handleAddNew(this,'src')) onIncomeSourceChange(this.value)"></select>
+      </div>
+      <!-- Shown only when the source is a reimbursement variant. Lets the
+           user tag this income to the expense it reimburses, so the
+           Summary's per-expense totals (category, type, Saveable, Top
+           Categories) reflect the *real* net spend, not the gross charge. -->
+      <div class="frow" id="i-reimburses-row" style="display:none">
+        <span class="flabel">Reimburses</span>
+        <select class="finput" id="i-reimburses"></select>
       </div>
       <div class="frow">
         <span class="flabel">Account</span>
@@ -2289,7 +2297,11 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
       <div class="modal-field edit-only-income" style="display:none">
         <div class="modal-label">Source</div>
-        <select class="modal-input" id="edit-source"></select>
+        <select class="modal-input" id="edit-source" onchange="onEditIncomeSourceChange(this.value)"></select>
+      </div>
+      <div class="modal-field edit-only-income" id="edit-reimburses-row" style="display:none">
+        <div class="modal-label">Reimburses</div>
+        <select class="modal-input" id="edit-reimburses"></select>
       </div>
       <div class="modal-field edit-only-acct">
         <div class="modal-label">Account</div>
@@ -2728,7 +2740,9 @@ async function syncNow() {
       id: r.id, date: r.date, amount: Number(r.amount),
       source: r.source, receivedBy: r.received_by,
       account: r.account != null ? Number(r.account) : null,
-      desc: r.description, month: r.month, addedBy: r.added_by
+      desc: r.description, month: r.month, addedBy: r.added_by,
+      // Optional column on Supabase — survives if added, harmless if not.
+      reimbursesEntryId: r.reimburses_entry_id != null ? Number(r.reimburses_entry_id) : null,
     })), ...localOnly];
   }
   if (xferRows && Array.isArray(xferRows)) {
@@ -3358,6 +3372,13 @@ async function submitIncome() {
   const receivedBy = getPill('received');
   const acctRaw = document.getElementById('i-account').value;
   const account = acctRaw ? Number(acctRaw) : null;
+  // Reimbursement-only: the expense this income offsets (so the Summary
+  // can reduce the right per-expense total). Stored as an integer id or
+  // null when unlinked. The picker is hidden for non-reimbursement
+  // sources, so we read it conditionally to avoid carrying stale values.
+  const reimburses = isReimbursementSource(source)
+    ? (Number(document.getElementById('i-reimburses')?.value) || null)
+    : null;
 
   if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
   if (!source) return toast('Select a source', 'err');
@@ -3368,6 +3389,7 @@ async function submitIncome() {
   const entry = {
     id: newId(),
     date, amount, source, receivedBy, account, desc,
+    reimbursesEntryId: reimburses,
     month: date.slice(0,7),
     addedBy: currentUser
   };
@@ -3377,6 +3399,7 @@ async function submitIncome() {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
     account: entry.account, description: entry.desc,
+    reimburses_entry_id: entry.reimbursesEntryId,
     month: entry.month, added_by: entry.addedBy
   });
   saveLocal();
@@ -3397,6 +3420,11 @@ function resetIncomeForm() {
   document.getElementById('i-account').value = accountStillExists(S.lastAccountInc) ? String(S.lastAccountInc) : '';
   document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
   document.querySelectorAll('.pill[data-g="received"]').forEach(p => p.classList.toggle('active', p.dataset.v === (currentUser || 'Edwin')));
+  // Source is blank → reimburses picker is irrelevant. Hide + clear.
+  const rRow = document.getElementById('i-reimburses-row');
+  if (rRow) rRow.style.display = 'none';
+  const rSel = document.getElementById('i-reimburses');
+  if (rSel) rSel.value = '';
 }
 
 async function deleteIncome(id) {
@@ -3762,6 +3790,12 @@ function openEditIncomeModal(id) {
   document.querySelectorAll('.modal-pill[data-mg="received"]').forEach(p => {
     p.classList.toggle('active', p.dataset.mv === i.receivedBy);
   });
+  // Reimbursement linkage: stash the current value on the picker as a
+  // dataset hint, then onEditIncomeSourceChange picks it up when it
+  // populates options. Hidden unless the source actually matches.
+  const rSel = document.getElementById('edit-reimburses');
+  if (rSel) rSel.dataset.preselect = i.reimbursesEntryId != null ? String(i.reimbursesEntryId) : '';
+  onEditIncomeSourceChange(i.source);
   enhanceAllSearchableSelects(document.getElementById('edit-modal'));
   document.getElementById('edit-modal').classList.add('show');
 }
@@ -3838,14 +3872,22 @@ async function saveEdit() {
     const amount = parseAmount(document.getElementById('edit-amount').value);
     if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
     if (!account) return toast('Pick an account', 'err');
+    const newSource = document.getElementById('edit-source').value;
+    // Same rule as the Add form: a reimbursement source can carry an
+    // expense link; any other source clears it so changing the source
+    // away from 'Reimbursement' doesn't leave a stale tag behind.
+    const reimburses = isReimbursementSource(newSource)
+      ? (Number(document.getElementById('edit-reimburses')?.value) || null)
+      : null;
     const updated = {
       ...S.income[idx],
       amount,
-      source: document.getElementById('edit-source').value,
+      source: newSource,
       date,
       desc: document.getElementById('edit-desc').value.trim(),
       receivedBy: getModalPill('received'),
       account,
+      reimbursesEntryId: reimburses,
       month: date.slice(0,7)
     };
     S.income[idx] = updated;
@@ -3853,6 +3895,7 @@ async function saveEdit() {
       amount: updated.amount, source: updated.source,
       date: updated.date, description: updated.desc,
       received_by: updated.receivedBy, account: updated.account,
+      reimburses_entry_id: updated.reimbursesEntryId,
       month: updated.month
     });
     saveLocal();
@@ -3940,6 +3983,7 @@ async function repeatIncome(id) {
     id: clone.id, date: clone.date, amount: clone.amount,
     source: clone.source, received_by: clone.receivedBy,
     account: clone.account, description: clone.desc,
+    reimburses_entry_id: clone.reimbursesEntryId,
     month: clone.month, added_by: clone.addedBy
   });
   saveLocal();
@@ -4133,6 +4177,16 @@ function renderLog() {
 function renderExpenseCard(e, q) {
   const fc = 'for-' + (e.forWhom || 'both').toLowerCase();
   const an = (S.accounts.find(a => a.id === e.account) || {}).name;
+  // If this expense has any tagged reimbursements pointing at it, show the
+  // net effective amount under the gross. Gross stays prominent because
+  // that's the real charge on the card / account; the netted figure is the
+  // sub-line so the user always sees both.
+  const reimbAmt = S.income
+    .filter(i => i.reimbursesEntryId === e.id && isReimbursementSource(i.source))
+    .reduce((s, i) => s + Number(i.amount), 0);
+  const effLine = reimbAmt > 0
+    ? `<div class="entry-date" style="color:var(--green)">−₹${fmt(Math.round(reimbAmt))} reimbursed · net ₹${fmt(Math.max(0, Math.round(Number(e.amount) - reimbAmt)))}</div>`
+    : '';
   return `
     <div class="entry-card" id="entry-${e.id}">
       <div class="entry-left">
@@ -4156,12 +4210,24 @@ function renderExpenseCard(e, q) {
       <div class="entry-right">
         <div class="entry-amount">₹${Number(e.amount).toLocaleString('en-IN')}</div>
         <div class="entry-date">${fmtDate(e.date)}</div>
+        ${effLine}
       </div>
     </div>`;
 }
 
 function renderIncomeCard(i, q) {
   const an = (S.accounts.find(a => a.id === i.account) || {}).name;
+  // If this income reimburses a tagged expense, surface the link in the
+  // card so it's obvious in the Log what it's offsetting — the user can
+  // see the chain at a glance instead of cross-referencing dates.
+  let linkChip = '';
+  if (i.reimbursesEntryId != null) {
+    const linked = S.entries.find(e => e.id === i.reimbursesEntryId);
+    if (linked) {
+      const desc = linked.desc ? ` · ${linked.desc}` : '';
+      linkChip = `<div class="echip" style="background:var(--bg2);color:var(--ink2);border-color:var(--border)">↪ for ${escapeHtml(linked.category)}${escapeHtml(desc)} (${fmtDate(linked.date)})</div>`;
+    }
+  }
   return `
     <div class="entry-card" id="inc-${i.id}">
       <div class="entry-left">
@@ -4171,6 +4237,7 @@ function renderIncomeCard(i, q) {
           <div class="echip income">+ Income</div>
           <div class="echip paid">By: ${hl(i.receivedBy, q)}</div>
           ${an ? `<div class="echip acct">⊞ ${hl(an, q)}</div>` : ''}
+          ${linkChip}
         </div>
         ${i.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(i.addedBy, q)}</div>` : ''}
         <div class="entry-actions">
@@ -4449,6 +4516,74 @@ function isReimbursementSource(src) {
   return /reimburse|refund/i.test(String(src).trim());
 }
 
+// ── Reimbursement → Expense linking ───────────────────────────────────
+// When a user records income tagged with a reimbursement source, they can
+// optionally point it at the specific expense it offsets. Persisting that
+// link on the income entry lets the Summary's per-expense aggregates (Top
+// Categories, type splits, Saveable, etc.) reduce the right expense rather
+// than just netting at the total level. Unlinked reimbursements continue
+// to net globally so older entries keep their previous behaviour.
+
+// Populate a <select> with the most recent expenses paid by `paidByPref`
+// first (the income's receiver — usually the person who got reimbursed
+// also paid the bill). Falls back to all recent expenses. Currently
+// selected value is preserved when present.
+function populateReimbursesPicker(selId, paidByPref, currentValue) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  const fmtINR = n => '₹' + fmt(Math.round(Number(n) || 0));
+  const within = (e, days) => {
+    if (!e.date) return false;
+    const d = new Date(e.date + 'T00:00:00');
+    return (Date.now() - d.getTime()) <= days * 86400000;
+  };
+  const recent = (S.entries || [])
+    .filter(e => within(e, 120))
+    .sort((a, b) => {
+      // Same-payer first, then most recent.
+      const ap = a.paidBy === paidByPref ? 0 : 1;
+      const bp = b.paidBy === paidByPref ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return (b.date || '').localeCompare(a.date || '');
+    })
+    .slice(0, 40);
+  // Make sure the currently-linked entry is in the list even if older than
+  // the 120-day window or paid by someone else.
+  if (currentValue && !recent.find(e => e.id === currentValue)) {
+    const linked = (S.entries || []).find(e => e.id === currentValue);
+    if (linked) recent.unshift(linked);
+  }
+  const opt = e => {
+    const label = [e.date, e.category, fmtINR(e.amount), e.desc].filter(Boolean).join(' · ');
+    return `<option value="${e.id}"${e.id === currentValue ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  };
+  sel.innerHTML = `<option value="">— Not linked —</option>` + recent.map(opt).join('');
+  enhanceSearchableSelect(sel);
+}
+
+function onIncomeSourceChange(source) {
+  const row = document.getElementById('i-reimburses-row');
+  if (!row) return;
+  const show = isReimbursementSource(source);
+  row.style.display = show ? 'flex' : 'none';
+  if (show) {
+    const recv = getPill('received') || currentUser;
+    populateReimbursesPicker('i-reimburses', recv, null);
+  }
+}
+
+function onEditIncomeSourceChange(source) {
+  const row = document.getElementById('edit-reimburses-row');
+  if (!row) return;
+  const show = isReimbursementSource(source);
+  row.style.display = show ? '' : 'none';
+  if (show) {
+    const recv = getModalPill('received') || currentUser;
+    const cur = Number(document.getElementById('edit-reimburses')?.dataset.preselect || 0) || null;
+    populateReimbursesPicker('edit-reimburses', recv, cur);
+  }
+}
+
 // polarity: 'up-good' (more is better), 'up-bad' (less is better), 'neutral'
 // Mutates the chip element in place — sets className for the colour/state
 // and innerHTML for the arrow/text. Chip text is kept to <= ~6 chars so it
@@ -4712,6 +4847,22 @@ function renderDash() {
                         .reduce((s,i) => s + Number(i.amount), 0);
   const realIncome  = incTotal - reimbursed;
   const realExpense = expTotal - reimbursed;
+  // Per-expense reimbursement map for the period — used by every sum that
+  // groups by category / type / saving-flag below. Only reimbursements
+  // that are linked (reimbursesEntryId set) reduce a specific expense;
+  // unlinked ones still net globally (via realExpense above) but won't
+  // attribute to a category. Capped at the expense amount so an
+  // over-reimbursement never turns a positive bill negative.
+  const linkedReimb = new Map();
+  inc.filter(i => isReimbursementSource(i.source) && i.reimbursesEntryId != null)
+     .forEach(i => {
+       const k = Number(i.reimbursesEntryId);
+       linkedReimb.set(k, (linkedReimb.get(k) || 0) + Number(i.amount));
+     });
+  const effAmt = e => {
+    const r = linkedReimb.get(e.id) || 0;
+    return Math.max(0, Number(e.amount) - r);
+  };
   // Money parked into investments this period — transfers from an active
   // account (not already Investment/Asset, so fund switches don't count) into
   // an Investment or Asset account.
@@ -4851,12 +5002,16 @@ function renderDash() {
 
   // ── Spend split by type (shown inside the Net card) ──
   const tsBox = document.getElementById('d-typesplit');
-  if (expTotal > 0) {
+  if (realExpense > 0) {
+    // Use effAmt so the per-type proportion reflects real spend (linked
+    // reimbursements peeled off the relevant entries). Percentages run
+    // against realExpense so the segments sum to 100% even after netting.
     const byType = {};
-    es.forEach(e => { const t = e.type || 'Other'; byType[t] = (byType[t] || 0) + Number(e.amount); });
+    es.forEach(e => { const t = e.type || 'Other'; byType[t] = (byType[t] || 0) + effAmt(e); });
     let fb = 0;
     const segs = Object.entries(byType)
-      .map(([type, amt]) => ({ type, amt, pct: amt / expTotal * 100 }))
+      .filter(([,amt]) => amt > 0)
+      .map(([type, amt]) => ({ type, amt, pct: amt / realExpense * 100 }))
       .sort((a,b) => b.pct - a.pct)
       .map(s => ({ ...s, color: TYPE_COLORS[s.type] || TYPE_FALLBACK[fb++ % TYPE_FALLBACK.length] }));
     document.getElementById('d-typesplit-bar').innerHTML =
@@ -4892,11 +5047,20 @@ function renderDash() {
   // Reimbursement received by a person offsets two things at once:
   //   - their reported income (it's not earnings),
   //   - their reported out-of-pocket (it cancels part of what they paid).
-  // Subtract from both Earned-By and Paid-By splits so the per-person
-  // numbers sum to the netted headlines above.
+  // For the Paid-By split we use effAmt on each expense so a linked
+  // reimbursement reduces the actual payer's share precisely (the payer
+  // is the row's paidBy, not necessarily the income's receivedBy).
+  // Unlinked reimbursements fall back to subtracting from the receiver's
+  // own paid total so the split still sums to the netted headline.
+  const linkedReimbAmt = inc.filter(i => isReimbursementSource(i.source) && i.reimbursesEntryId != null)
+                            .reduce((s,i) => s + Number(i.amount), 0);
+  const unlinkedReimbBy = name => sumBy(
+    inc.filter(i => isReimbursementSource(i.source) && i.reimbursesEntryId == null),
+    'receivedBy', name, i => i.amount
+  );
   const reimbBy = name => sumBy(inc.filter(i => isReimbursementSource(i.source)), 'receivedBy', name, i => i.amount);
   const incByPerson = ['Edwin','Divya'].map(n => [n, sumBy(inc, 'receivedBy', n, i => i.amount) - reimbBy(n)]);
-  const expByPaid   = ['Edwin','Divya'].map(n => [n, sumBy(es, 'paidBy',     n, e => e.amount) - reimbBy(n)]);
+  const expByPaid   = ['Edwin','Divya'].map(n => [n, sumBy(es, 'paidBy',     n, effAmt)            - unlinkedReimbBy(n)]);
   document.getElementById('d-cf-income-split').innerHTML = cardSplitHTML([{head:'Earned By', pairs: incByPerson, link:'Income', anchor:'d-cf-income-split'}]);
   document.getElementById('d-cf-expense-split').innerHTML = cardSplitHTML([
     {head:'Paid By', pairs: expByPaid}
@@ -5023,12 +5187,18 @@ function renderDash() {
   }
 
   // ── Expense breakdown ──
-  const total = expTotal;
+  // Total + per-type figures use effAmt so a reimbursement linked to a
+  // specific expense reduces THAT expense's contribution to its category
+  // and type bucket. Unlinked reimbursements still net at the global level
+  // (via realExpense) so the headline cards stay correct, but they can't
+  // attribute to a type — by definition we don't know which expense they
+  // belong to.
   const esSave   = es.filter(e => e.saving === 'Yes');
   const esEss    = es.filter(e => e.type === 'Essentials');
   const esNon    = es.filter(e => e.type === 'Non-Essentials');
   const esFun    = es.filter(e => e.type === 'Fun');
-  const sum = arr => arr.reduce((s,e) => s + Number(e.amount), 0);
+  const sum = arr => arr.reduce((s,e) => s + effAmt(e), 0);
+  const total = es.reduce((s,e) => s + effAmt(e), 0);
   const saveable = sum(esSave), ess = sum(esEss), noness = sum(esNon), fun = sum(esFun);
   const pct = v => total ? Math.round(v/total*100) + '% of total' : '0% of total';
 
@@ -5048,8 +5218,9 @@ function renderDash() {
   document.getElementById('d-fun-pct').textContent = pct(fun);
   setChip('d-fun-chip',    fun,      'neutral', 'fun');
 
-  // Each expense-type card gets a "For" split
-  const forSplit = subset => ['Edwin','Divya','Both','AJ'].map(n => [n, sumBy(subset, 'forWhom', n, e => e.amount)]);
+  // Each expense-type card gets a "For" split — effAmt so reimbursements
+  // linked to one of these entries reduce that person's share.
+  const forSplit = subset => ['Edwin','Divya','Both','AJ'].map(n => [n, sumBy(subset, 'forWhom', n, effAmt)]);
   document.getElementById('d-total-split').innerHTML  = cardSplitHTML([{pairs: forSplit(es),     link:'Expense', anchor:'d-total-split'}]);
   document.getElementById('d-save-split').innerHTML   = cardSplitHTML([{pairs: forSplit(esSave), link:'Expense', linkType:'Saveable',       anchor:'d-save-split'}]);
   document.getElementById('d-ess-split').innerHTML    = cardSplitHTML([{pairs: forSplit(esEss),  link:'Expense', linkType:'Essentials',     anchor:'d-ess-split'}]);
@@ -5057,8 +5228,11 @@ function renderDash() {
   document.getElementById('d-fun-split').innerHTML    = cardSplitHTML([{pairs: forSplit(esFun),  link:'Expense', linkType:'Fun',            anchor:'d-fun-split'}]);
 
   // Bars
+  // Top categories use effAmt so a reimbursement attributed to a specific
+  // expense reduces that category's share — the user's stated motivation:
+  // 'Dining' shouldn't show ₹6,159 when ₹3,500 of it was paid back.
   const catTot = {};
-  es.forEach(e => catTot[e.category] = (catTot[e.category]||0) + Number(e.amount));
+  es.forEach(e => catTot[e.category] = (catTot[e.category]||0) + effAmt(e));
   const sorted = Object.entries(catTot).sort((a,b)=>b[1]-a[1]).slice(0,10);
   const mx = sorted[0]?.[1] || 1;
   document.getElementById('d-bars').innerHTML = sorted.length
@@ -5730,6 +5904,7 @@ async function importBackup(input) {
       id: x.id, date: x.date, amount: x.amount,
       source: x.source, received_by: x.receivedBy,
       account: x.account ?? null, description: x.desc,
+      reimburses_entry_id: x.reimbursesEntryId ?? null,
       month: x.month, added_by: x.addedBy
     })));
   }
