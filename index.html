@@ -4351,16 +4351,27 @@ function aggregatesInRange(start, end) {
   ).reduce((s,t) => s + Number(t.amount), 0);
   const sum = arr => arr.reduce((s,x) => s + Number(x.amount), 0);
   const expTotal = sum(es), incTotal = sum(inc);
+  // Reimbursements (e.g. cousin paying you back after a split CC bill) aren't
+  // earnings; they offset a previously-recorded expense. To keep both the
+  // account balances real AND the dashboard showing your true out-of-pocket
+  // spend, we net the reimbursement total out of BOTH sides — real income
+  // strips it out, real expense subtracts it. Net is mathematically the
+  // same (gross income minus gross expense) but each side now reflects
+  // genuine activity instead of an inflated wash.
+  const reimbursed = sum(inc.filter(i => i.source === 'Reimbursement'));
   return {
-    income: incTotal,
-    expense: expTotal,
-    net: incTotal - expTotal,
+    income: incTotal - reimbursed,           // real earnings (no reimbursements)
+    expense: expTotal - reimbursed,          // real out-of-pocket spend
+    net: incTotal - expTotal,                // unchanged: both sides shifted equally
     invested: inv,
     savings: (incTotal - expTotal) - inv,
     saveable: sum(es.filter(e => e.saving === 'Yes')),
     essentials:    sum(es.filter(e => e.type === 'Essentials')),
     nonEssentials: sum(es.filter(e => e.type === 'Non-Essentials')),
     fun:           sum(es.filter(e => e.type === 'Fun')),
+    reimbursed,
+    grossIncome:  incTotal,                  // kept for display sub-lines
+    grossExpense: expTotal,
   };
 }
 
@@ -4656,6 +4667,17 @@ function renderDash() {
   const inc = filteredIncome();
   const incTotal = inc.reduce((s,i) => s + Number(i.amount), 0);
   const expTotal = es.reduce((s,e) => s + Number(e.amount), 0);
+  // Reimbursement income (e.g. friend paying you back for a split bill that
+  // hit your card) isn't real earnings — it offsets a previously-recorded
+  // expense. Net it out of both income AND expense so the headline cards
+  // show your true out-of-pocket position. Mathematically: net stays the
+  // same (both sides reduced by the same amount). Account balances are
+  // untouched — the CC still owes its full charge, savings still has the
+  // real deposit. We just display the activity honestly.
+  const reimbursed = inc.filter(i => i.source === 'Reimbursement')
+                        .reduce((s,i) => s + Number(i.amount), 0);
+  const realIncome  = incTotal - reimbursed;
+  const realExpense = expTotal - reimbursed;
   // Money parked into investments this period — transfers from an active
   // account (not already Investment/Asset, so fund switches don't count) into
   // an Investment or Asset account.
@@ -4664,15 +4686,18 @@ function renderDash() {
     && !['Investment','Asset'].includes(acctType(t.fromAccount))
     && ['Investment','Asset'].includes(acctType(t.toAccount))
   ).reduce((s,t) => s + Number(t.amount), 0);
-  const net = incTotal - expTotal;
+  const net = realIncome - realExpense;     // == incTotal - expTotal
   // Big cash-flow numbers are rounded — decimals are noise at this size.
   // Smaller displays (legend amounts, splits) keep them.
-  document.getElementById('d-cf-income').textContent  = '₹' + fmt(Math.round(incTotal));
-  document.getElementById('d-cf-income-sub').textContent = inc.length + ' entries';
-  setChip('d-cf-income-chip',  incTotal, 'up-good', 'income');
-  document.getElementById('d-cf-expense').textContent = '₹' + fmt(Math.round(expTotal));
-  document.getElementById('d-cf-expense-sub').textContent = es.length + ' entries';
-  setChip('d-cf-expense-chip', expTotal, 'up-bad',  'expense');
+  // Sub-line on each card calls out reimbursements when present so the
+  // user can see the relationship between gross activity and net figure.
+  const reimburseSub = reimbursed > 0 ? ` · ₹${fmt(Math.round(reimbursed))} reimbursed` : '';
+  document.getElementById('d-cf-income').textContent  = '₹' + fmt(Math.round(realIncome));
+  document.getElementById('d-cf-income-sub').textContent = inc.length + ' entries' + reimburseSub;
+  setChip('d-cf-income-chip',  realIncome, 'up-good', 'income');
+  document.getElementById('d-cf-expense').textContent = '₹' + fmt(Math.round(realExpense));
+  document.getElementById('d-cf-expense-sub').textContent = es.length + ' entries' + reimburseSub;
+  setChip('d-cf-expense-chip', realExpense, 'up-bad',  'expense');
   setChip('d-cf-net-chip',     net,      'up-good', 'net');
   const netEl = document.getElementById('d-cf-net');
   netEl.textContent = (net >= 0 ? '+₹' : '−₹') + fmt(Math.round(Math.abs(net)));
@@ -4695,9 +4720,13 @@ function renderDash() {
     el.style.borderRadius = radius;
     el.textContent = pct >= 12 ? pct + '%' : '';
   };
-  if (incTotal > 0) {
-    const spendPct = Math.round(expTotal / incTotal * 100);
-    const invPct   = Math.round(invTotal / incTotal * 100);
+  if (realIncome > 0) {
+    // Percentages run against real income (gross minus reimbursements), so
+    // the bar reflects 'of every real rupee earned, how was it deployed'.
+    // Spent uses realExpense for the same reason — the Spent row should
+    // match the Expenses headline above it.
+    const spendPct = Math.round(realExpense / realIncome * 100);
+    const invPct   = Math.round(invTotal    / realIncome * 100);
     const over = spendPct > 100;
     spendWrap.style.display = 'flex';
     spendBar.classList.toggle('over', over);
@@ -4744,7 +4773,10 @@ function renderDash() {
     // red of Spent (which the flat amber was starting to mimic).
     const dp = S.dashPeriod;
     const rows = [
-      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: expTotal, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')`, prevKey: 'expense',  polarity: 'up-bad'  },
+      // 'Spent' here mirrors the Expenses headline (net of reimbursements)
+      // so the breakdown numbers add up to the bar above and the user's
+      // mental model: 'of my real earnings, this much actually went out'.
+      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: realExpense, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')`, prevKey: 'expense',  polarity: 'up-bad'  },
       ...(invTotal > 0 ? [{ color: GOLD_DOT, tint: GOLD_TINT, label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoInvested('${dp}','d-cf-net-card')`, prevKey: 'invested', polarity: 'up-good' }] : []),
       { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0, prevKey: 'savings', polarity: 'up-good' },
     ].sort((a, b) => b.amt - a.amt);
@@ -4823,8 +4855,14 @@ function renderDash() {
   // Income split by who received it; Expenses split by who paid (the
   // "For" split lives in the Expense Breakdown card below)
   const sumBy = (rows, field, name, valFn) => rows.filter(r => r[field] === name).reduce((s,r) => s + Number(valFn(r)), 0);
-  const incByPerson = ['Edwin','Divya'].map(n => [n, sumBy(inc, 'receivedBy', n, i => i.amount)]);
-  const expByPaid   = ['Edwin','Divya'].map(n => [n, sumBy(es, 'paidBy', n, e => e.amount)]);
+  // Reimbursement received by a person offsets two things at once:
+  //   - their reported income (it's not earnings),
+  //   - their reported out-of-pocket (it cancels part of what they paid).
+  // Subtract from both Earned-By and Paid-By splits so the per-person
+  // numbers sum to the netted headlines above.
+  const reimbBy = name => sumBy(inc.filter(i => i.source === 'Reimbursement'), 'receivedBy', name, i => i.amount);
+  const incByPerson = ['Edwin','Divya'].map(n => [n, sumBy(inc, 'receivedBy', n, i => i.amount) - reimbBy(n)]);
+  const expByPaid   = ['Edwin','Divya'].map(n => [n, sumBy(es, 'paidBy',     n, e => e.amount) - reimbBy(n)]);
   document.getElementById('d-cf-income-split').innerHTML = cardSplitHTML([{head:'Earned By', pairs: incByPerson, link:'Income', anchor:'d-cf-income-split'}]);
   document.getElementById('d-cf-expense-split').innerHTML = cardSplitHTML([
     {head:'Paid By', pairs: expByPaid}
@@ -5008,8 +5046,13 @@ function renderDash() {
     const d = new Date(fyY, 3 + k, 1); // April (FY start) through March
     const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
-    const mInc  = S.income .filter(i => (i.date||'').slice(0,7) === key).reduce((s,i)=>s+Number(i.amount),0);
-    const mExp  = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
+    const monthInc = S.income.filter(i => (i.date||'').slice(0,7) === key);
+    const mIncGross = monthInc.reduce((s,i)=>s+Number(i.amount),0);
+    const mReimb    = monthInc.filter(i => i.source === 'Reimbursement').reduce((s,i)=>s+Number(i.amount),0);
+    const mExpGross = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
+    // Reimbursements net out of both columns (see aggregatesInRange comment).
+    const mInc = mIncGross - mReimb;
+    const mExp = mExpGross - mReimb;
     if (key === curKey) curIdx = k;
     trend.push({ label, key, inc:mInc, exp:mExp, net:mInc-mExp });
   }
