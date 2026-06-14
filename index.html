@@ -2629,6 +2629,18 @@ async function sbFetch(path, opts={}) {
 // retried on the next sync / when the device comes back online — so
 // offline edits aren't lost and offline deletes don't reappear.
 function queueOp(table, method, id, body) {
+  // A DELETE for an id that has a pending POST in the queue means the
+  // row never landed remotely — so the cleanest 'net effect = nothing'
+  // is to drop both ops. This also unsticks the sync queue when the
+  // original POST is blocked on a schema issue (an unknown column on
+  // the server's table): without compaction the failed POST stays at
+  // the head forever and the user's subsequent DELETE never runs.
+  // A pending PATCH for the same id is also superseded by a DELETE.
+  if (method === 'DELETE') {
+    const hadPost = S.pendingOps.some(op => op.table === table && op.id === id && op.method === 'POST');
+    S.pendingOps = S.pendingOps.filter(op => !(op.table === table && op.id === id && (op.method === 'POST' || op.method === 'PATCH')));
+    if (hadPost) { saveLocal(); return; }  // POST + DELETE cancel
+  }
   S.pendingOps.push({ table, method, id, body: body || null });
 }
 
@@ -2638,17 +2650,29 @@ async function sendOp(op) {
     'Content-Type': 'application/json', Prefer: 'return=minimal'
   };
   const base = S.sbUrl + '/rest/v1/' + op.table;
+  const doFetch = (body) => {
+    if (op.method === 'POST')        return fetch(base, { method:'POST', headers, body: JSON.stringify(body) });
+    if (op.method === 'PATCH')       return fetch(base + '?id=eq.' + op.id, { method:'PATCH', headers, body: JSON.stringify(body) });
+    if (op.method === 'DELETE')      return fetch(base + '?id=eq.' + op.id, { method:'DELETE', headers });
+  };
   try {
-    let res;
-    if (op.method === 'POST')        res = await fetch(base, { method:'POST', headers, body: JSON.stringify(op.body) });
-    else if (op.method === 'PATCH')  res = await fetch(base + '?id=eq.' + op.id, { method:'PATCH', headers, body: JSON.stringify(op.body) });
-    else if (op.method === 'DELETE') res = await fetch(base + '?id=eq.' + op.id, { method:'DELETE', headers });
-    else return false;
+    let res = await doFetch(op.body);
+    if (!res) return false;
     // A duplicate-insert (409) means the row already landed — treat as done.
     if (res.ok || (op.method === 'POST' && res.status === 409)) return true;
     // If the optional app_config table doesn't exist yet, drop the op so it
     // can't block the main queue (config simply won't sync until it's created).
     if (op.table === 'app_config' && (res.status === 404 || res.status === 400)) return true;
+    // Schema fallback: a 400 on an income POST/PATCH usually means the
+    // user's table doesn't have the new reimburses_entry_id column yet.
+    // Strip the optional field and retry once so the row at least lands
+    // remotely (the link still lives in the local entry, used by the
+    // dashboard's effAmt). Same idea for any future optional column we add.
+    if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'reimburses_entry_id' in op.body) {
+      const { reimburses_entry_id, ...rest } = op.body;
+      res = await doFetch(rest);
+      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) return true;
+    }
     return false;
   } catch(e) { return false; }
 }
@@ -3385,6 +3409,12 @@ async function submitIncome() {
   if (!date) return toast('Select a date', 'err');
   if (!receivedBy) return toast('Pick who received it', 'err');
   if (!account) return toast('Pick an account', 'err');
+  // Reimbursement source MUST be linked to a specific expense — otherwise
+  // the dashboard can't reduce the right entry and the user is back to the
+  // gross-everywhere problem the linkage was built to solve.
+  if (isReimbursementSource(source) && !reimburses) {
+    return toast('Pick the expense this reimburses', 'err');
+  }
 
   const entry = {
     id: newId(),
@@ -3879,6 +3909,9 @@ async function saveEdit() {
     const reimburses = isReimbursementSource(newSource)
       ? (Number(document.getElementById('edit-reimburses')?.value) || null)
       : null;
+    if (isReimbursementSource(newSource) && !reimburses) {
+      return toast('Pick the expense this reimburses', 'err');
+    }
     const updated = {
       ...S.income[idx],
       amount,
