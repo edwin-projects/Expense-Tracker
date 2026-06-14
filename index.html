@@ -2532,14 +2532,26 @@ function loadLocal() {
   if (!S.types.length) S.types = [...DEFAULTS.types];
   if (!S.frequencies.length) S.frequencies = [...DEFAULTS.frequencies];
   if (!Array.isArray(S.incomeSources) || !S.incomeSources.length) S.incomeSources = [...DEFAULTS.incomeSources];
-  // Ensure 'Reimbursement' is present for existing users — it gates the
-  // friend-paid-me-back-on-savings workflow that the Summary now nets out
-  // (commit c32e1f4). The default list above is only applied to brand-new
-  // installs, so without this migration the dropdown wouldn't offer it
-  // until the user added it themselves.
-  if (!S.incomeSources.includes('Reimbursement')) {
-    // Insert before 'Other' if present, else append, so the natural list
-    // order is preserved (Salary / Business / … / Reimbursement / Other).
+  // Reimbursement workflow — the Summary nets entries whose source name
+  // matches the reimbursement pattern (case- and form-insensitive: catches
+  // 'Reimbursement', 'reimbursements', 'Refund', etc.). We canonicalise the
+  // list here so anyone who created a variant before this version sees
+  // their tagged entries net out, and we always offer the canonical name
+  // in the dropdown.
+  const reimbVariantIdx = S.incomeSources.findIndex(s => isReimbursementSource(s) && s !== 'Reimbursement');
+  if (reimbVariantIdx >= 0) {
+    // Rename the variant in-place so existing entries (which reference the
+    // exact string) tie back to the canonical source. We also rewrite the
+    // entries themselves so the Log shows the consistent label.
+    const oldName = S.incomeSources[reimbVariantIdx];
+    S.incomeSources[reimbVariantIdx] = 'Reimbursement';
+    if (Array.isArray(S.income)) {
+      S.income.forEach(i => { if (i.source === oldName) i.source = 'Reimbursement'; });
+    }
+  } else if (!S.incomeSources.includes('Reimbursement')) {
+    // Brand-new for this user — insert before 'Other' if present so the
+    // natural list order is preserved (Salary / Business / … /
+    // Reimbursement / Other).
     const otherIdx = S.incomeSources.indexOf('Other');
     if (otherIdx >= 0) S.incomeSources.splice(otherIdx, 0, 'Reimbursement');
     else               S.incomeSources.push('Reimbursement');
@@ -4370,7 +4382,7 @@ function aggregatesInRange(start, end) {
   // strips it out, real expense subtracts it. Net is mathematically the
   // same (gross income minus gross expense) but each side now reflects
   // genuine activity instead of an inflated wash.
-  const reimbursed = sum(inc.filter(i => i.source === 'Reimbursement'));
+  const reimbursed = sum(inc.filter(i => isReimbursementSource(i.source)));
   return {
     income: incTotal - reimbursed,           // real earnings (no reimbursements)
     expense: expTotal - reimbursed,          // real out-of-pocket spend
@@ -4425,6 +4437,16 @@ function miniDeltaHTML(curr, prev, polarity, priorLabel) {
               : '';
   const ttl   = priorLabel ? ` title="vs ${priorLabel}"` : '';
   return `<span class="mini-delta ${cls}"${ttl}>${arrow}${Math.abs(pct)}%</span>`;
+}
+
+// Whether an income source name should be treated as a reimbursement
+// (i.e. a wash that offsets a prior expense rather than real earnings).
+// Match is loose so 'Reimbursement', 'reimbursements', 'Refund' all qualify
+// — the user shouldn't have to remember the exact casing/form. Pattern
+// allows leading/trailing whitespace and any word boundary form.
+function isReimbursementSource(src) {
+  if (!src) return false;
+  return /reimburse|refund/i.test(String(src).trim());
 }
 
 // polarity: 'up-good' (more is better), 'up-bad' (less is better), 'neutral'
@@ -4686,7 +4708,7 @@ function renderDash() {
   // same (both sides reduced by the same amount). Account balances are
   // untouched — the CC still owes its full charge, savings still has the
   // real deposit. We just display the activity honestly.
-  const reimbursed = inc.filter(i => i.source === 'Reimbursement')
+  const reimbursed = inc.filter(i => isReimbursementSource(i.source))
                         .reduce((s,i) => s + Number(i.amount), 0);
   const realIncome  = incTotal - reimbursed;
   const realExpense = expTotal - reimbursed;
@@ -4872,7 +4894,7 @@ function renderDash() {
   //   - their reported out-of-pocket (it cancels part of what they paid).
   // Subtract from both Earned-By and Paid-By splits so the per-person
   // numbers sum to the netted headlines above.
-  const reimbBy = name => sumBy(inc.filter(i => i.source === 'Reimbursement'), 'receivedBy', name, i => i.amount);
+  const reimbBy = name => sumBy(inc.filter(i => isReimbursementSource(i.source)), 'receivedBy', name, i => i.amount);
   const incByPerson = ['Edwin','Divya'].map(n => [n, sumBy(inc, 'receivedBy', n, i => i.amount) - reimbBy(n)]);
   const expByPaid   = ['Edwin','Divya'].map(n => [n, sumBy(es, 'paidBy',     n, e => e.amount) - reimbBy(n)]);
   document.getElementById('d-cf-income-split').innerHTML = cardSplitHTML([{head:'Earned By', pairs: incByPerson, link:'Income', anchor:'d-cf-income-split'}]);
@@ -5060,7 +5082,7 @@ function renderDash() {
     const label = d.toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
     const monthInc = S.income.filter(i => (i.date||'').slice(0,7) === key);
     const mIncGross = monthInc.reduce((s,i)=>s+Number(i.amount),0);
-    const mReimb    = monthInc.filter(i => i.source === 'Reimbursement').reduce((s,i)=>s+Number(i.amount),0);
+    const mReimb    = monthInc.filter(i => isReimbursementSource(i.source)).reduce((s,i)=>s+Number(i.amount),0);
     const mExpGross = S.entries.filter(e => (e.date||'').slice(0,7) === key).reduce((s,e)=>s+Number(e.amount),0);
     // Reimbursements net out of both columns (see aggregatesInRange comment).
     const mInc = mIncGross - mReimb;
