@@ -3113,12 +3113,28 @@ function goPage(name, navEl) {
   navEl.classList.add('active');
   // The "Back to Summary" link is only valid while still on the Log
   if (name !== 'log') S.logReturnAnchor = null;
-  if (name === 'log') renderLog();
+  if (name === 'log') {
+    // Log filters are always ephemeral. The only time a filtered Log is
+    // legitimate is right after a drill-down from the Summary (gotoLog,
+    // setLogCategoryFilterGo, setLogAccountFilter, gotoInvested, etc.),
+    // which set __logEnterAsDrillDown=true just before calling goToLog().
+    // Any other entry — tapping the nav icon, returning from another tab,
+    // or a fresh app launch — wipes filters so the user always lands on
+    // the full list. Avoids the stale-filter confusion the user hit.
+    if (__logEnterAsDrillDown) __logEnterAsDrillDown = false;
+    else                       clearAllLogFilters();
+    renderLog();
+  }
   if (name === 'dash') renderDash();
   if (name === 'cfg') renderCfg();
   if (name === 'income') renderIncomeForm();
   if (name === 'transfer') renderTransferForm();
 }
+
+// Set to true by any Summary-side drill-down right before it calls
+// goToLog(), so the upcoming goPage('log') keeps the filters they just
+// applied. Consumed on first entry; defaults back to false.
+let __logEnterAsDrillDown = false;
 
 // ══════════════════════════════════════════════════
 //  FORM
@@ -3570,6 +3586,12 @@ function setLogAddedBy(el) {
 }
 
 function goToLog() {
+  // Every caller of goToLog() is a Summary-side drill-down that has just
+  // populated S.logXxx with the filter it wants applied. Set the flag so
+  // goPage('log') preserves those filters on this entry. Direct nav taps
+  // bypass goToLog() and go through goPage('log',...) directly, leaving
+  // the flag false → filters wiped on that path.
+  __logEnterAsDrillDown = true;
   const navItem = [...document.querySelectorAll('.nav-item')]
     .find(n => n.querySelector('.nav-label')?.textContent.trim() === 'LOG');
   if (navItem) goPage('log', navItem); else renderLog();
