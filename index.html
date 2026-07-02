@@ -2443,8 +2443,10 @@ const DEFAULTS = {
 //     reimburses_entry_id BIGINT NULL,
 //     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 //   );
-//   -- Existing installs: add the reimbursement-link column so a tagged
-//   -- reimbursement remembers which expense it offsets across devices/reloads.
+//   -- OPTIONAL: a dedicated column for the reimbursement→expense link. Not
+//   -- required — the link also travels inside the income description (see
+//   -- encodeIncomeDesc), so tags persist across devices/reloads even without
+//   -- this column. Add it only if you want the link as a queryable field.
 //   ALTER TABLE income ADD COLUMN IF NOT EXISTS reimburses_entry_id BIGINT NULL;
 //   CREATE TABLE IF NOT EXISTS transfers (
 //     id BIGINT PRIMARY KEY, date DATE NOT NULL, amount NUMERIC(14,2) NOT NULL,
@@ -2648,18 +2650,6 @@ function queueOp(table, method, id, body) {
   S.pendingOps.push({ table, method, id, body: body || null });
 }
 
-// Raised when Supabase rejects the reimburses_entry_id column (older schema).
-// Warns the user once per session with the exact one-line fix; links keep
-// working on this device in the meantime.
-let __warnedReimbCol = false;
-function flagReimbColumnMissing() {
-  if (__warnedReimbCol) return;
-  __warnedReimbCol = true;
-  toast("Reimbursement links save on this device only — run the income column migration in Supabase to sync them across devices", 'err');
-  console.warn('[sync] income.reimburses_entry_id column is missing. Run:\n' +
-    '  ALTER TABLE income ADD COLUMN IF NOT EXISTS reimburses_entry_id BIGINT NULL;');
-}
-
 async function sendOp(op) {
   const headers = {
     apikey: S.sbKey, Authorization: 'Bearer ' + S.sbKey,
@@ -2687,15 +2677,11 @@ async function sendOp(op) {
     if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'reimburses_entry_id' in op.body) {
       const { reimburses_entry_id, ...rest } = op.body;
       res = await doFetch(rest);
-      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) {
-        // The row landed, but WITHOUT the link — because the income table has
-        // no reimburses_entry_id column. The tag still lives locally (and is
-        // preserved across syncs on this device), but it won't reach another
-        // device until the column exists. Flag it once so the user knows the
-        // one-line migration is still outstanding.
-        flagReimbColumnMissing();
-        return true;
-      }
+      // The row lands without the dedicated column, but the link is still
+      // safe: it's embedded in the description (see encodeIncomeDesc), which
+      // always round-trips — so the tag survives across syncs and devices
+      // even when the column was never added. No user action needed.
+      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) return true;
     }
     return false;
   } catch(e) { return false; }
@@ -2787,22 +2773,28 @@ async function syncNow() {
     const prevLink = new Map(S.income.map(i => [i.id, i.reimbursesEntryId]));
     const remoteIds = new Set(incRows.map(r => r.id));
     const localOnly = flushed ? [] : S.income.filter(i => !remoteIds.has(i.id));
-    S.income = [...incRows.map(r => ({
-      id: r.id, date: r.date, amount: Number(r.amount),
-      source: r.source, receivedBy: r.received_by,
-      account: r.account != null ? Number(r.account) : null,
-      desc: r.description, month: r.month, addedBy: r.added_by,
-      // Optional column on Supabase. If the row actually carries the column we
-      // trust the server value (a real id, or null when genuinely unlinked).
-      // If the column is ABSENT (older schema — the key won't appear in the
-      // row at all), the server can't tell us anything, so we KEEP whatever
-      // link we had locally rather than clobbering it to null. This is what
-      // stops a tagged reimbursement from "forgetting" its expense overnight
-      // when the column hasn't been added to Supabase yet.
-      reimbursesEntryId: ('reimburses_entry_id' in r)
-        ? (r.reimburses_entry_id != null ? Number(r.reimburses_entry_id) : null)
-        : (prevLink.has(r.id) ? prevLink.get(r.id) : null),
-    })), ...localOnly];
+    S.income = [...incRows.map(r => {
+      // Resolve the reimbursement link from the most reliable source:
+      //   1. the dedicated column, when the row actually carries a value;
+      //   2. else the id embedded in the description (works on any schema);
+      //   3. else, if the column exists but is null (genuine unlink), null;
+      //   4. else (older row, no column, no embed) keep the local link so a
+      //      bare row can't wipe a tag we already hold this session.
+      const embedded = parseReimbFromDesc(r.description);
+      let link;
+      if ('reimburses_entry_id' in r && r.reimburses_entry_id != null) link = Number(r.reimburses_entry_id);
+      else if (embedded != null) link = embedded;
+      else if ('reimburses_entry_id' in r) link = null;
+      else link = prevLink.has(r.id) ? prevLink.get(r.id) : null;
+      return {
+        id: r.id, date: r.date, amount: Number(r.amount),
+        source: r.source, receivedBy: r.received_by,
+        account: r.account != null ? Number(r.account) : null,
+        // Strip the hidden marker so the UI only ever shows the real text.
+        desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by,
+        reimbursesEntryId: link,
+      };
+    }), ...localOnly];
   }
   if (xferRows && Array.isArray(xferRows)) {
     const remoteIds = new Set(xferRows.map(r => r.id));
@@ -3479,7 +3471,10 @@ async function submitIncome() {
   queueOp('income', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
-    account: entry.account, description: entry.desc,
+    account: entry.account,
+    // Embed the link in the description too, so it survives even when the
+    // reimburses_entry_id column doesn't exist on this Supabase.
+    description: encodeIncomeDesc(entry.desc, entry.reimbursesEntryId),
     reimburses_entry_id: entry.reimbursesEntryId,
     month: entry.month, added_by: entry.addedBy
   });
@@ -3983,7 +3978,8 @@ async function saveEdit() {
     S.income[idx] = updated;
     queueOp('income', 'PATCH', id, {
       amount: updated.amount, source: updated.source,
-      date: updated.date, description: updated.desc,
+      date: updated.date,
+      description: encodeIncomeDesc(updated.desc, updated.reimbursesEntryId),
       received_by: updated.receivedBy, account: updated.account,
       reimburses_entry_id: updated.reimbursesEntryId,
       month: updated.month
@@ -4040,7 +4036,11 @@ async function deleteEntry(id) {
   S.income.forEach(i => {
     if (i.reimbursesEntryId === id) {
       i.reimbursesEntryId = null;
-      queueOp('income', 'PATCH', i.id, { reimburses_entry_id: null });
+      // Rewrite the description too, to clear the embedded link fallback.
+      queueOp('income', 'PATCH', i.id, {
+        reimburses_entry_id: null,
+        description: encodeIncomeDesc(i.desc, null)
+      });
     }
   });
   queueOp('expenses', 'DELETE', id);
@@ -4082,7 +4082,8 @@ async function repeatIncome(id) {
   queueOp('income', 'POST', clone.id, {
     id: clone.id, date: clone.date, amount: clone.amount,
     source: clone.source, received_by: clone.receivedBy,
-    account: clone.account, description: clone.desc,
+    account: clone.account,
+    description: encodeIncomeDesc(clone.desc, clone.reimbursesEntryId),
     reimburses_entry_id: clone.reimbursesEntryId,
     month: clone.month, added_by: clone.addedBy
   });
@@ -4628,6 +4629,29 @@ function miniDeltaHTML(curr, prev, polarity, priorLabel) {
 function isReimbursementSource(src) {
   if (!src) return false;
   return /reimburse|refund/i.test(String(src).trim());
+}
+
+// ── Durable reimbursement link (works on ANY Supabase schema) ──────────
+// The link ideally lives in its own column (reimburses_entry_id). Many
+// installs never added that column, so on those the link was silently
+// dropped and "forgotten" on the next sync. To make the tag survive with
+// NO schema change and NO database access, we ALSO stash the linked expense
+// id inside the income row's description — a column that always exists and
+// always round-trips — behind an invisible marker (Unit Separator, a char
+// no one types) that we strip before the text is ever shown or edited.
+// In memory the description stays clean and the id lives in
+// reimbursesEntryId; the marker only ever exists on the wire / at rest.
+const RMB_MARK = '';
+function encodeIncomeDesc(desc, reimbId) {
+  const clean = stripIncomeDesc(desc);
+  return reimbId != null ? clean + RMB_MARK + 'rmb:' + reimbId : clean;
+}
+function stripIncomeDesc(desc) {
+  return String(desc == null ? '' : desc).split(RMB_MARK)[0];
+}
+function parseReimbFromDesc(desc) {
+  const m = String(desc == null ? '' : desc).match(/rmb:(\d+)/);
+  return m ? Number(m[1]) : null;
 }
 
 // ── Reimbursement → Expense linking ───────────────────────────────────
