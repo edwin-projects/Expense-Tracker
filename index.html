@@ -2440,8 +2440,12 @@ const DEFAULTS = {
 //     id BIGINT PRIMARY KEY, date DATE NOT NULL, amount NUMERIC(14,2) NOT NULL,
 //     source TEXT NOT NULL, received_by TEXT, account BIGINT NULL,
 //     description TEXT, month TEXT, added_by TEXT,
+//     reimburses_entry_id BIGINT NULL,
 //     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 //   );
+//   -- Existing installs: add the reimbursement-link column so a tagged
+//   -- reimbursement remembers which expense it offsets across devices/reloads.
+//   ALTER TABLE income ADD COLUMN IF NOT EXISTS reimburses_entry_id BIGINT NULL;
 //   CREATE TABLE IF NOT EXISTS transfers (
 //     id BIGINT PRIMARY KEY, date DATE NOT NULL, amount NUMERIC(14,2) NOT NULL,
 //     from_account BIGINT NOT NULL, to_account BIGINT NOT NULL,
@@ -2644,6 +2648,18 @@ function queueOp(table, method, id, body) {
   S.pendingOps.push({ table, method, id, body: body || null });
 }
 
+// Raised when Supabase rejects the reimburses_entry_id column (older schema).
+// Warns the user once per session with the exact one-line fix; links keep
+// working on this device in the meantime.
+let __warnedReimbCol = false;
+function flagReimbColumnMissing() {
+  if (__warnedReimbCol) return;
+  __warnedReimbCol = true;
+  toast("Reimbursement links save on this device only — run the income column migration in Supabase to sync them across devices", 'err');
+  console.warn('[sync] income.reimburses_entry_id column is missing. Run:\n' +
+    '  ALTER TABLE income ADD COLUMN IF NOT EXISTS reimburses_entry_id BIGINT NULL;');
+}
+
 async function sendOp(op) {
   const headers = {
     apikey: S.sbKey, Authorization: 'Bearer ' + S.sbKey,
@@ -2671,7 +2687,15 @@ async function sendOp(op) {
     if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'reimburses_entry_id' in op.body) {
       const { reimburses_entry_id, ...rest } = op.body;
       res = await doFetch(rest);
-      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) return true;
+      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) {
+        // The row landed, but WITHOUT the link — because the income table has
+        // no reimburses_entry_id column. The tag still lives locally (and is
+        // preserved across syncs on this device), but it won't reach another
+        // device until the column exists. Flag it once so the user knows the
+        // one-line migration is still outstanding.
+        flagReimbColumnMissing();
+        return true;
+      }
     }
     return false;
   } catch(e) { return false; }
@@ -2758,6 +2782,9 @@ async function syncNow() {
     })), ...localOnly];
   }
   if (incRows && Array.isArray(incRows)) {
+    // Remember every link we already hold locally, keyed by income id, so a
+    // server that lacks the reimburses_entry_id column can't silently wipe it.
+    const prevLink = new Map(S.income.map(i => [i.id, i.reimbursesEntryId]));
     const remoteIds = new Set(incRows.map(r => r.id));
     const localOnly = flushed ? [] : S.income.filter(i => !remoteIds.has(i.id));
     S.income = [...incRows.map(r => ({
@@ -2765,8 +2792,16 @@ async function syncNow() {
       source: r.source, receivedBy: r.received_by,
       account: r.account != null ? Number(r.account) : null,
       desc: r.description, month: r.month, addedBy: r.added_by,
-      // Optional column on Supabase — survives if added, harmless if not.
-      reimbursesEntryId: r.reimburses_entry_id != null ? Number(r.reimburses_entry_id) : null,
+      // Optional column on Supabase. If the row actually carries the column we
+      // trust the server value (a real id, or null when genuinely unlinked).
+      // If the column is ABSENT (older schema — the key won't appear in the
+      // row at all), the server can't tell us anything, so we KEEP whatever
+      // link we had locally rather than clobbering it to null. This is what
+      // stops a tagged reimbursement from "forgetting" its expense overnight
+      // when the column hasn't been added to Supabase yet.
+      reimbursesEntryId: ('reimburses_entry_id' in r)
+        ? (r.reimburses_entry_id != null ? Number(r.reimburses_entry_id) : null)
+        : (prevLink.has(r.id) ? prevLink.get(r.id) : null),
     })), ...localOnly];
   }
   if (xferRows && Array.isArray(xferRows)) {
