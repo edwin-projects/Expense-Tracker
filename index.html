@@ -829,6 +829,39 @@ select.finput option { background: white; color: var(--ink); }
 /* Log entry action row — Edit / Repeat / Delete share one line equally. */
 .entry-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: nowrap; }
 .entry-actions .btn-del-entry { flex: 1 1 0; margin-top: 0; padding: 6px 6px; text-align: center; }
+/* ── Recently Deleted ─────────────────────────────────────────────── */
+/* The bin is a separate reading of the Log: no totals, no filters, so the
+   entry-shaped controls step aside while it's open. */
+#page-log.trash-mode .log-live-only { display: none !important; }
+
+.log-chip-deleted.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* Binned entries read as inactive — muted surface, dashed edge — so they're
+   never mistaken for live ones while scrolling. */
+.trash-card {
+  background: var(--bg2);
+  border-style: dashed;
+  box-shadow: none;
+}
+.trash-card .entry-cat { color: var(--ink2); }
+.trash-card .entry-amount { color: var(--ink2) !important; opacity: 0.75; }
+.echip.trash-kind { background: var(--bg); border-color: var(--border2); color: var(--ink3); font-weight: 600; }
+.btn-restore { border-color: var(--green-border-soft) !important; color: var(--green) !important; }
+
+.trash-bulk-btn {
+  background: none;
+  border: 1px solid var(--btn-del-border);
+  color: var(--red);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.trash-bulk-btn.restore { border-color: var(--green-border-soft); color: var(--green); }
+
 .entry-right { text-align: right; flex-shrink: 0; }
 .entry-amount {
   font-family: 'Inter', system-ui, sans-serif;
@@ -1866,7 +1899,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div id="log-back-banner" onclick="returnToSummary()" style="display:none;position:fixed;bottom:88px;left:50%;transform:translateX(-50%);padding:11px 20px;background:var(--blue);border:none;border-radius:24px;font-size:13px;color:#fff;font-weight:600;cursor:pointer;align-items:center;gap:6px;z-index:55;box-shadow:0 6px 18px rgba(0,0,0,0.25);white-space:nowrap">
       ← Back to Summary
     </div>
-    <div style="display:flex;justify-content:flex-end;margin:14px 0 0">
+    <div class="log-live-only" style="display:flex;justify-content:flex-end;margin:14px 0 0">
       <button onclick="clearAllLogFilters()" style="background:none;border:1px solid var(--border2);color:var(--ink2);padding:6px 13px;border-radius:15px;font-size:11.5px;font-family:'Inter',system-ui,sans-serif;font-weight:600;cursor:pointer">✕ Clear all filters</button>
     </div>
     <div class="log-bar">
@@ -1874,22 +1907,23 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <div class="log-chip" data-k="Expense" onclick="setLogKind(this)">Expense</div>
       <div class="log-chip" data-k="Income" onclick="setLogKind(this)">Income</div>
       <div class="log-chip" data-k="Transfer" onclick="setLogKind(this)">Transfer</div>
+      <div class="log-chip log-chip-deleted" id="log-chip-deleted" data-k="Deleted" onclick="setLogKind(this)">🗑 Deleted</div>
     </div>
-    <div class="log-bar">
+    <div class="log-bar log-live-only">
       <div class="log-chip active" data-f="All" onclick="setLogFilter(this)">All</div>
       <div class="log-chip" data-f="Edwin" onclick="setLogFilter(this)">Edwin</div>
       <div class="log-chip" data-f="Divya" onclick="setLogFilter(this)">Divya</div>
       <div class="log-chip" data-f="AJ" onclick="setLogFilter(this)">AJ</div>
       <div class="log-chip" data-f="Both" onclick="setLogFilter(this)">Both</div>
     </div>
-    <div class="log-bar">
+    <div class="log-bar log-live-only">
       <div class="log-chip active" data-t="All" onclick="setLogTypeFilter(this)">All Types</div>
       <div class="log-chip" data-t="Essentials" onclick="setLogTypeFilter(this)">Essentials</div>
       <div class="log-chip" data-t="Non-Essentials" onclick="setLogTypeFilter(this)">Non-Essentials</div>
       <div class="log-chip" data-t="Fun" onclick="setLogTypeFilter(this)">Fun</div>
       <div class="log-chip" data-t="Saveable" onclick="setLogTypeFilter(this)">Saveable</div>
     </div>
-    <div class="log-bar">
+    <div class="log-bar log-live-only">
       <div class="log-chip active" data-by="All" onclick="setLogAddedBy(this)">Added by anyone</div>
       <div class="log-chip" data-by="Edwin" onclick="setLogAddedBy(this)">Added by Edwin</div>
       <div class="log-chip" data-by="Divya" onclick="setLogAddedBy(this)">Added by Divya</div>
@@ -1906,7 +1940,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <span id="log-period-banner-text"></span>
       <button onclick="clearLogPeriodFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
     </div>
-    <div class="cat-select-wrap">
+    <div class="cat-select-wrap log-live-only">
       <select id="cat-filter-select" class="cat-filter-select" onchange="setCategoryFilter(this.value)">
         <option value="All">All Categories</option>
       </select>
@@ -2267,6 +2301,26 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div id="cfg-backup-status" style="font-size:11.5px;color:var(--ink3);text-align:center">No backup taken yet</div>
       </div>
     </div>
+
+    <!-- Recently Deleted -->
+    <div class="sec-label">Recently Deleted</div>
+    <div class="cfg-card">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div id="cfg-trash-status" style="font-size:12.5px;color:var(--ink2);line-height:1.5"></div>
+        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="gotoTrash()">🗑 Open Recently Deleted</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
+        <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
+          Entries deleted before this feature existed left no record in the app.
+          If you have an older backup file, this compares it against your current
+          data and puts anything missing into Recently Deleted for you to restore.
+          It only adds to the bin — nothing live is changed.
+        </div>
+        <label style="width:100%;margin:0">
+          <input type="file" id="recover-file-input" accept=".json" style="display:none" onchange="scanBackupForDeleted(this)">
+          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⌕ Find deleted entries in a backup (.json)</span>
+        </label>
+      </div>
+    </div>
     <div style="height:20px"></div>
   </div>
 
@@ -2454,6 +2508,16 @@ const DEFAULTS = {
 //     description TEXT, month TEXT, added_by TEXT,
 //     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 //   );
+//   -- OPTIONAL: shared "Recently Deleted" bin. Without this table the bin
+//   -- still works, but only on the device the delete happened on. Add it and
+//   -- a deleted entry shows up (and can be restored) on every device.
+//   CREATE TABLE IF NOT EXISTS deleted_items (
+//     id BIGINT PRIMARY KEY, kind TEXT NOT NULL, item_id BIGINT NOT NULL,
+//     deleted_at TIMESTAMPTZ NOT NULL DEFAULT now(), deleted_by TEXT,
+//     origin TEXT, payload JSONB NOT NULL, links JSONB
+//   );
+//   GRANT SELECT, INSERT, UPDATE, DELETE ON public.deleted_items TO anon, authenticated, service_role;
+//
 //   CREATE INDEX IF NOT EXISTS idx_income_date    ON income(date DESC);
 //   CREATE INDEX IF NOT EXISTS idx_income_month   ON income(month);
 //   CREATE INDEX IF NOT EXISTS idx_expenses_acct  ON expenses(account);
@@ -2497,6 +2561,12 @@ let S = {
   income: [],
   accounts: [],
   transfers: [],
+  // Recently Deleted. Every delete moves the full record here instead of
+  // destroying it, so nothing is ever lost to a mis-tap. Each item is
+  //   { tid, kind:'expense'|'income'|'transfer', itemId, deletedAt, deletedBy,
+  //     origin:'delete'|'backup', data:<the original record>, links:[incomeId] }
+  // Items stay until explicitly removed — there is no auto-purge.
+  trash: [],
   dashPeriod: 'month',
   dashMonths: [],
   logFilter: 'All',
@@ -2577,6 +2647,7 @@ function loadLocal() {
   if (!Array.isArray(S.income)) S.income = [];
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
+  if (!Array.isArray(S.trash)) S.trash = [];
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
@@ -2669,6 +2740,10 @@ async function sendOp(op) {
     // If the optional app_config table doesn't exist yet, drop the op so it
     // can't block the main queue (config simply won't sync until it's created).
     if (op.table === 'app_config' && (res.status === 404 || res.status === 400)) return true;
+    // Same for the optional deleted_items table: if it hasn't been created,
+    // drop the op rather than wedging the queue. The Recently Deleted bin
+    // still works locally — it just doesn't sync to the other device.
+    if (op.table === 'deleted_items' && (res.status === 404 || res.status === 400)) return true;
     // Schema fallback: a 400 on an income POST/PATCH usually means the
     // user's table doesn't have the new reimburses_entry_id column yet.
     // Strip the optional field and retry once so the row at least lands
@@ -2726,12 +2801,15 @@ function pushConfig() {
 async function syncNow() {
   setSyncState('syncing');
   await flushPendingOps();
-  const [rows, acctRows, incRows, xferRows, cfgRows] = await Promise.all([
+  const [rows, acctRows, incRows, xferRows, cfgRows, delRows] = await Promise.all([
     sbFetch('expenses?select=*&order=date.desc'),
     sbFetch('accounts?select=*&order=created_at.asc'),
     sbFetch('income?select=*&order=date.desc'),
     sbFetch('transfers?select=*&order=date.desc'),
-    sbFetch('app_config?select=*')
+    sbFetch('app_config?select=*'),
+    // Optional table — returns null if it hasn't been created, in which case
+    // the bin simply stays device-local (see the migration note above).
+    sbFetch('deleted_items?select=*&order=deleted_at.desc')
   ]);
   // When the queue is fully flushed (online), every genuine local record is
   // already on the server — so anything missing from the server was deleted
@@ -2805,6 +2883,32 @@ async function syncNow() {
       toAccount:   r.to_account   != null ? Number(r.to_account)   : null,
       desc: r.description, month: r.month, addedBy: r.added_by
     })), ...localOnly];
+  }
+  // Recently Deleted bin. Same rule as the data tables: once the queue is
+  // flushed the server is authoritative, so an entry the other device
+  // restored (or purged) leaves this device's bin too. While offline, keep
+  // local-only bin items so an unsynced delete stays recoverable here.
+  if (delRows && Array.isArray(delRows)) {
+    const remoteIds = new Set(delRows.map(r => Number(r.id)));
+    const localOnly = flushed ? [] : S.trash.filter(t => !remoteIds.has(t.tid));
+    S.trash = [...delRows.map(r => ({
+      tid: Number(r.id),
+      kind: r.kind,
+      itemId: r.item_id != null ? Number(r.item_id) : null,
+      deletedAt: r.deleted_at,
+      deletedBy: r.deleted_by || '',
+      origin: r.origin || 'delete',
+      data: r.payload || {},
+      links: Array.isArray(r.links) ? r.links : []
+    })), ...localOnly];
+    // A record that's live again (restored elsewhere, or re-created) has no
+    // business showing as deleted.
+    const live = {
+      expense:  new Set(S.entries.map(e => e.id)),
+      income:   new Set(S.income.map(i => i.id)),
+      transfer: new Set(S.transfers.map(t => t.id)),
+    };
+    S.trash = S.trash.filter(t => !(live[t.kind] && live[t.kind].has(t.itemId)));
   }
   // Shared config lists (categories / types / frequencies / income sources).
   if (cfgRows && Array.isArray(cfgRows) && cfgRows[0]) {
@@ -3504,11 +3608,13 @@ function resetIncomeForm() {
 }
 
 async function deleteIncome(id) {
-  if (!confirm('Delete this income entry?')) return;
+  if (!confirm('Delete this income entry?\n\nIt moves to Recently Deleted in the Log and can be restored.')) return;
+  const rec = S.income.find(i => i.id === id);
+  if (rec) trashRecord('income', rec);
   S.income = S.income.filter(i => i.id !== id);
   queueOp('income', 'DELETE', id);
   saveLocal();
-  await pushChanges('Income deleted');
+  await pushChanges('Income deleted — recoverable from Recently Deleted');
   const card = document.getElementById('inc-' + id);
   if (card) card.remove();
   renderLog();
@@ -3574,13 +3680,353 @@ function resetTransferForm() {
 }
 
 async function deleteTransfer(id) {
-  if (!confirm('Delete this transfer?')) return;
+  if (!confirm('Delete this transfer?\n\nIt moves to Recently Deleted in the Log and can be restored.')) return;
+  const rec = S.transfers.find(t => t.id === id);
+  if (rec) trashRecord('transfer', rec);
   S.transfers = S.transfers.filter(t => t.id !== id);
   queueOp('transfers', 'DELETE', id);
   saveLocal();
-  await pushChanges('Transfer deleted');
+  await pushChanges('Transfer deleted — recoverable from Recently Deleted');
   const card = document.getElementById('xfer-' + id);
   if (card) card.remove();
+  renderLog();
+}
+
+// ══════════════════════════════════════════════════
+//  RECENTLY DELETED  (trash + restore)
+// ══════════════════════════════════════════════════
+// Deletes are no longer destructive. The full record is copied into S.trash
+// before it leaves the live list, so a mis-tap costs nothing — the entry is
+// one tap from being back exactly where it was, same id, same date, same
+// account. The remote row is still removed (so totals and balances are
+// immediately correct everywhere) and re-inserted verbatim on restore.
+
+const TRASH_KIND_LABELS = { expense: 'Expense', income: 'Income', transfer: 'Transfer' };
+
+// Push a record into the bin and queue it for the shared bin table.
+// `links` carries any reimbursement-income ids that pointed at a deleted
+// expense, so restoring re-establishes the tags the delete had to clear.
+function trashRecord(kind, data, opts = {}) {
+  const item = {
+    tid: newId(),
+    kind,
+    itemId: data.id,
+    deletedAt: opts.deletedAt || new Date().toISOString(),
+    deletedBy: opts.deletedBy !== undefined ? opts.deletedBy : currentUser,
+    origin: opts.origin || 'delete',
+    data: JSON.parse(JSON.stringify(data)),
+    links: opts.links || []
+  };
+  S.trash.unshift(item);
+  queueOp('deleted_items', 'POST', item.tid, {
+    id: item.tid, kind: item.kind, item_id: item.itemId,
+    deleted_at: item.deletedAt, deleted_by: item.deletedBy || null,
+    origin: item.origin, payload: item.data, links: item.links
+  });
+  return item;
+}
+
+// Re-insert a binned record into the live data and back into Supabase.
+async function restoreFromTrash(tid) {
+  const idx = S.trash.findIndex(t => t.tid === tid);
+  if (idx < 0) return;
+  const item = S.trash[idx];
+  const rec = JSON.parse(JSON.stringify(item.data));
+
+  // An entry whose account was deleted in the meantime would restore with a
+  // dangling account reference. Drop the link rather than block the restore —
+  // the amount and date are what matter; the account can be re-picked.
+  let droppedAcct = false;
+  const liveAcct = id => id == null || S.accounts.some(a => a.id === id);
+  if (item.kind === 'transfer') {
+    if (!liveAcct(rec.fromAccount) || !liveAcct(rec.toAccount)) {
+      toast('Cannot restore — one of its accounts no longer exists', 'err');
+      return;
+    }
+  } else if (!liveAcct(rec.account)) {
+    rec.account = null;
+    droppedAcct = true;
+  }
+
+  if (item.kind === 'expense') {
+    if (S.entries.some(e => e.id === rec.id)) { toast('That entry is already back', ''); }
+    else {
+      S.entries.unshift(rec);
+      queueOp('expenses', 'POST', rec.id, {
+        id: rec.id, date: rec.date, amount: rec.amount,
+        category: rec.category, type: rec.type, freq: rec.freq,
+        for_whom: rec.forWhom, paid_by: rec.paidBy,
+        saving: rec.saving, description: rec.desc,
+        month: rec.month, added_by: rec.addedBy,
+        account: rec.account ?? null
+      });
+      // Re-tag any reimbursement income that pointed here, as long as it
+      // still exists and hasn't since been pointed somewhere else.
+      (item.links || []).forEach(incId => {
+        const inc = S.income.find(i => i.id === incId);
+        if (!inc || inc.reimbursesEntryId != null) return;
+        inc.reimbursesEntryId = rec.id;
+        queueOp('income', 'PATCH', inc.id, {
+          reimburses_entry_id: rec.id,
+          description: encodeIncomeDesc(inc.desc, rec.id)
+        });
+      });
+    }
+  } else if (item.kind === 'income') {
+    if (S.income.some(i => i.id === rec.id)) { toast('That entry is already back', ''); }
+    else {
+      // A reimbursement tag is only valid if its expense is still around.
+      if (rec.reimbursesEntryId != null && !S.entries.some(e => e.id === rec.reimbursesEntryId)) {
+        rec.reimbursesEntryId = null;
+      }
+      S.income.unshift(rec);
+      queueOp('income', 'POST', rec.id, {
+        id: rec.id, date: rec.date, amount: rec.amount,
+        source: rec.source, received_by: rec.receivedBy,
+        account: rec.account ?? null,
+        description: encodeIncomeDesc(rec.desc, rec.reimbursesEntryId ?? null),
+        reimburses_entry_id: rec.reimbursesEntryId ?? null,
+        month: rec.month, added_by: rec.addedBy
+      });
+    }
+  } else if (item.kind === 'transfer') {
+    if (S.transfers.some(t => t.id === rec.id)) { toast('That entry is already back', ''); }
+    else {
+      S.transfers.unshift(rec);
+      queueOp('transfers', 'POST', rec.id, {
+        id: rec.id, date: rec.date, amount: rec.amount,
+        from_account: rec.fromAccount, to_account: rec.toAccount,
+        description: rec.desc, month: rec.month, added_by: rec.addedBy
+      });
+    }
+  }
+
+  S.trash.splice(idx, 1);
+  queueOp('deleted_items', 'DELETE', item.tid);
+  saveLocal();
+  await pushChanges(droppedAcct ? 'Restored — its old account is gone, so no account is set' : '✓ Restored');
+  renderLog();
+}
+
+// Restore everything currently in the bin, in oldest-first order so same-day
+// items come back in the sequence they were created.
+async function restoreAllTrash() {
+  const ids = [...S.trash].sort((a, b) => (a.deletedAt || '').localeCompare(b.deletedAt || '')).map(t => t.tid);
+  if (!ids.length) return;
+  if (!confirm(`Restore all ${ids.length} deleted ${ids.length === 1 ? 'entry' : 'entries'}?`)) return;
+  const before = S.trash.length;
+  for (const tid of ids) await restoreFromTrash(tid);
+  const done = before - S.trash.length;
+  toast(`✓ Restored ${done} of ${before}`, 'ok');
+  renderLog();
+}
+
+// Permanent removal — the only way data actually leaves the app.
+async function purgeFromTrash(tid) {
+  const item = S.trash.find(t => t.tid === tid);
+  if (!item) return;
+  if (!confirm('Delete this permanently? It cannot be restored after this.')) return;
+  S.trash = S.trash.filter(t => t.tid !== tid);
+  queueOp('deleted_items', 'DELETE', tid);
+  saveLocal();
+  await pushChanges('Deleted permanently');
+  renderLog();
+}
+
+async function emptyTrash() {
+  const n = S.trash.length;
+  if (!n) return;
+  if (!confirm(`Permanently delete all ${n} ${n === 1 ? 'entry' : 'entries'} in Recently Deleted?\n\nThis cannot be undone.`)) return;
+  S.trash.forEach(t => queueOp('deleted_items', 'DELETE', t.tid));
+  S.trash = [];
+  saveLocal();
+  await pushChanges(`Emptied Recently Deleted (${n})`);
+  renderLog();
+}
+
+function trashAgeLabel(iso) {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (!then) return '';
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30)  return `${days} day${days === 1 ? '' : 's'} ago`;
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// One-line summary of a binned record — enough to recognise it without
+// reproducing the full card, since a deleted entry can't be edited or filtered.
+function trashSummary(item) {
+  const d = item.data || {};
+  const acctName = id => (S.accounts.find(a => a.id === id) || {}).name || '';
+  if (item.kind === 'income')   return { title: d.source || 'Income', chips: [acctName(d.account) && `⊞ ${acctName(d.account)}`, d.receivedBy && `By: ${d.receivedBy}`] };
+  if (item.kind === 'transfer') return { title: `${acctName(d.fromAccount) || '(unknown)'} → ${acctName(d.toAccount) || '(unknown)'}`, chips: [] };
+  return { title: d.category || 'Expense', chips: [d.forWhom && `For: ${d.forWhom}`, d.paidBy && `Paid: ${d.paidBy}`, acctName(d.account) && `⊟ ${acctName(d.account)}`] };
+}
+
+function trashAmountColor(kind) {
+  if (kind === 'income')   return 'var(--green)';
+  if (kind === 'transfer') return 'var(--transfer-ink)';
+  return 'var(--red)';
+}
+
+function renderTrashCard(item, q) {
+  const d = item.data || {};
+  const { title, chips } = trashSummary(item);
+  const sign = item.kind === 'income' ? '+' : '';
+  const origin = item.origin === 'backup'
+    ? 'Found in a backup — missing from the app'
+    : `Deleted ${trashAgeLabel(item.deletedAt)}${item.deletedBy ? ` by ${item.deletedBy}` : ''}`;
+  return `
+    <div class="entry-card trash-card" id="trash-${item.tid}">
+      <div class="entry-left">
+        <div class="entry-cat">${hl(title, q)}</div>
+        ${d.desc ? `<div class="entry-desc">${hl(d.desc, q)}</div>` : ''}
+        <div class="entry-chips">
+          <div class="echip trash-kind">${TRASH_KIND_LABELS[item.kind] || item.kind}</div>
+          ${chips.filter(Boolean).map(c => `<div class="echip">${hl(c, q)}</div>`).join('')}
+        </div>
+        <div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">${escapeHtml(origin)}</div>
+        <div class="entry-actions">
+          <button class="btn-del-entry btn-restore" onclick="runSave(this, () => restoreFromTrash(${item.tid}), 'Restoring…')">↺ Restore</button>
+          <button class="btn-del-entry" onclick="runSave(this, () => purgeFromTrash(${item.tid}), 'Deleting…')">✕ Delete forever</button>
+        </div>
+      </div>
+      <div class="entry-right">
+        <div class="entry-amount" style="color:${trashAmountColor(item.kind)}">${sign}₹${Number(d.amount || 0).toLocaleString('en-IN')}</div>
+        <div class="entry-date">${fmtDate(d.date)}</div>
+      </div>
+    </div>`;
+}
+
+// Jump straight to the bin (from Config). Uses the drill-down path so
+// goPage('log') doesn't wipe the kind we just set.
+function gotoTrash() {
+  S.logKind = 'Deleted';
+  S.logSearch = '';
+  S.logReturnAnchor = null;
+  const search = document.getElementById('log-search-input');
+  if (search) search.value = '';
+  goToLog();
+}
+
+// The Recently Deleted view of the Log. Search still applies (handy when the
+// bin has years of entries in it); the entry-shaped filters don't, since a
+// deleted record isn't part of any total.
+function renderTrashList() {
+  const list = document.getElementById('log-list');
+  const totalBar = document.getElementById('log-total-bar');
+  const acctName = id => (S.accounts.find(a => a.id === id) || {}).name || '';
+
+  let items = [...S.trash];
+  if (S.logSearch) {
+    const q = S.logSearch.toLowerCase();
+    items = items.filter(t => {
+      const d = t.data || {};
+      return [d.category, d.source, d.desc, d.forWhom, d.paidBy, d.receivedBy, d.addedBy,
+              acctName(d.account), acctName(d.fromAccount), acctName(d.toAccount),
+              String(d.amount), d.date, t.deletedBy]
+        .some(v => v && String(v).toLowerCase().includes(q));
+    });
+  }
+  items.sort((a, b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''));
+
+  if (items.length) {
+    totalBar.innerHTML =
+      `<span class="ltb-label">${items.length} deleted ${items.length === 1 ? 'entry' : 'entries'}</span>` +
+      `<span style="margin-left:auto;display:flex;gap:8px">` +
+        `<button class="trash-bulk-btn restore" onclick="runSave(this, restoreAllTrash, 'Restoring…')">↺ Restore all</button>` +
+        `<button class="trash-bulk-btn" onclick="runSave(this, emptyTrash, 'Deleting…')">Empty bin</button>` +
+      `</span>`;
+    totalBar.style.display = 'flex';
+  } else {
+    totalBar.style.display = 'none';
+  }
+
+  if (!items.length) {
+    list.innerHTML = S.trash.length
+      ? `<div class="no-data">No deleted entries match that search.</div>`
+      : `<div class="no-data">Nothing deleted.<br>Anything you delete lands here and can be restored.</div>`;
+    return;
+  }
+  const q = S.logSearch;
+  list.innerHTML = items.map(t => renderTrashCard(t, q)).join('');
+}
+
+// ── Recover entries deleted before the bin existed ───────────────────
+// Deletes were permanent until now, so older mis-deletions left no trace in
+// the app. A backup .json taken before them still holds them, though: read
+// the file, compare it against what's live, and drop anything that's missing
+// into Recently Deleted so it can be reviewed and restored one by one. This
+// only ever adds to the bin — it never touches or overwrites live data.
+async function scanBackupForDeleted(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
+    toast('Invalid backup file', 'err');
+    return;
+  }
+  if (!payload || !Array.isArray(payload.entries)) {
+    toast('That file has no entries to compare', 'err');
+    return;
+  }
+  const when = (payload.exportedAt || '').slice(0, 10);
+  const inBin = new Set(S.trash.map(t => `${t.kind}:${t.itemId}`));
+  const sets = {
+    expense:  new Set(S.entries.map(e => e.id)),
+    income:   new Set(S.income.map(i => i.id)),
+    transfer: new Set(S.transfers.map(t => t.id)),
+  };
+  const sources = [
+    ['expense',  payload.entries],
+    ['income',   Array.isArray(payload.income)    ? payload.income    : []],
+    ['transfer', Array.isArray(payload.transfers) ? payload.transfers : []],
+  ];
+  const missing = [];
+  sources.forEach(([kind, rows]) => {
+    rows.forEach(r => {
+      if (!r || r.id == null) return;
+      if (sets[kind].has(r.id)) return;              // still live
+      if (inBin.has(`${kind}:${r.id}`)) return;      // already in the bin
+      missing.push({ kind, data: r });
+    });
+  });
+
+  if (!missing.length) {
+    toast(`Nothing missing — everything in that backup is still in the app`, 'ok');
+    return;
+  }
+  const byKind = k => missing.filter(m => m.kind === k).length;
+  const msg = `Found ${missing.length} ${missing.length === 1 ? 'entry' : 'entries'} in the backup` +
+              `${when ? ` dated ${when}` : ''} that are no longer in the app:\n\n` +
+              `  • ${byKind('expense')} expenses\n` +
+              `  • ${byKind('income')} income\n` +
+              `  • ${byKind('transfer')} transfers\n\n` +
+              `Add them to Recently Deleted so you can review and restore them?\n\n` +
+              `Nothing live is changed or overwritten.`;
+  if (!confirm(msg)) return;
+
+  // Feed them in oldest-first; trashRecord unshifts, so the bin ends up
+  // newest-first like the rest of the Log.
+  missing.sort((a, b) => (a.data.date || '').localeCompare(b.data.date || ''));
+  missing.forEach(m => trashRecord(m.kind, m.data, {
+    origin: 'backup',
+    // The real deletion time is unknowable; use the backup's own timestamp so
+    // the bin sorts these together and the card can say where they came from.
+    deletedAt: payload.exportedAt || new Date().toISOString(),
+    deletedBy: ''
+  }));
+  saveLocal();
+  await pushChanges(`✓ ${missing.length} recoverable ${missing.length === 1 ? 'entry' : 'entries'} added to Recently Deleted`);
+  renderCfg();
   renderLog();
 }
 
@@ -4027,7 +4473,12 @@ async function saveEdit() {
 }
 
 async function deleteEntry(id) {
-  if (!confirm('Delete this entry?')) return;
+  if (!confirm('Delete this entry?\n\nIt moves to Recently Deleted in the Log and can be restored.')) return;
+  const rec = S.entries.find(e => e.id === id);
+  // Remember which reimbursement income pointed here before the links are
+  // cleared, so a restore can re-establish exactly those tags.
+  const links = S.income.filter(i => i.reimbursesEntryId === id).map(i => i.id);
+  if (rec) trashRecord('expense', rec, { links });
   S.entries = S.entries.filter(e => e.id !== id);
   // Clear any reimbursement-income links that pointed at this expense, so
   // the income side doesn't quietly carry dead references. The income
@@ -4045,7 +4496,7 @@ async function deleteEntry(id) {
   });
   queueOp('expenses', 'DELETE', id);
   saveLocal();
-  await pushChanges('Entry deleted');
+  await pushChanges('Entry deleted — recoverable from Recently Deleted');
   const card = document.getElementById('entry-' + id);
   if (card) card.remove();
   renderLog();
@@ -4133,6 +4584,26 @@ function renderLog() {
     else if (c.dataset.by != null) on = c.dataset.by === S.logAddedBy;
     c.classList.toggle('active', on);
   });
+  // Keep the bin's chip count live wherever the Log is rendered.
+  const delChip = document.getElementById('log-chip-deleted');
+  if (delChip) delChip.textContent = S.trash.length ? `🗑 Deleted (${S.trash.length})` : '🗑 Deleted';
+
+  // Recently Deleted is its own view: binned records aren't part of any
+  // total and can't be edited, so the person/type/category filters and the
+  // drill-down banners don't apply. Hide them and hand off to renderTrashList.
+  const trashMode = S.logKind === 'Deleted';
+  document.getElementById('page-log').classList.toggle('trash-mode', trashMode);
+  document.getElementById('log-search-input').placeholder =
+    trashMode ? 'Search deleted entries…' : 'Search expenses…';
+  if (trashMode) {
+    ['log-account-banner','log-accttype-banner','log-period-banner'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    renderTrashList();
+    return;
+  }
+
   const list = document.getElementById('log-list');
   const totalBar = document.getElementById('log-total-bar');
   const acctBanner = document.getElementById('log-account-banner');
@@ -5467,6 +5938,13 @@ function renderCfg() {
   });
   const bs = document.getElementById('cfg-backup-status');
   if (bs) bs.textContent = S.lastBackupAt ? `Last backup: ${daysAgo(S.lastBackupAt)}` : 'No backup taken yet';
+  const ts = document.getElementById('cfg-trash-status');
+  if (ts) {
+    const n = S.trash.length;
+    ts.textContent = n
+      ? `${n} deleted ${n === 1 ? 'entry' : 'entries'} held and restorable. Nothing is ever purged automatically.`
+      : 'Nothing deleted. Anything you delete is kept here until you remove it for good.';
+  }
 }
 
 function savePin(who) {
@@ -5886,6 +6364,9 @@ function buildBackupPayload() {
     accounts: S.accounts,
     transfers: S.transfers,
     nwSnapshots: S.nwSnapshots,
+    // The Recently Deleted bin travels with the backup, so a restore onto a
+    // fresh device doesn't lose anything that was pending recovery.
+    trash: S.trash,
   };
 }
 
@@ -6095,6 +6576,19 @@ async function importBackup(input) {
   S.accounts  = accountsArr;
   S.transfers = transfersArr;
   if (payload.nwSnapshots && typeof payload.nwSnapshots === 'object') S.nwSnapshots = payload.nwSnapshots;
+  // Merge (don't replace) the Recently Deleted bin: a restore shouldn't be
+  // able to lose recoverable entries, whichever side they were sitting on.
+  // Anything the backup brings back as live is dropped from the bin.
+  if (Array.isArray(payload.trash)) {
+    const seen = new Set(S.trash.map(t => t.tid));
+    S.trash = [...S.trash, ...payload.trash.filter(t => t && !seen.has(t.tid))];
+  }
+  const liveNow = {
+    expense:  new Set(S.entries.map(e => e.id)),
+    income:   new Set(S.income.map(i => i.id)),
+    transfer: new Set(S.transfers.map(t => t.id)),
+  };
+  S.trash = S.trash.filter(t => !(liveNow[t.kind] && liveNow[t.kind].has(t.itemId)));
   S.pendingOps = []; // a full restore supersedes any queued incremental ops
   saveLocal();
   buildSelects();
