@@ -14,11 +14,31 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-SUPABASE_URL  = os.environ['SUPABASE_URL'].rstrip('/')
-SUPABASE_KEY  = os.environ['SUPABASE_KEY']
-SMTP_HOST     = os.environ['SMTP_HOST']
-SMTP_PORT     = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USER     = os.environ['SMTP_USER']
+# An unset GitHub secret arrives as an empty string, not as a missing key — so
+# os.environ['X'] happily returns '' and the run used to die further down with
+# something unhelpful like "invalid literal for int() with base 10: ''". Check
+# up front and say exactly which secrets are missing: a silently broken backup
+# is worse than no backup, because it looks like it's working.
+REQUIRED = ['SUPABASE_URL', 'SUPABASE_KEY', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD']
+missing = [k for k in REQUIRED if not os.environ.get(k, '').strip()]
+if missing:
+    raise SystemExit(
+        'Backup NOT sent — these repository secrets are empty or unset:\n'
+        + ''.join(f'  • {k}\n' for k in missing)
+        + '\nSet them under: GitHub repo → Settings → Secrets and variables →\n'
+          'Actions → New repository secret. SMTP_PORT is optional (defaults to 587).\n'
+          'Until they are set, no backup email is being sent.'
+    )
+
+SUPABASE_URL  = os.environ['SUPABASE_URL'].strip().rstrip('/')
+SUPABASE_KEY  = os.environ['SUPABASE_KEY'].strip()
+SMTP_HOST     = os.environ['SMTP_HOST'].strip()
+# Blank/garbage port falls back to 587 rather than killing the whole run.
+try:
+    SMTP_PORT = int(os.environ.get('SMTP_PORT', '').strip() or '587')
+except ValueError:
+    SMTP_PORT = 587
+SMTP_USER     = os.environ['SMTP_USER'].strip()
 SMTP_PASSWORD = os.environ['SMTP_PASSWORD']
 
 RECIPIENTS = ['edwin@spicemore.com', 'mary.george@spicemore.com']
