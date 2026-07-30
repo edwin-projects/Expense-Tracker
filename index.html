@@ -2296,8 +2296,13 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--green);border:1.5px solid var(--green);margin-top:0" onclick="runSave(this, shareBackup, 'Sharing…')">✉ Email / Share Backup</button>
         <label style="width:100%;margin:0">
           <input type="file" id="backup-file-input" accept=".json" style="display:none" onchange="importBackup(this)">
-          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⬆ Import Backup (.json)</span>
+          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--red);border:1.5px solid var(--btn-del-border);cursor:pointer">⬆ Import Backup — replaces everything</span>
         </label>
+        <div style="font-size:11.5px;color:var(--ink3);line-height:1.55;text-align:center">
+          Import wipes all current data and puts the file's contents in its place —
+          anything added since that backup is lost. To get back a few deleted
+          entries without losing anything, use <b>Recently Deleted</b> below instead.
+        </div>
         <div id="cfg-backup-status" style="font-size:11.5px;color:var(--ink3);text-align:center">No backup taken yet</div>
       </div>
     </div>
@@ -2310,14 +2315,17 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="gotoTrash()">🗑 Open Recently Deleted</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
         <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
-          Entries deleted before this feature existed left no record in the app.
-          If you have an older backup file, this compares it against your current
-          data and puts anything missing into Recently Deleted for you to restore.
-          It only adds to the bin — nothing live is changed.
+          Entries deleted before this existed left no record in the app, but the
+          weekly backup emails still hold them. Pick <b>as many backup files as you
+          have</b> — this reads them, finds every entry that's no longer in the app,
+          and offers to put them all back in one tap.
+          <br><br>
+          Safe to run any time: it only reads the files and adds what's missing.
+          Nothing you currently have is changed, replaced or removed.
         </div>
         <label style="width:100%;margin:0">
-          <input type="file" id="recover-file-input" accept=".json" style="display:none" onchange="scanBackupForDeleted(this)">
-          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⌕ Find deleted entries in a backup (.json)</span>
+          <input type="file" id="recover-file-input" accept=".json" multiple style="display:none" onchange="scanBackupForDeleted(this)">
+          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⌕ Recover deleted entries from backups</span>
         </label>
       </div>
     </div>
@@ -2465,6 +2473,20 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 <div class="toast" id="toast"></div>
 
 <script>
+// ══════════════════════════════════════════════════
+//  BUILD VERSION
+// ══════════════════════════════════════════════════
+// Bump this on EVERY deploy and write the SAME value into version.json.
+// GitHub Pages puts a ~10-min HTTP cache on index.html, so without this an
+// already-installed app keeps serving the stale page even on refresh. The app
+// fetches version.json with cache:'no-store' (which that HTTP cache can't
+// intercept) on load, on every foreground and every 2 min; when the live
+// version differs from this baked-in one it logs out and reloads, so the next
+// login is on the fresh build. Keep the two values identical — if version.json
+// runs ahead of the deployed APP_VERSION, clients try to update on every
+// check (the per-session guard stops the loop, but it's still wrong).
+const APP_VERSION = '2026-07-30-01';
+
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
 // ══════════════════════════════════════════════════
@@ -2997,6 +3019,8 @@ function showPinStep() {
   document.getElementById('pin-entry-label').textContent = S.pins[remembered] ? `Enter ${remembered}'s PIN` : `Set ${remembered}'s PIN`;
   renderPinDots();
   refreshFaceIdButton(remembered);
+  // If we're here because a new build logged everyone out, say so.
+  showUpdateNoticeIfAny();
   // Auto-fire Face ID for the remembered user. On iOS PWAs the launch
   // counts as transient user activation in many cases; if it doesn't,
   // get() throws NotAllowedError and we wire up a one-shot tap handler
@@ -3959,73 +3983,115 @@ function renderTrashList() {
 
 // ── Recover entries deleted before the bin existed ───────────────────
 // Deletes were permanent until now, so older mis-deletions left no trace in
-// the app. A backup .json taken before them still holds them, though: read
-// the file, compare it against what's live, and drop anything that's missing
-// into Recently Deleted so it can be reviewed and restored one by one. This
-// only ever adds to the bin — it never touches or overwrites live data.
+// the app. The weekly emailed backups still hold them, though: read the
+// file(s), compare against what's live, and collect anything that's missing.
+//
+// Several files can be picked at once, which matters — a backup only contains
+// what was alive when it was taken, so an entry deleted in May is in April's
+// backup but not June's. Feeding in every backup you have is what makes the
+// recovery complete, and scanning is idempotent, so overlapping files and
+// repeat runs never produce duplicates.
+//
+// This is purely additive: it reads the files and nothing else. No live entry
+// is changed, overwritten or removed — unlike Import Backup, which replaces
+// everything.
 async function scanBackupForDeleted(input) {
-  const file = input.files[0];
-  if (!file) return;
+  const files = [...(input.files || [])];
+  if (!files.length) return;
   input.value = '';
-  let payload;
-  try {
-    payload = JSON.parse(await file.text());
-  } catch {
-    toast('Invalid backup file', 'err');
-    return;
-  }
-  if (!payload || !Array.isArray(payload.entries)) {
-    toast('That file has no entries to compare', 'err');
-    return;
-  }
-  const when = (payload.exportedAt || '').slice(0, 10);
-  const inBin = new Set(S.trash.map(t => `${t.kind}:${t.itemId}`));
-  const sets = {
+
+  // Track ids across all files as well as against live data, so two backups
+  // containing the same deleted entry only ever yield one bin item.
+  const seen = new Set(S.trash.map(t => `${t.kind}:${t.itemId}`));
+  const live = {
     expense:  new Set(S.entries.map(e => e.id)),
     income:   new Set(S.income.map(i => i.id)),
     transfer: new Set(S.transfers.map(t => t.id)),
   };
-  const sources = [
-    ['expense',  payload.entries],
-    ['income',   Array.isArray(payload.income)    ? payload.income    : []],
-    ['transfer', Array.isArray(payload.transfers) ? payload.transfers : []],
-  ];
-  const missing = [];
-  sources.forEach(([kind, rows]) => {
-    rows.forEach(r => {
-      if (!r || r.id == null) return;
-      if (sets[kind].has(r.id)) return;              // still live
-      if (inBin.has(`${kind}:${r.id}`)) return;      // already in the bin
-      missing.push({ kind, data: r });
-    });
-  });
 
-  if (!missing.length) {
-    toast(`Nothing missing — everything in that backup is still in the app`, 'ok');
+  const missing = [];
+  const badFiles = [];
+  let scanned = 0, oldest = '', newest = '';
+
+  for (const file of files) {
+    let payload;
+    try { payload = JSON.parse(await file.text()); } catch { badFiles.push(file.name); continue; }
+    if (!payload || !Array.isArray(payload.entries)) { badFiles.push(file.name); continue; }
+    scanned++;
+    const when = (payload.exportedAt || '').slice(0, 10);
+    if (when) {
+      if (!oldest || when < oldest) oldest = when;
+      if (!newest || when > newest) newest = when;
+    }
+    const sources = [
+      ['expense',  payload.entries],
+      ['income',   Array.isArray(payload.income)    ? payload.income    : []],
+      ['transfer', Array.isArray(payload.transfers) ? payload.transfers : []],
+    ];
+    sources.forEach(([kind, rows]) => {
+      rows.forEach(r => {
+        if (!r || r.id == null) return;
+        const key = `${kind}:${r.id}`;
+        if (live[kind].has(r.id) || seen.has(key)) return;
+        seen.add(key);
+        missing.push({ kind, data: r, deletedAt: payload.exportedAt || new Date().toISOString() });
+      });
+    });
+  }
+
+  if (!scanned) {
+    toast(badFiles.length > 1 ? 'None of those files are backups' : 'That file is not a backup', 'err');
     return;
   }
+  const fileNote = scanned > 1
+    ? `${scanned} backups (${oldest} → ${newest})`
+    : `the backup${oldest ? ` dated ${oldest}` : ''}`;
+  const skipped = badFiles.length ? `\n\n(Skipped ${badFiles.length} file${badFiles.length === 1 ? '' : 's'} that weren't backups.)` : '';
+
+  if (!missing.length) {
+    toast(`Nothing missing — everything in ${fileNote} is still in the app`, 'ok');
+    return;
+  }
+
   const byKind = k => missing.filter(m => m.kind === k).length;
-  const msg = `Found ${missing.length} ${missing.length === 1 ? 'entry' : 'entries'} in the backup` +
-              `${when ? ` dated ${when}` : ''} that are no longer in the app:\n\n` +
-              `  • ${byKind('expense')} expenses\n` +
-              `  • ${byKind('income')} income\n` +
-              `  • ${byKind('transfer')} transfers\n\n` +
-              `Add them to Recently Deleted so you can review and restore them?\n\n` +
-              `Nothing live is changed or overwritten.`;
-  if (!confirm(msg)) return;
+  const lines = [
+    byKind('expense')  ? `  • ${byKind('expense')} expense${byKind('expense') === 1 ? '' : 's'}` : '',
+    byKind('income')   ? `  • ${byKind('income')} income` : '',
+    byKind('transfer') ? `  • ${byKind('transfer')} transfer${byKind('transfer') === 1 ? '' : 's'}` : '',
+  ].filter(Boolean).join('\n');
+  const total = missing.reduce((s, m) => s + Number(m.data.amount || 0), 0);
 
   // Feed them in oldest-first; trashRecord unshifts, so the bin ends up
   // newest-first like the rest of the Log.
   missing.sort((a, b) => (a.data.date || '').localeCompare(b.data.date || ''));
   missing.forEach(m => trashRecord(m.kind, m.data, {
     origin: 'backup',
-    // The real deletion time is unknowable; use the backup's own timestamp so
-    // the bin sorts these together and the card can say where they came from.
-    deletedAt: payload.exportedAt || new Date().toISOString(),
+    // The real deletion time is unknowable, so the backup's own timestamp
+    // stands in — it's the last moment the entry is known to have existed.
+    deletedAt: m.deletedAt,
     deletedBy: ''
   }));
   saveLocal();
-  await pushChanges(`✓ ${missing.length} recoverable ${missing.length === 1 ? 'entry' : 'entries'} added to Recently Deleted`);
+
+  // Offer the one-tap finish. Declining isn't a cancel — they're already in
+  // the bin either way, which is the whole point: nothing gets decided
+  // irreversibly here, and the Log gives a per-entry choice.
+  const msg = `Found ${missing.length} ${missing.length === 1 ? 'entry' : 'entries'} in ${fileNote} ` +
+              `that are no longer in the app (₹${fmt(Math.round(total))} in total):\n\n${lines}${skipped}\n\n` +
+              `Restore all of them now?\n\n` +
+              `OK — put them all back straight away.\n` +
+              `Cancel — leave them in Recently Deleted to review one by one.`;
+  if (confirm(msg)) {
+    const ids = [...S.trash].filter(t => t.origin === 'backup')
+      .sort((a, b) => (a.data.date || '').localeCompare(b.data.date || '')).map(t => t.tid);
+    for (const tid of ids) await restoreFromTrash(tid);
+    const left = S.trash.filter(t => t.origin === 'backup').length;
+    toast(left
+      ? `✓ Restored ${ids.length - left} — ${left} need attention in Recently Deleted`
+      : `✓ Restored all ${ids.length}`, 'ok');
+  } else {
+    await pushChanges(`${missing.length} ${missing.length === 1 ? 'entry' : 'entries'} waiting in Recently Deleted`);
+  }
   renderCfg();
   renderLog();
 }
@@ -6854,6 +6920,122 @@ function enhanceAllSearchableSelects(root) {
 
 
 // ══════════════════════════════════════════════════
+//  LIVE UPDATES  (new build → log out → log in on the new build)
+// ══════════════════════════════════════════════════
+// Two layers, same as the Comedor dashboard:
+//   1. version.json polled with cache:'no-store' — works even before the
+//      service worker exists, so a stale page self-heals in about a second
+//      instead of waiting out GitHub Pages' ~10-min HTML cache.
+//   2. sw.js serves navigations network-first, so the next open is fresh.
+// When a new build is found the app logs whoever is signed in straight out
+// and reloads: being back at the PIN screen IS the signal that something
+// changed, and the login that follows is running the new code.
+
+const UPDATE_GUARD_KEY  = 'de_updated_to';     // sessionStorage — reload-loop guard
+const UPDATE_NOTICE_KEY = 'de_update_notice';  // localStorage — survives the reload
+
+// Never yank the page out from under someone mid-entry. An update can wait
+// for the next foreground or the next 2-minute check; losing a half-typed
+// entry can't be undone.
+function updateIsSafeNow() {
+  // Not signed in yet → nothing to lose, always safe.
+  if (!currentUser) return true;
+  // An open modal or picker means an edit is in progress.
+  if (document.querySelector('.modal-overlay.show, .picker-overlay.show')) return false;
+  // Any amount/description the user has started typing, on any of the three
+  // entry forms (expense f-*, income i-*, transfer t-*).
+  const inProgress = ['f-amount','f-desc','i-amount','i-desc','t-amount','t-desc']
+    .map(id => document.getElementById(id))
+    .some(el => el && el.value && el.value.trim());
+  if (inProgress) return false;
+  // Don't reload on top of writes that haven't reached Supabase yet. They're
+  // persisted in localStorage and would survive, but flushing first keeps the
+  // ordering simple and means the new build starts from a clean queue.
+  if (S.pendingOps && S.pendingOps.length) return false;
+  return true;
+}
+
+let __pendingUpdateVersion = null;
+
+function applyUpdate(version) {
+  try { sessionStorage.setItem(UPDATE_GUARD_KEY, version); } catch (e) {}
+  // Read back on the PIN screen after the reload to explain the logout.
+  try { localStorage.setItem(UPDATE_NOTICE_KEY, version); } catch (e) {}
+  // Log out explicitly. currentUser is memory-only, so the reload alone would
+  // do it, but clearing first means no stale user survives a failed reload.
+  currentUser = '';
+  location.reload();
+}
+
+// Ask the server what the current build is, bypassing every cache.
+function checkForUpdate() {
+  try {
+    fetch('version.json?_=' + Date.now(), { cache: 'no-store' })
+      .then(r => (r && r.ok) ? r.json() : null)
+      .then(v => {
+        if (!v || !v.version || v.version === APP_VERSION) return;
+        if (sessionStorage.getItem(UPDATE_GUARD_KEY) === v.version) return;
+        if (updateIsSafeNow()) applyUpdate(v.version);
+        else __pendingUpdateVersion = v.version;   // retry on the next check
+      })
+      .catch(() => {});
+  } catch (e) {}
+}
+
+// A deferred update lands as soon as the user is no longer mid-entry.
+function applyPendingUpdateIfSafe() {
+  if (!__pendingUpdateVersion) return;
+  if (sessionStorage.getItem(UPDATE_GUARD_KEY) === __pendingUpdateVersion) { __pendingUpdateVersion = null; return; }
+  if (updateIsSafeNow()) applyUpdate(__pendingUpdateVersion);
+}
+
+// Network-first service worker: the next app open gets the live page even
+// when GitHub Pages would still hand out a cached one.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(reg => { try { reg.update(); } catch (e) {} })
+      .catch(() => {});
+    // A brand-new worker taking control means the shell it fetched is newer
+    // than the one running — reload once onto it. Guarded against loops.
+    let swapped = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (swapped) return;
+      swapped = true;
+      if (updateIsSafeNow()) { currentUser = ''; location.reload(); }
+    });
+  } catch (e) {}
+}
+
+// Shown on the PIN screen after an update-triggered logout, so the sign-out
+// reads as "the app just updated" rather than something going wrong.
+function showUpdateNoticeIfAny() {
+  let v = null;
+  try { v = localStorage.getItem(UPDATE_NOTICE_KEY); } catch (e) {}
+  if (!v) return;
+  try { localStorage.removeItem(UPDATE_NOTICE_KEY); } catch (e) {}
+  const hint = document.getElementById('pin-hint');
+  if (hint) hint.textContent = '✓ App updated — log in to continue';
+}
+
+function startUpdateWatch() {
+  registerServiceWorker();
+  checkForUpdate();
+  // Returning to the app is the natural moment to pick up a new build.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    applyPendingUpdateIfSafe();
+    checkForUpdate();
+  });
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    applyPendingUpdateIfSafe();
+    checkForUpdate();
+  }, 120000);
+}
+
+// ══════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════
 // Retry any queued offline writes as soon as the network returns.
@@ -6863,6 +7045,7 @@ window.addEventListener('online', () => {
   });
 });
 initSetup();
+startUpdateWatch();
 </script>
 </body>
 </html>
