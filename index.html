@@ -2329,6 +2329,10 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         </label>
       </div>
     </div>
+
+    <!-- Which build am I running? Tap to check for a newer one. -->
+    <div id="cfg-version" onclick="checkForUpdateNow(this)"
+         style="text-align:center;font-size:11.5px;color:var(--ink3);padding:14px 0 4px;cursor:pointer;font-variant-numeric:tabular-nums"></div>
     <div style="height:20px"></div>
   </div>
 
@@ -2485,7 +2489,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-07-30-01';
+const APP_VERSION = '2026-07-30-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6004,6 +6008,8 @@ function renderCfg() {
   });
   const bs = document.getElementById('cfg-backup-status');
   if (bs) bs.textContent = S.lastBackupAt ? `Last backup: ${daysAgo(S.lastBackupAt)}` : 'No backup taken yet';
+  const vs = document.getElementById('cfg-version');
+  if (vs) vs.textContent = 'Version ' + APP_VERSION + ' · tap to check for updates';
   const ts = document.getElementById('cfg-trash-status');
   if (ts) {
     const n = S.trash.length;
@@ -6980,6 +6986,31 @@ function checkForUpdate() {
       })
       .catch(() => {});
   } catch (e) {}
+}
+
+// Manual "am I on the latest?" check from Config. Says so either way — the
+// automatic check is silent when there's nothing to do, which is unhelpful
+// when you're standing there wondering whether a change has landed yet.
+async function checkForUpdateNow(el) {
+  if (el) el.textContent = 'Checking…';
+  let live = null;
+  try {
+    const r = await fetch('version.json?_=' + Date.now(), { cache: 'no-store' });
+    if (r && r.ok) live = (await r.json()).version;
+  } catch (e) {}
+  if (!live) {
+    toast('Could not reach the server — check your connection', 'err');
+  } else if (live === APP_VERSION) {
+    toast("You're on the latest version (" + APP_VERSION + ')', 'ok');
+  } else {
+    // Clear the guard so an explicit tap always wins, even if this session
+    // already deferred or skipped this exact version.
+    try { sessionStorage.removeItem(UPDATE_GUARD_KEY); } catch (e) {}
+    toast('Updating to ' + live + '…', 'ok');
+    setTimeout(() => applyUpdate(live), 600);
+    return;
+  }
+  if (el) el.textContent = 'Version ' + APP_VERSION + ' · tap to check for updates';
 }
 
 // A deferred update lands as soon as the user is no longer mid-entry.
