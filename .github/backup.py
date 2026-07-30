@@ -44,6 +44,9 @@ expense_rows  = fetch('expenses?select=*&order=date.desc')
 income_rows   = fetch('income?select=*&order=date.desc')
 account_rows  = fetch('accounts?select=*&order=created_at.asc')
 transfer_rows = fetch('transfers?select=*&order=date.desc')
+# Optional table behind the app's Recently Deleted bin. Absent → [] , so the
+# backup simply carries no bin (fetch() already treats 404 that way).
+deleted_rows  = fetch('deleted_items?select=*&order=deleted_at.desc')
 
 # ── 2. Map Supabase columns → app format ──────────────────────────────────────
 entries = [{
@@ -99,6 +102,18 @@ transfers = [{
     'addedBy':     r.get('added_by', ''),
 } for r in transfer_rows]
 
+# Recently Deleted bin, in the shape the app keeps it in (see S.trash).
+trash = [{
+    'tid':       r.get('id'),
+    'kind':      r.get('kind', ''),
+    'itemId':    r.get('item_id'),
+    'deletedAt': r.get('deleted_at', ''),
+    'deletedBy': r.get('deleted_by') or '',
+    'origin':    r.get('origin') or 'delete',
+    'data':      r.get('payload') or {},
+    'links':     r.get('links') or [],
+} for r in deleted_rows]
+
 # ── 3. Build backup payload ───────────────────────────────────────────────────
 now_utc   = datetime.now(timezone.utc)
 date_str  = now_utc.strftime('%Y-%m-%d')
@@ -111,6 +126,7 @@ backup = {
     'income':     income,
     'accounts':   accounts,
     'transfers':  transfers,
+    'trash':      trash,
 }
 backup_json = json.dumps(backup, indent=2, ensure_ascii=False)
 filename    = f'de-finance-backup-{date_str}.json'
@@ -171,8 +187,17 @@ Your weekly D & E Finance backup is attached.
   Backup date        : {date_str}
   File               : {filename}
 
-HOW TO RESTORE
-──────────────
+RECOVERING A FEW DELETED ENTRIES  (keeps everything else as it is)
+─────────────────────────────────────────────────────────────────
+1. Open the app and go to CONFIG (bottom-right gear icon).
+2. Scroll to "Recently Deleted".
+3. Tap "Find deleted entries in a backup" and pick this .json file.
+4. Anything in this backup that's no longer in the app is listed under
+   LOG → Deleted, where you can restore the ones you want.
+   Nothing live is changed or overwritten.
+
+RESTORING EVERYTHING  (replaces all current data)
+─────────────────────────────────────────────────
 1. Open the app and go to CONFIG (bottom-right gear icon).
 2. Scroll to the Data section.
 3. Tap "Import Backup" and select the attached .json file.
