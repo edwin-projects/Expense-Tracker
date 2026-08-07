@@ -1772,12 +1772,12 @@ body { transition: background 0.25s ease, color 0.25s ease; }
   <div id="page-add" class="page active">
     <div class="sec-label">Paste bank message</div>
     <div class="fcard">
-      <textarea id="sms-paste" class="sms-paste" rows="2" placeholder="Paste the SMS from your bank — the form fills itself in"></textarea>
+      <textarea id="sms-paste-exp" class="sms-paste" rows="2" placeholder="Paste the SMS from your bank — the form fills itself in"></textarea>
       <div class="sms-paste-row">
         <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
-        <button class="sms-paste-btn ghost" onclick="clearSmsPaste()">Clear</button>
+        <button class="sms-paste-btn ghost" onclick="smsClearBoxes()">Clear</button>
       </div>
-      <div id="sms-paste-hint" class="sms-paste-hint"></div>
+      <div id="sms-hint-exp" class="sms-paste-hint"></div>
     </div>
 
     <div class="sec-label">Amount</div>
@@ -1852,6 +1852,16 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 
   <!-- INCOME PAGE -->
   <div id="page-income" class="page">
+    <div class="sec-label">Paste bank message</div>
+    <div class="fcard">
+      <textarea id="sms-paste-inc" class="sms-paste" rows="2" placeholder="Paste a credit/deposit SMS — the form fills itself in"></textarea>
+      <div class="sms-paste-row">
+        <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
+        <button class="sms-paste-btn ghost" onclick="smsClearBoxes()">Clear</button>
+      </div>
+      <div id="sms-hint-inc" class="sms-paste-hint"></div>
+    </div>
+
     <div class="sec-label">Amount</div>
     <div class="fcard">
       <div class="frow">
@@ -1908,6 +1918,16 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 
   <!-- TRANSFER PAGE -->
   <div id="page-transfer" class="page">
+    <div class="sec-label">Paste bank message</div>
+    <div class="fcard">
+      <textarea id="sms-paste-xfer" class="sms-paste" rows="2" placeholder="Paste a card-bill or transfer SMS — the form fills itself in"></textarea>
+      <div class="sms-paste-row">
+        <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
+        <button class="sms-paste-btn ghost" onclick="smsClearBoxes()">Clear</button>
+      </div>
+      <div id="sms-hint-xfer" class="sms-paste-hint"></div>
+    </div>
+
     <div class="sec-label">Amount</div>
     <div class="fcard">
       <div class="frow">
@@ -2543,7 +2563,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-07-01';
+const APP_VERSION = '2026-08-07-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2730,6 +2750,8 @@ function loadLocal() {
   if (!Array.isArray(S.trash)) S.trash = [];
   // card last-4 → account id, learned from what the user actually picks
   if (!S.smsCards || typeof S.smsCards !== 'object') S.smsCards = {};
+  // payer name → income source, learned the same way
+  if (!S.smsPayees || typeof S.smsPayees !== 'object') S.smsPayees = {};
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
@@ -3661,6 +3683,7 @@ async function submitIncome() {
   S.income.unshift(entry);
   S.lastAccountInc = account;
   rememberSmsCard(account);
+  rememberSmsPayee(entry.source);
   queueOp('income', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
@@ -3900,14 +3923,35 @@ function smsMerchant(text) {
 // credited". Taking the first match picks the wrong one half the time, so
 // collect every candidate and keep whichever sits closest to the word that
 // describes what happened to *our* money.
+// Who the money came from (or went to) in a bank-transfer narration. NEFT and
+// friends pack it into a hyphenated string:
+//   NEFT Cr-UTIB0002671-SPICE MORE TRADING COMPANY-EDWIN JOSEPH JOHN-AXISP008…
+// which is <IFSC>-<remitter>-<beneficiary>-<ref>. The first segment that reads
+// like a name rather than a bank code is the counterparty worth recording.
+function smsCounterparty(text) {
+  const m = text.match(/\b(?:NEFT|IMPS|RTGS|UPI|ACH|ECS)\b[^A-Za-z0-9]*(?:Cr|Dr)?[\s\-:]*([^.]{4,140})/i);
+  if (!m) return '';
+  for (const raw of m[1].split('-')) {
+    const seg = raw.trim().replace(/\s{2,}/g, ' ');
+    if (seg.length < 4) continue;
+    if (/^[A-Za-z]{4}0?\w{6,}$/.test(seg)) continue;   // IFSC / bank ref code
+    if (/^\w*\d{6,}\w*$/.test(seg)) continue;          // transaction reference
+    if (/^\d+$/.test(seg)) continue;
+    const letters = (seg.match(/[A-Za-z]/g) || []).length;
+    if (letters >= 4 && letters / seg.length > 0.6) return seg;
+  }
+  return '';
+}
+
 function smsCardLast4(text, verbIndex) {
   const cands = [];
   const push = (re) => {
     let m; const r = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
     while ((m = r.exec(text)) !== null) cands.push({ d: m[1], i: m.index });
   };
-  push(/(?:ending(?:\s+with)?|card\s*(?:no\.?)?|a\/c\s*(?:no\.?)?|acct?\.?|account)\s*[:\s]*[xX*]{0,8}(\d{4})\b/gi);
-  push(/[xX*]{1,8}(\d{4})\b/g);
+  push(/(?:ending(?:\s+with)?|card\s*(?:no\.?)?|a\/c\s*(?:no\.?)?|acct?\.?|account)\s*[:\s]*[xX*]{0,8}[\s\-]?(\d{4})\b/gi);
+  // "XXXX-7974" — some senders separate the mask from the digits.
+  push(/[xX*]{1,8}[\s\-]?(\d{4})\b/g);
   if (!cands.length) return '';
   if (verbIndex == null || verbIndex < 0) return cands[0].d;
   cands.sort((a, b) => Math.abs(a.i - verbIndex) - Math.abs(b.i - verbIndex));
@@ -3957,15 +4001,23 @@ function parseBankSms(text) {
   const creditRe = /\b(credited|received|deposited|refund(?:ed)?|cashback|salary)\b/i;
   const debitRe  = /\b(spent|debited|debit|withdrawn|paid|purchase|sent|charged)\b/i;
   const credit = creditRe.test(t), debit = debitRe.test(t);
+
+  // Paying a credit card bill isn't spending — the money moves from a bank
+  // account to the card, which is a transfer. Treated as an expense it would
+  // double-count against the purchases already logged on that card.
+  const billPay = /credit\s*card\s*bill|card\s*bill.*\b(paid|payment)\b|\bbill\b.*\bcredit\s*card\b|payment\s+received\s+.*credit\s*card|autopay/i.test(t)
+               && !/\bspent\b/i.test(t);
+
+  let kind;
+  if (billPay) kind = 'transfer';
+  else if (debit && !credit) kind = 'expense';
+  else if (credit && !debit) kind = 'income';
   // A refund says both ("refunded to your card"), so when both appear the one
   // that comes first describes what actually happened to the money.
-  let kind;
-  if (debit && !credit) kind = 'expense';
-  else if (credit && !debit) kind = 'income';
   else if (debit && credit) kind = t.search(debitRe) < t.search(creditRe) ? 'expense' : 'income';
   else kind = 'expense';
 
-  const verbIndex = kind === 'expense' ? t.search(debitRe) : t.search(creditRe);
+  const verbIndex = kind === 'income' ? t.search(creditRe) : t.search(debitRe);
   const amount   = smsAmount(t);
   const date     = smsDate(t);
   const merchant = smsMerchant(t);
@@ -3977,12 +4029,25 @@ function parseBankSms(text) {
   const category = kind === 'expense' ? smsCategory(merchant, t) : '';
   const type     = category && S.types.includes(SMS_CATEGORY_TYPES[category] || '') ? SMS_CATEGORY_TYPES[category] : '';
 
+  // Who sent the money in. Once the user tags a payer's first deposit with an
+  // income source, every later deposit from that same payer arrives tagged.
+  const payer = kind === 'income' ? smsCounterparty(t) : '';
+  let source = '';
+  if (kind === 'income') {
+    const learnedSrc = payer && S.smsPayees ? S.smsPayees[payer.toUpperCase()] : '';
+    if (learnedSrc && S.incomeSources.includes(learnedSrc)) source = learnedSrc;
+    else if (/\bsalary\b/i.test(t) && S.incomeSources.includes('Salary')) source = 'Salary';
+  }
+
   return {
     kind, amount, date, merchant, last4, bank, isCard, isCredit,
-    account, accountLearned: learned, category, type,
+    account, accountLearned: learned, category, type, payer, source,
+    // A bill-payment message names the card being paid; the account it's paid
+    // from is not in the message, so the user picks that side.
+    toAccount: kind === 'transfer' ? account : null,
     found: {
       amount: amount != null, date: !!date, merchant: !!merchant,
-      account: !!account, category: !!category,
+      account: !!account, category: !!category, source: !!source,
     }
   };
 }
@@ -3990,6 +4055,9 @@ function parseBankSms(text) {
 // Last-4 of the card the current form was prefilled from, so saving can record
 // which account the user actually chose for it.
 let __smsPendingLast4 = '';
+// Payer named in the deposit that prefilled the Income form, so saving can
+// record which income source the user filed it under.
+let __smsPendingPayer = '';
 
 function rememberSmsCard(accountId) {
   if (!__smsPendingLast4 || !accountId) return;
@@ -3999,41 +4067,101 @@ function rememberSmsCard(accountId) {
   saveLocal();
 }
 
+function rememberSmsPayee(source) {
+  if (!__smsPendingPayer || !source) return;
+  if (!S.smsPayees || typeof S.smsPayees !== 'object') S.smsPayees = {};
+  S.smsPayees[__smsPendingPayer.toUpperCase()] = source;
+  __smsPendingPayer = '';
+  saveLocal();
+}
+
 // Say what was read and, just as importantly, what still needs a human. A
 // guessed account is called out until the card has been confirmed once —
 // after that it's known, not guessed, and the nudge disappears.
 function smsToast(p) {
   const bits = [];
   if (p.found.amount)   bits.push('₹' + fmt(p.amount));
-  if (p.found.merchant) bits.push(p.merchant);
-  if (p.found.account)  bits.push(p.account.name);
+  if (p.kind === 'transfer') bits.push('card bill');
+  else if (p.payer)     bits.push(p.payer);
+  else if (p.found.merchant) bits.push(p.merchant);
+  if (p.found.account)  bits.push((p.kind === 'transfer' ? '→ ' : '') + p.account.name);
   if (p.found.category) bits.push(p.category);
+  if (p.found.source)   bits.push(p.source);
   const asks = [];
   if (!p.found.amount)  asks.push('add the amount');
-  if (!p.found.account) asks.push('pick the account');
+  if (p.kind === 'transfer') {
+    // The message names the card, never the account the money left.
+    asks.push('pick the account it was paid from');
+    if (!p.found.account) asks.push('pick the card');
+  } else if (!p.found.account) asks.push('pick the account');
   else if (!p.accountLearned) asks.push('check the account');
   if (!p.found.category && p.kind === 'expense') asks.push('pick a category');
+  if (!p.found.source && p.kind === 'income') asks.push('pick a source');
   return (bits.length ? '✓ ' + bits.join(' · ') : 'Read the message')
        + (asks.length ? ' — ' + asks.join(', ') : '');
 }
 
+// The three entry pages each carry a paste box. Whichever one you use, the
+// message decides where the entry belongs — paste a salary credit into the
+// Expense page and it still lands on Income, filled in.
+const SMS_BOXES = ['sms-paste-exp', 'sms-paste-inc', 'sms-paste-xfer'];
+const SMS_PAGE_NAV = { expense: 'EXPENSE', income: 'INCOME', transfer: 'TRANSFER' };
+const SMS_PAGE_ID  = { expense: 'add', income: 'income', transfer: 'transfer' };
+
+function smsReadBoxes() {
+  for (const id of SMS_BOXES) {
+    const el = document.getElementById(id);
+    if (el && el.value.trim()) return { el, text: el.value };
+  }
+  return { el: null, text: '' };
+}
+
+function smsClearBoxes(hintText) {
+  SMS_BOXES.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['sms-hint-exp','sms-hint-inc','sms-hint-xfer'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = hintText || '';
+  });
+}
+
+function smsGoPage(kind) {
+  if (document.getElementById('page-' + SMS_PAGE_ID[kind]).classList.contains('active')) return;
+  const nav = [...document.querySelectorAll('.nav-item')]
+    .find(n => n.querySelector('.nav-label')?.textContent.trim() === SMS_PAGE_NAV[kind]);
+  if (nav) goPage(SMS_PAGE_ID[kind], nav);
+}
+
 // Read the pasted message and fill the matching form.
 function applyPastedSms() {
-  const box = document.getElementById('sms-paste');
-  const p = parseBankSms(box ? box.value : '');
+  const { text } = smsReadBoxes();
+  const p = parseBankSms(text);
   if (!p) { toast('Paste a bank message first', 'err'); return; }
   if (p.amount == null) { toast("Couldn't find an amount in that message", 'err'); return; }
 
   __smsPendingLast4 = p.last4 || '';
+  __smsPendingPayer = p.payer || '';
+  smsGoPage(p.kind);
 
   if (p.kind === 'income') {
-    const nav = [...document.querySelectorAll('.nav-item')]
-      .find(n => n.querySelector('.nav-label')?.textContent.trim() === 'INCOME');
-    if (nav) goPage('income', nav);
     setMoneyField('i-amount', p.amount);
-    if (p.date) document.getElementById('i-date').value = p.date;
-    if (p.merchant) document.getElementById('i-desc').value = p.merchant;
-    if (p.account) document.getElementById('i-account').value = String(p.account.id);
+    if (p.date)   document.getElementById('i-date').value = p.date;
+    if (p.source) { document.getElementById('i-source').value = p.source; onIncomeSourceChange(p.source); }
+    // The payer name is the useful note here — "SPICE MORE TRADING COMPANY"
+    // says far more than "NEFT".
+    const desc = p.payer || p.merchant;
+    if (desc) document.getElementById('i-desc').value = desc;
+    if (p.account) {
+      document.getElementById('i-account').value = String(p.account.id);
+      onPickAccount(String(p.account.id), 'received');
+    }
+  } else if (p.kind === 'transfer') {
+    setMoneyField('t-amount', p.amount);
+    if (p.date) document.getElementById('t-date').value = p.date;
+    // The card being paid is the destination — paying it reduces what's owed.
+    // The paying account isn't in the message, so whatever was used last
+    // stays put for the user to confirm or change.
+    if (p.toAccount) document.getElementById('t-to').value = String(p.toAccount.id);
+    document.getElementById('t-desc').value =
+      /\bcred\b/i.test(text) ? 'Credit card bill via CRED' : 'Credit card bill';
   } else {
     setMoneyField('f-amount', p.amount);
     if (p.date)     document.getElementById('f-date').value = p.date;
@@ -4048,9 +4176,7 @@ function applyPastedSms() {
       onPickAccount(String(p.account.id), 'paid');
     }
   }
-  if (box) box.value = '';
-  const hint = document.getElementById('sms-paste-hint');
-  if (hint) hint.textContent = smsToast(p);
+  smsClearBoxes(smsToast(p));
   toast(smsToast(p), 'ok');
 }
 
@@ -4061,13 +4187,6 @@ function setMoneyField(id, val) {
   if (!el) return;
   el.value = String(val);
   onAmountInput(el);
-}
-
-function clearSmsPaste() {
-  const box = document.getElementById('sms-paste');
-  if (box) box.value = '';
-  const hint = document.getElementById('sms-paste-hint');
-  if (hint) hint.textContent = '';
 }
 
 // ══════════════════════════════════════════════════
