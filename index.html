@@ -829,6 +829,50 @@ select.finput option { background: white; color: var(--ink); }
 /* Log entry action row — Edit / Repeat / Delete share one line equally. */
 .entry-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: nowrap; }
 .entry-actions .btn-del-entry { flex: 1 1 0; margin-top: 0; padding: 6px 6px; text-align: center; }
+/* ── Paste-a-bank-SMS box ─────────────────────────────────────────── */
+.sms-paste {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 14px 16px 6px;
+  resize: none;
+  outline: none;
+}
+.sms-paste::placeholder { color: var(--ink3); }
+.sms-paste-row { display: flex; gap: 8px; padding: 0 16px 14px; }
+.sms-paste-btn {
+  flex: 1 1 0;
+  background: var(--ink);
+  color: var(--btn-dark-text);
+  border: none;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sms-paste-btn.ghost {
+  flex: 0 0 auto;
+  background: none;
+  color: var(--ink2);
+  border: 1px solid var(--border2);
+  font-weight: 500;
+}
+.sms-paste-hint {
+  padding: 0 16px 12px;
+  font-size: 11.5px;
+  color: var(--ink3);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.sms-paste-hint:empty { display: none; }
+
 /* ── Recently Deleted ─────────────────────────────────────────────── */
 /* The bin is a separate reading of the Log: no totals, no filters, so the
    entry-shaped controls step aside while it's open. */
@@ -1726,6 +1770,16 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 
   <!-- ADD PAGE -->
   <div id="page-add" class="page active">
+    <div class="sec-label">Paste bank message</div>
+    <div class="fcard">
+      <textarea id="sms-paste" class="sms-paste" rows="2" placeholder="Paste the SMS from your bank — the form fills itself in"></textarea>
+      <div class="sms-paste-row">
+        <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
+        <button class="sms-paste-btn ghost" onclick="clearSmsPaste()">Clear</button>
+      </div>
+      <div id="sms-paste-hint" class="sms-paste-hint"></div>
+    </div>
+
     <div class="sec-label">Amount</div>
     <div class="fcard">
       <div class="frow">
@@ -2489,7 +2543,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-07-30-02';
+const APP_VERSION = '2026-08-07-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2674,6 +2728,8 @@ function loadLocal() {
   if (!Array.isArray(S.accounts)) S.accounts = [];
   if (!Array.isArray(S.transfers)) S.transfers = [];
   if (!Array.isArray(S.trash)) S.trash = [];
+  // card last-4 → account id, learned from what the user actually picks
+  if (!S.smsCards || typeof S.smsCards !== 'object') S.smsCards = {};
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
@@ -3535,6 +3591,10 @@ async function submitExpense() {
 
   S.entries.unshift(entry);
   S.lastAccountExp = account;
+  // If this entry came from a pasted card SMS, tie that card's last four to
+  // whichever account was actually saved — right or corrected, the next
+  // message from the same card lands on the right account with no guessing.
+  rememberSmsCard(account);
   queueOp('expenses', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     category: entry.category, type: entry.type, freq: entry.freq,
@@ -3600,6 +3660,7 @@ async function submitIncome() {
   };
   S.income.unshift(entry);
   S.lastAccountInc = account;
+  rememberSmsCard(account);
   queueOp('income', 'POST', entry.id, {
     id: entry.id, date: entry.date, amount: entry.amount,
     source: entry.source, received_by: entry.receivedBy,
@@ -3718,6 +3779,295 @@ async function deleteTransfer(id) {
   const card = document.getElementById('xfer-' + id);
   if (card) card.remove();
   renderLog();
+}
+
+// ══════════════════════════════════════════════════
+//  BANK SMS → PREFILLED ENTRY
+// ══════════════════════════════════════════════════
+// Paste the alert your bank sent and the form fills itself in. Indian bank
+// SMS are rigidly templated, so this is pattern matching, not guesswork —
+// and everything it produces is a suggestion sitting in an editable form,
+// never a silent save. What it can't know (who the expense was for) it
+// leaves alone rather than inventing.
+
+const SMS_BANKS = [
+  ['IDFC FIRST', /idfc/i], ['HDFC', /hdfc/i], ['ICICI', /icici/i],
+  ['SBI', /\bsbi\b|state bank/i], ['Axis', /\baxis\b/i], ['Kotak', /kotak/i],
+  ['Amex', /amex|american express/i], ['Citi', /\bciti\b/i], ['HSBC', /hsbc/i],
+  ['Yes Bank', /yes bank/i], ['IndusInd', /indusind/i], ['RBL', /\brbl\b/i],
+  ['Standard Chartered', /standard chartered|\bscb\b/i], ['Bank of Baroda', /bank of baroda|\bbob\b/i],
+  ['Canara', /canara/i], ['PNB', /\bpnb\b|punjab national/i], ['Federal', /federal bank/i],
+  ['AU', /\bau small\b|\bau bank\b/i], ['DBS', /\bdbs\b/i], ['Bandhan', /bandhan/i],
+];
+
+// Merchant → category. Only ever applied if the category still exists in the
+// user's own list, so editing the category list can't produce dead values.
+const SMS_MERCHANT_CATEGORIES = [
+  [/instamart|blinkit|zepto|bigbasket|big basket|dmart|d-mart|reliance fresh|more retail|jiomart|licious|country delight|milkbasket|freshtohome/i, 'Grocery'],
+  [/zomato|swiggy(?!\s*instamart)|dominos|pizza hut|mcdonald|kfc|burger king|starbucks|barbeque|restaurant|cafe|eatery|biryani|hotel /i, 'Zomato'],
+  [/indian ?oil|iocl|bharat ?petroleum|bpcl|hindustan petroleum|hpcl|\bshell\b|nayara|jio-?bp|petrol|fuel/i, 'Petrol'],
+  [/netflix|spotify|prime video|hotstar|disney|sonyliv|zee5|youtube|apple\.com\/bill|google ?\*|icloud|adobe|microsoft|openai|chatgpt|anthropic|claude/i, 'Subscriptions'],
+  [/apollo|pharmeasy|1mg|tata 1mg|netmeds|practo|medplus|hospital|clinic|diagnostic|lab |pathology|dental|pharmacy|chemist/i, 'Healthcare'],
+  [/airtel|jio\b|vodafone|\bvi\b|bsnl|recharge/i, 'Mobile'],
+  [/cult\.?fit|cultfit|gym|fitness|decathlon|nike|adidas|puma/i, 'Fitness'],
+  [/bookmyshow|pvr\b|inox|cinepolis|cinema|imax/i, 'Movie'],
+  [/myntra|ajio|zara|h&m|uniqlo|westside|lifestyle|shoppers stop|max fashion|pantaloons|tata cliq/i, 'Clothing & Accessories'],
+  [/nykaa|sephora|forest essentials|kama ayurveda|body shop/i, 'Cosmetics'],
+  [/urban ?company|urbanclap|plumber|electrician|carpenter|pest control/i, 'Home Maintenance'],
+  [/salon|barber|spa\b|looks |naturals |toni ?& ?guy|lakme/i, 'Salon'],
+  [/irctc|makemytrip|goibibo|cleartrip|yatra|indigo|air india|vistara|spicejet|airbnb|oyo|booking\.com|agoda/i, 'Vacation'],
+  [/wine|liquor|spirits|brewery|beer|madhuloka|tonique/i, 'Alcohol'],
+  [/insurance|policybazaar|\blic\b|hdfc life|icici pru|max life|star health|niva bupa/i, 'Insurance'],
+  [/ikea|pepperfry|urban ?ladder|home ?centre|nilkamal|wakefit|sleepwell/i, 'Home Decor'],
+  [/uber|ola\b|rapido|blusmart|namma yatri/i, 'Sundries'],
+  [/amazon|flipkart|meesho|snapdeal/i, 'Sundries'],
+];
+
+// Category → expense type, used only when the category is a confident match.
+const SMS_CATEGORY_TYPES = {
+  'Grocery':'Essentials', 'Rent':'Essentials', 'Healthcare':'Essentials', 'Mobile':'Essentials',
+  'Petrol':'Essentials', 'Insurance':'Essentials', 'Tax':'Essentials', 'Home Maintenance':'Essentials',
+  'Zomato':'Fun', 'Movie':'Fun', 'Alcohol':'Fun', 'Vacation':'Fun',
+  'Subscriptions':'Non-Essentials', 'Fitness':'Non-Essentials', 'Salon':'Non-Essentials',
+  'Clothing & Accessories':'Non-Essentials', 'Cosmetics':'Non-Essentials', 'Home Decor':'Non-Essentials',
+};
+
+const SMS_MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+
+// The transaction amount, not the balance. Banks quote the remaining limit or
+// balance in the same message ("Avbl Limit: INR 518449"), and it's usually the
+// larger number — so picking the first or biggest match gets it wrong. Skip
+// any amount introduced by a balance-ish word.
+function smsAmount(text) {
+  const re = /(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)/gi;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const before = text.slice(Math.max(0, m.index - 30), m.index).toLowerCase();
+    if (/\b(limit|balance|bal|avbl|available|outstanding|due|o\/s)\b[^a-z]*$/.test(before)) continue;
+    const val = parseFloat(m[1].replace(/,/g, ''));
+    if (val > 0) return val;
+  }
+  return null;
+}
+
+function smsDate(text) {
+  // ISO first (2026-08-05). Checked before the day-first pattern, which would
+  // otherwise read "2026-08-05" as 26 Aug 2005 by matching mid-string.
+  let m = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+  if (m) return `${m[1]}-${String(Number(m[2])).padStart(2,'0')}-${String(Number(m[3])).padStart(2,'0')}`;
+  // 07 AUG 2026 / 07-Aug-26 / 07 August 2026
+  m = text.match(/(\d{1,2})[\s\-\/]([A-Za-z]{3,9})[\s\-\/'](\d{2,4})/);
+  if (m) {
+    const mon = SMS_MONTHS[m[2].slice(0, 3).toLowerCase()];
+    if (mon) {
+      let y = Number(m[3]); if (y < 100) y += 2000;
+      return `${y}-${String(mon).padStart(2,'0')}-${String(Number(m[1])).padStart(2,'0')}`;
+    }
+  }
+  // 07-08-2026 / 07/08/26 — Indian order is day first.
+  m = text.match(/(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})/);
+  if (m) {
+    let y = Number(m[3]); if (y < 100) y += 2000;
+    const d = Number(m[1]), mo = Number(m[2]);
+    if (d <= 31 && mo <= 12) return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+// Words that follow "at"/"to" in bank boilerplate but are never a merchant.
+const SMS_NOT_MERCHANT = /^(your|the|a|an|card|account|a\/c|acct|ref|ref no|upi|upi ref|info|avbl|available|bal|balance|block|dispute|call|customer|dear|no)$/i;
+
+function smsMerchant(text) {
+  const patterns = [
+    /\b(?:at|to|towards)\s+([A-Za-z0-9][A-Za-z0-9 &.'\-_*]{1,40}?)\s+on\s+\d/i,
+    /\btrf\s+to\s+([A-Za-z0-9][A-Za-z0-9 &.'\-_*]{1,40}?)\s+(?:ref|on|\.)/i,
+    // "…(UPI Ref no 512…) to NETFLIX." — the payee trails the reference block.
+    /\)\s*to\s+([A-Za-z0-9][A-Za-z0-9 &.'\-_]{1,40}?)\s*[.\-]?\s*(?:$|-[A-Z])/i,
+    /\b(?:VPA)[\/\- ]+([A-Za-z0-9][A-Za-z0-9 &.'\-_@]{1,40}?)(?:\s|\.|$)/i,
+    /\b(?:at|to)\s+([A-Za-z0-9][A-Za-z0-9 &.'\-_*]{2,40}?)(?:\.|\s+(?:Avbl|Available|Ref|Info|UPI|Not|If))/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m && m[1]) {
+      const name = m[1].trim().replace(/\s{2,}/g, ' ').replace(/[.,]+$/, '');
+      if (name.length >= 2 && !SMS_NOT_MERCHANT.test(name)) return name;
+    }
+  }
+  return '';
+}
+
+// A message can name two accounts — "Acct XX8891 is debited ... account XX2211
+// credited". Taking the first match picks the wrong one half the time, so
+// collect every candidate and keep whichever sits closest to the word that
+// describes what happened to *our* money.
+function smsCardLast4(text, verbIndex) {
+  const cands = [];
+  const push = (re) => {
+    let m; const r = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    while ((m = r.exec(text)) !== null) cands.push({ d: m[1], i: m.index });
+  };
+  push(/(?:ending(?:\s+with)?|card\s*(?:no\.?)?|a\/c\s*(?:no\.?)?|acct?\.?|account)\s*[:\s]*[xX*]{0,8}(\d{4})\b/gi);
+  push(/[xX*]{1,8}(\d{4})\b/g);
+  if (!cands.length) return '';
+  if (verbIndex == null || verbIndex < 0) return cands[0].d;
+  cands.sort((a, b) => Math.abs(a.i - verbIndex) - Math.abs(b.i - verbIndex));
+  return cands[0].d;
+}
+
+function smsBank(text) {
+  for (const [name, re] of SMS_BANKS) if (re.test(text)) return name;
+  return '';
+}
+
+// Pick the account this message is about. A confirmed card→account mapping
+// (learned the first time the user saves an entry from this card) always wins;
+// otherwise score on bank name, account kind and the last four digits.
+function smsMatchAccount(bank, last4, isCard) {
+  if (last4 && S.smsCards && S.smsCards[last4]) {
+    const learned = S.accounts.find(a => a.id === S.smsCards[last4]);
+    if (learned) return { account: learned, learned: true };
+  }
+  let best = null, bestScore = 0;
+  S.accounts.filter(a => !a.archived).forEach(a => {
+    let score = 0;
+    const hay = (a.name + ' ' + (a.notes || '')).toLowerCase();
+    if (last4 && hay.includes(last4)) score += 5;
+    if (bank && hay.includes(bank.toLowerCase().split(' ')[0])) score += 3;
+    if (isCard && a.type === 'Credit Card') score += 2;
+    if (!isCard && (a.type === 'Bank' || a.type === 'Savings')) score += 1;
+    if (score > bestScore) { bestScore = score; best = a; }
+  });
+  return bestScore >= 3 ? { account: best, learned: false } : { account: null, learned: false };
+}
+
+function smsCategory(merchant, whole) {
+  const hay = (merchant + ' ' + whole);
+  for (const [re, cat] of SMS_MERCHANT_CATEGORIES) {
+    if (re.test(hay)) return S.categories.includes(cat) ? cat : '';
+  }
+  return '';
+}
+
+// Returns everything the message yields, plus which fields were actually found
+// so the UI can be honest about what was read and what was left to the user.
+function parseBankSms(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+
+  const creditRe = /\b(credited|received|deposited|refund(?:ed)?|cashback|salary)\b/i;
+  const debitRe  = /\b(spent|debited|debit|withdrawn|paid|purchase|sent|charged)\b/i;
+  const credit = creditRe.test(t), debit = debitRe.test(t);
+  // A refund says both ("refunded to your card"), so when both appear the one
+  // that comes first describes what actually happened to the money.
+  let kind;
+  if (debit && !credit) kind = 'expense';
+  else if (credit && !debit) kind = 'income';
+  else if (debit && credit) kind = t.search(debitRe) < t.search(creditRe) ? 'expense' : 'income';
+  else kind = 'expense';
+
+  const verbIndex = kind === 'expense' ? t.search(debitRe) : t.search(creditRe);
+  const amount   = smsAmount(t);
+  const date     = smsDate(t);
+  const merchant = smsMerchant(t);
+  const last4    = smsCardLast4(t, verbIndex);
+  const bank     = smsBank(t);
+  const isCard   = /credit card|debit card|\bcard\b/i.test(t);
+  const isCredit = /credit card/i.test(t);
+  const { account, learned } = smsMatchAccount(bank, last4, isCredit);
+  const category = kind === 'expense' ? smsCategory(merchant, t) : '';
+  const type     = category && S.types.includes(SMS_CATEGORY_TYPES[category] || '') ? SMS_CATEGORY_TYPES[category] : '';
+
+  return {
+    kind, amount, date, merchant, last4, bank, isCard, isCredit,
+    account, accountLearned: learned, category, type,
+    found: {
+      amount: amount != null, date: !!date, merchant: !!merchant,
+      account: !!account, category: !!category,
+    }
+  };
+}
+
+// Last-4 of the card the current form was prefilled from, so saving can record
+// which account the user actually chose for it.
+let __smsPendingLast4 = '';
+
+function rememberSmsCard(accountId) {
+  if (!__smsPendingLast4 || !accountId) return;
+  if (!S.smsCards || typeof S.smsCards !== 'object') S.smsCards = {};
+  S.smsCards[__smsPendingLast4] = Number(accountId);
+  __smsPendingLast4 = '';
+  saveLocal();
+}
+
+// Say what was read and, just as importantly, what still needs a human. A
+// guessed account is called out until the card has been confirmed once —
+// after that it's known, not guessed, and the nudge disappears.
+function smsToast(p) {
+  const bits = [];
+  if (p.found.amount)   bits.push('₹' + fmt(p.amount));
+  if (p.found.merchant) bits.push(p.merchant);
+  if (p.found.account)  bits.push(p.account.name);
+  if (p.found.category) bits.push(p.category);
+  const asks = [];
+  if (!p.found.amount)  asks.push('add the amount');
+  if (!p.found.account) asks.push('pick the account');
+  else if (!p.accountLearned) asks.push('check the account');
+  if (!p.found.category && p.kind === 'expense') asks.push('pick a category');
+  return (bits.length ? '✓ ' + bits.join(' · ') : 'Read the message')
+       + (asks.length ? ' — ' + asks.join(', ') : '');
+}
+
+// Read the pasted message and fill the matching form.
+function applyPastedSms() {
+  const box = document.getElementById('sms-paste');
+  const p = parseBankSms(box ? box.value : '');
+  if (!p) { toast('Paste a bank message first', 'err'); return; }
+  if (p.amount == null) { toast("Couldn't find an amount in that message", 'err'); return; }
+
+  __smsPendingLast4 = p.last4 || '';
+
+  if (p.kind === 'income') {
+    const nav = [...document.querySelectorAll('.nav-item')]
+      .find(n => n.querySelector('.nav-label')?.textContent.trim() === 'INCOME');
+    if (nav) goPage('income', nav);
+    setMoneyField('i-amount', p.amount);
+    if (p.date) document.getElementById('i-date').value = p.date;
+    if (p.merchant) document.getElementById('i-desc').value = p.merchant;
+    if (p.account) document.getElementById('i-account').value = String(p.account.id);
+  } else {
+    setMoneyField('f-amount', p.amount);
+    if (p.date)     document.getElementById('f-date').value = p.date;
+    if (p.merchant) document.getElementById('f-desc').value = p.merchant;
+    if (p.category) document.getElementById('f-cat').value = p.category;
+    if (p.type)     document.getElementById('f-type').value = p.type;
+    if (!document.getElementById('f-freq').value && S.frequencies.includes('One-time')) {
+      document.getElementById('f-freq').value = 'One-time';
+    }
+    if (p.account) {
+      document.getElementById('f-account').value = String(p.account.id);
+      onPickAccount(String(p.account.id), 'paid');
+    }
+  }
+  if (box) box.value = '';
+  const hint = document.getElementById('sms-paste-hint');
+  if (hint) hint.textContent = smsToast(p);
+  toast(smsToast(p), 'ok');
+}
+
+// Amount fields carry live Indian-comma formatting, so write through the same
+// path a keystroke would take rather than assigning a raw number.
+function setMoneyField(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = String(val);
+  onAmountInput(el);
+}
+
+function clearSmsPaste() {
+  const box = document.getElementById('sms-paste');
+  if (box) box.value = '';
+  const hint = document.getElementById('sms-paste-hint');
+  if (hint) hint.textContent = '';
 }
 
 // ══════════════════════════════════════════════════
