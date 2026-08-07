@@ -83,6 +83,12 @@
   --longterm-ink: #6b5d3f;
   /* Dark inverted text (button/toast on dark pill) */
   --btn-dark-text: #ffffff;
+  /* Gradient buttons — gold for the affirmative action, red for the destructive
+     one. Defined per theme so both stay legible against their own ground. */
+  --grad-gold: linear-gradient(135deg, #d9a544 0%, #b4771c 100%);
+  --grad-gold-ink: #ffffff;
+  --grad-red: linear-gradient(135deg, #d1553f 0%, #9e2b1e 100%);
+  --grad-red-ink: #ffffff;
   /* Modal scrim */
   --scrim: rgba(0,0,0,0.5);
   --divider: rgba(0,0,0,0.05);
@@ -154,6 +160,10 @@
   --longterm-border: #3e3a2a;
   --longterm-ink: #c4ad7c;
   --btn-dark-text: #141416;
+  --grad-gold: linear-gradient(135deg, #e3cb92 0%, #c9a040 100%);
+  --grad-gold-ink: #1a1712;
+  --grad-red: linear-gradient(135deg, #e59292 0%, #c25a5a 100%);
+  --grad-red-ink: #1a1010;
   --scrim: rgba(0,0,0,0.7);
   --divider: rgba(255,255,255,0.05);
   --shadow: 0 2px 14px rgba(0,0,0,0.55);
@@ -844,25 +854,30 @@ select.finput option { background: white; color: var(--ink); }
   outline: none;
 }
 .sms-paste::placeholder { color: var(--ink3); }
-.sms-paste-row { display: flex; gap: 8px; padding: 0 16px 14px; }
+.sms-paste-row { display: flex; gap: 10px; padding: 0 16px 14px; }
 .sms-paste-btn {
   flex: 1 1 0;
-  background: var(--ink);
-  color: var(--btn-dark-text);
+  background: var(--grad-gold);
+  color: var(--grad-gold-ink);
   border: none;
-  border-radius: 9px;
-  padding: 9px 12px;
-  font-size: 12.5px;
+  border-radius: 11px;
+  padding: 12px 14px;
   font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   cursor: pointer;
+  transition: filter 0.15s, transform 0.06s;
 }
+.sms-paste-btn:active { transform: translateY(1px); filter: brightness(0.94); }
+/* Same box, destructive gradient — it wipes the form, not just the text. */
 .sms-paste-btn.ghost {
   flex: 0 0 auto;
-  background: none;
-  color: var(--ink2);
-  border: 1px solid var(--border2);
-  font-weight: 500;
+  background: var(--grad-red);
+  color: var(--grad-red-ink);
+  border: none;
+  font-weight: 700;
 }
 .sms-paste-hint {
   padding: 0 16px 12px;
@@ -1774,8 +1789,8 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="fcard">
       <textarea id="sms-paste-exp" class="sms-paste" rows="2" placeholder="Paste the SMS from your bank — the form fills itself in"></textarea>
       <div class="sms-paste-row">
-        <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
-        <button class="sms-paste-btn ghost" onclick="smsClearBoxes()">Clear</button>
+        <button class="sms-paste-btn" onclick="applyPastedSms()">Read message</button>
+        <button class="sms-paste-btn ghost" onclick="smsClearAll()">Clear</button>
       </div>
       <div id="sms-hint-exp" class="sms-paste-hint"></div>
     </div>
@@ -1856,8 +1871,8 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="fcard">
       <textarea id="sms-paste-inc" class="sms-paste" rows="2" placeholder="Paste a credit/deposit SMS — the form fills itself in"></textarea>
       <div class="sms-paste-row">
-        <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
-        <button class="sms-paste-btn ghost" onclick="smsClearBoxes()">Clear</button>
+        <button class="sms-paste-btn" onclick="applyPastedSms()">Read message</button>
+        <button class="sms-paste-btn ghost" onclick="smsClearAll()">Clear</button>
       </div>
       <div id="sms-hint-inc" class="sms-paste-hint"></div>
     </div>
@@ -1922,8 +1937,8 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="fcard">
       <textarea id="sms-paste-xfer" class="sms-paste" rows="2" placeholder="Paste a card-bill or transfer SMS — the form fills itself in"></textarea>
       <div class="sms-paste-row">
-        <button class="sms-paste-btn" onclick="applyPastedSms()">✦ Read message</button>
-        <button class="sms-paste-btn ghost" onclick="smsClearBoxes()">Clear</button>
+        <button class="sms-paste-btn" onclick="applyPastedSms()">Read message</button>
+        <button class="sms-paste-btn ghost" onclick="smsClearAll()">Clear</button>
       </div>
       <div id="sms-hint-xfer" class="sms-paste-hint"></div>
     </div>
@@ -2563,7 +2578,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-07-02';
+const APP_VERSION = '2026-08-07-03';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4121,6 +4136,19 @@ function smsClearBoxes(hintText) {
   ['sms-hint-exp','sms-hint-inc','sms-hint-xfer'].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = hintText || '';
   });
+}
+
+// Clear means clear: the pasted text, the hint, and the half-filled form it
+// produced. Wiping only the textarea left a form full of numbers from a
+// message that was no longer on screen — the opposite of a fresh start.
+function smsClearAll() {
+  smsClearBoxes();
+  if (document.getElementById('page-income').classList.contains('active'))        resetIncomeForm();
+  else if (document.getElementById('page-transfer').classList.contains('active')) resetTransferForm();
+  else                                                                            resetForm();
+  // Nothing is left half-applied, so a pending card/payer tag would be stale.
+  __smsPendingLast4 = '';
+  __smsPendingPayer = '';
 }
 
 function smsGoPage(kind) {
