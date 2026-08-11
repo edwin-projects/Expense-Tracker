@@ -2578,7 +2578,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-07-03';
+const APP_VERSION = '2026-08-07-04';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6381,19 +6381,21 @@ function renderDash() {
   const saveable = sum(esSave), ess = sum(esEss), noness = sum(esNon), fun = sum(esFun);
   const pct = v => total ? Math.round(v/total*100) + '% of total' : '0% of total';
 
-  document.getElementById('d-total').textContent = '₹' + fmt(total);
+  // Whole rupees on the breakdown headlines — paise on a six-figure total is
+  // noise, and every other figure on this page is already rounded.
+  document.getElementById('d-total').textContent = '₹' + fmt(Math.round(total));
   document.getElementById('d-entries-sub').textContent = es.length + ' entries';
   setChip('d-total-chip',  total,    'up-bad', 'expense');
-  document.getElementById('d-save').textContent = '₹' + fmt(saveable);
+  document.getElementById('d-save').textContent = '₹' + fmt(Math.round(saveable));
   document.getElementById('d-save-pct').textContent = pct(saveable);
   setChip('d-save-chip',   saveable, 'up-good', 'saveable');
-  document.getElementById('d-ess').textContent = '₹' + fmt(ess);
+  document.getElementById('d-ess').textContent = '₹' + fmt(Math.round(ess));
   document.getElementById('d-ess-pct').textContent = pct(ess);
   setChip('d-ess-chip',    ess,      'up-bad',  'essentials');
-  document.getElementById('d-noness').textContent = '₹' + fmt(noness);
+  document.getElementById('d-noness').textContent = '₹' + fmt(Math.round(noness));
   document.getElementById('d-noness-pct').textContent = pct(noness);
   setChip('d-noness-chip', noness,   'up-bad',  'nonEssentials');
-  document.getElementById('d-fun').textContent = '₹' + fmt(fun);
+  document.getElementById('d-fun').textContent = '₹' + fmt(Math.round(fun));
   document.getElementById('d-fun-pct').textContent = pct(fun);
   setChip('d-fun-chip',    fun,      'neutral', 'fun');
 
