@@ -30,6 +30,14 @@ Every delete moves the record into the Recently Deleted bin (`S.trash`, synced v
 `deleted_items` table) instead of dropping it. Nothing auto-purges. Keep it that way: if you add
 a new record type, give it the same treatment via `trashRecord()` / `restoreFromTrash()`.
 
+## Numbers are Indian — always
+Grouping is Indian (`toLocaleString('en-IN')` → `12,34,567`), and compact amounts use the
+Indian scale: **thousand → lakh → crore**. A figure of a lakh or more is never scaled in
+thousands: `₹1.37L`, never `₹137k`. Every compact display goes through `fmtShort()`; don't
+hand-roll `/1000` in a template. Full figures are whole rupees (`Math.round`) — paise are
+noise at these sizes; the one exception is the SMS reader's hint, which echoes the exact
+amount read out of the message.
+
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
 - Numbers: use the clean sans-serif ('Outfit'), never a decorative serif. Apply

@@ -2175,7 +2175,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
     </div>
 
-    <div class="sec-label">Top Categories</div>
+    <div class="sec-label">Top Expense Categories</div>
     <div class="fcard" style="padding:16px">
       <div id="d-bars"></div>
     </div>
@@ -2585,7 +2585,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-11-01';
+const APP_VERSION = '2026-08-16-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6451,7 +6451,7 @@ function renderDash() {
         <div class="bar-item" style="cursor:pointer" data-cat="${escapeHtml(c)}" onclick="setLogCategoryFilterGo(this.dataset.cat)">
           <div class="bar-name">${escapeHtml(c)}</div>
           <div class="bar-track"><div class="bar-fill" style="width:${v/mx*100}%"></div></div>
-          <div class="bar-val" style="width:90px;text-align:right">₹${Math.round(v/1000)}k <span style="color:var(--ink3);font-size:11px">(${total ? Math.round(v/total*100) : 0}%)</span></div>
+          <div class="bar-val" style="width:90px;text-align:right">₹${fmtShort(v)} <span style="color:var(--ink3);font-size:11px">(${total ? Math.round(v/total*100) : 0}%)</span></div>
         </div>`).join('')
     : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No data for this period</div>';
 
@@ -6470,7 +6470,7 @@ function renderDash() {
         <div class="bar-item" style="cursor:pointer" data-src="${escapeHtml(c)}" onclick="gotoIncomeSource(this.dataset.src)">
           <div class="bar-name">${escapeHtml(c)}</div>
           <div class="bar-track"><div class="bar-fill income" style="width:${v/srcMx*100}%"></div></div>
-          <div class="bar-val" style="width:90px;text-align:right">₹${Math.round(v/1000)}k <span style="color:var(--ink3);font-size:11px">(${srcSum ? Math.round(v/srcSum*100) : 0}%)</span></div>
+          <div class="bar-val" style="width:90px;text-align:right">₹${fmtShort(v)} <span style="color:var(--ink3);font-size:11px">(${srcSum ? Math.round(v/srcSum*100) : 0}%)</span></div>
         </div>`).join('')
     : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No income for this period</div>';
 
@@ -7229,6 +7229,9 @@ function dl(blob, name) {
 function fmt(n) { return Number(n).toLocaleString('en-IN'); }
 
 // Compact amount for dense layouts: 52212 → 52k, 248000 → 2.48L.
+// Compact amounts follow the Indian system: thousand, lakh, crore — never
+// scale a lakh-plus figure in thousands (₹1.37L, not ₹137k). Every compact
+// display in the app goes through here so the convention holds everywhere.
 function fmtShort(n) {
   const a = Math.abs(n);
   if (a >= 10000000) return (n/10000000).toFixed(2).replace(/\.?0+$/,'') + 'Cr';
