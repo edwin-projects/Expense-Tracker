@@ -765,6 +765,20 @@ select.finput option { background: white; color: var(--ink); }
   font-size: 11px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em;
   font-weight: 600; padding: 10px 14px 4px;
 }
+/* The note carries the sentence-case explanation; the header stays uppercase. */
+.acct-section-note {
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+  color: var(--ink3); margin-left: 7px; font-size: 10.5px;
+}
+.acct-section-head.linked { color: var(--longterm-ink); cursor: pointer; }
+.acct-section-head.linked .acct-section-note { color: var(--longterm-ink); opacity: 0.8; }
+
+/* Landing target when the long-term rows send you back up to their card. */
+.stat-card.flash { animation: cardFlash 1.4s ease-out; }
+@keyframes cardFlash {
+  0%, 100% { box-shadow: var(--shadow); }
+  25%      { box-shadow: 0 0 0 3px var(--amber-border); }
+}
 .acct-mtm {
   display: flex; gap: 6px; align-items: center; margin-top: 6px;
 }
@@ -2613,7 +2627,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-16-02';
+const APP_VERSION = '2026-08-16-03';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4856,6 +4870,19 @@ function gotoIncomeSource(src) {
   goToLog();
 }
 
+// Jump from the Long-term Holdings rows in the accounts table up to the card
+// they belong to, so the connection between the two is something you can
+// follow rather than something you have to infer.
+function scrollToLongTerm() {
+  const card = document.getElementById('d-longterm-card');
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // A brief highlight, otherwise landing mid-page leaves you hunting for what
+  // just moved.
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 1400);
+}
+
 function setLogCategoryFilterGo(cat) {
   S.logCategoryFilter = cat;
   S.logKind = 'Expense';
@@ -6359,10 +6386,10 @@ function renderDash() {
 
   const acctCard = document.getElementById('d-accounts-card');
   const acctList = document.getElementById('d-accounts-list');
-  if (activeAccts.length) {
+  if (activeAccts.length || longTermAccts.length) {
     // Accounts are grouped by type into collapsible groups; each group's
     // top line shows the combined total, tap to reveal the accounts.
-    const rows = (arr, header) => {
+    const rows = (arr, header, opts = {}) => {
       if (!arr.length) return '';
       const groups = {};
       arr.forEach(a => { (groups[a.type] = groups[a.type] || []).push(a); });
@@ -6415,9 +6442,20 @@ function renderDash() {
             <div class="acct-group-body">${items}</div>
           </div>`;
         }).join('');
-      return `<div class="acct-section-head">${header}</div>` + groupHTML;
+      const head = opts.link
+        ? `<div class="acct-section-head linked" onclick="scrollToLongTerm()">${header}<span class="acct-section-note">${opts.note} ›</span></div>`
+        : `<div class="acct-section-head">${header}${opts.note ? `<span class="acct-section-note">${opts.note}</span>` : ''}</div>`;
+      return head + groupHTML;
     };
-    acctList.innerHTML = rows(activeAccts.filter(a => !a.isLiability), 'Assets') + rows(activeAccts.filter(a => a.isLiability), 'Liabilities');
+    // Long-term holdings sit between assets and liabilities: asset-like, but
+    // deliberately outside active net worth. They were missing from this table
+    // entirely, which made the Investments row look wrong — it counts only the
+    // active ones while the card above counts the rest.
+    acctList.innerHTML =
+        rows(activeAccts.filter(a => !a.isLiability), 'Assets')
+      + rows(longTermAccts, 'Long-term Holdings',
+             { link: true, note: 'kept out of active net worth' })
+      + rows(activeAccts.filter(a => a.isLiability), 'Liabilities');
     acctCard.style.display = 'block';
   } else {
     acctCard.style.display = 'none';
