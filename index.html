@@ -1150,6 +1150,8 @@ select.finput option { background: white; color: var(--ink); }
 .bar-name { font-size: 12.5px; color: var(--ink2); width: 110px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar-track { flex: 1; height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--amber); border-radius: 4px; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+/* Income bars read green, matching every other income figure in the app. */
+.bar-fill.income { background: var(--green); }
 .bar-val { font-size: 12px; color: var(--ink2); width: 56px; text-align: right; flex-shrink: 0; font-weight: 500; }
 
 /* Monthly trend */
@@ -2178,6 +2180,11 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <div id="d-bars"></div>
     </div>
 
+    <div class="sec-label">Top Income Sources</div>
+    <div class="fcard" style="padding:16px">
+      <div id="d-inc-bars"></div>
+    </div>
+
     <div class="sec-label">Monthly Trend</div>
     <div class="fcard" id="d-trend"></div>
     <div style="height:10px"></div>
@@ -2578,7 +2585,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-07-04';
+const APP_VERSION = '2026-08-11-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4798,6 +4805,29 @@ function setLogPersonFilterGo(name, kind, type, anchor) {
 }
 
 // Tapping a Top-Categories bar jumps to the Log filtered to that category
+// Drill into one income source from the Summary. There's no dedicated source
+// filter on the Log, but the search already covers the source field, and
+// pinning the kind to Income keeps an expense that merely mentions the word
+// out of the results.
+function gotoIncomeSource(src) {
+  S.logKind = 'Income';
+  S.logSearch = src;
+  S.logCategoryFilter = 'All';
+  S.logFilter = 'All';
+  S.logType = 'All';
+  S.logAddedBy = 'All';
+  S.logAccountFilter = null;
+  S.logAcctTypeFilter = null;
+  S.logInvestedOnly = false;
+  S.logPeriod = S.dashPeriod;
+  S.logReturnAnchor = 'd-inc-bars';
+  const box = document.getElementById('log-search-input');
+  if (box) box.value = src;
+  const clear = document.getElementById('log-search-clear');
+  if (clear) clear.style.display = '';
+  goToLog();
+}
+
 function setLogCategoryFilterGo(cat) {
   S.logCategoryFilter = cat;
   S.logKind = 'Expense';
@@ -6424,6 +6454,25 @@ function renderDash() {
           <div class="bar-val" style="width:90px;text-align:right">₹${Math.round(v/1000)}k <span style="color:var(--ink3);font-size:11px">(${total ? Math.round(v/total*100) : 0}%)</span></div>
         </div>`).join('')
     : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No data for this period</div>';
+
+  // Income by source — the mirror of Top Categories. Reimbursements are left
+  // out for the same reason the Income headline leaves them out: money paid
+  // back isn't earnings, and including it here would make the bars disagree
+  // with the card above them.
+  const srcTot = {};
+  inc.filter(i => !isReimbursementSource(i.source))
+     .forEach(i => srcTot[i.source] = (srcTot[i.source] || 0) + Number(i.amount));
+  const srcSorted = Object.entries(srcTot).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const srcMx  = srcSorted[0]?.[1] || 1;
+  const srcSum = srcSorted.reduce((s, [,v]) => s + v, 0);
+  document.getElementById('d-inc-bars').innerHTML = srcSorted.length
+    ? srcSorted.map(([c,v]) => `
+        <div class="bar-item" style="cursor:pointer" data-src="${escapeHtml(c)}" onclick="gotoIncomeSource(this.dataset.src)">
+          <div class="bar-name">${escapeHtml(c)}</div>
+          <div class="bar-track"><div class="bar-fill income" style="width:${v/srcMx*100}%"></div></div>
+          <div class="bar-val" style="width:90px;text-align:right">₹${Math.round(v/1000)}k <span style="color:var(--ink3);font-size:11px">(${srcSum ? Math.round(v/srcSum*100) : 0}%)</span></div>
+        </div>`).join('')
+    : '<div style="color:var(--ink3);text-align:center;padding:20px 0;font-size:13px">No income for this period</div>';
 
   // ── Monthly trend (all 12 months of the current financial year) ──
   const tNow = new Date();
