@@ -853,6 +853,43 @@ select.finput option { background: white; color: var(--ink); }
 /* Log entry action row — Edit / Repeat / Delete share one line equally. */
 .entry-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: nowrap; }
 .entry-actions .btn-del-entry { flex: 1 1 0; margin-top: 0; padding: 6px 6px; text-align: center; }
+/* ── Settle Up ─────────────────────────────────────────────────────── */
+/* Small by design: it sits above everything else on the Summary, so it earns
+   its place by staying one line until you ask for the working. */
+.settle-card {
+  background: var(--surface);
+  border: 1px solid var(--amber-border);
+  border-radius: 14px;
+  padding: 12px 15px;
+  margin: 14px 0 4px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.settle-card.square { border-color: var(--border); }
+.settle-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.settle-lbl {
+  font-size: 10.5px; font-weight: 600; color: var(--ink3);
+  text-transform: uppercase; letter-spacing: 0.12em;
+}
+.settle-period { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.settle-amt {
+  font-size: 20px; font-weight: 700; color: var(--amber);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.settle-card.square .settle-amt { color: var(--ink3); }
+.settle-who { font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
+.settle-who b { color: var(--ink); font-weight: 600; }
+/* The working stays folded away until tapped. */
+.settle-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.settle-card.open .settle-detail { display: block; }
+.settle-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 12px; color: var(--ink2); padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+.settle-row.muted { color: var(--ink3); }
+.settle-note { font-size: 10.5px; color: var(--ink3); line-height: 1.5; margin-top: 8px; }
+
 /* ── Paste-a-bank-SMS box ─────────────────────────────────────────── */
 .sms-paste {
   width: 100%;
@@ -2099,6 +2136,15 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <div class="month-grid" id="month-grid"></div>
     </div>
 
+    <div class="settle-card" id="d-settle" onclick="toggleSettle()" style="display:none">
+      <div class="settle-head">
+        <div class="settle-lbl">Settle Up<span class="settle-period" id="d-settle-period"></span></div>
+        <div class="settle-amt" id="d-settle-amt">₹0</div>
+      </div>
+      <div class="settle-who" id="d-settle-who"></div>
+      <div class="settle-detail" id="d-settle-detail"></div>
+    </div>
+
     <div class="sec-label">Cash Flow</div>
     <div class="stat-grid">
       <div class="stat-card green">
@@ -2627,7 +2673,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-16-03';
+const APP_VERSION = '2026-08-16-04';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3866,6 +3912,126 @@ async function deleteTransfer(id) {
   const card = document.getElementById('xfer-' + id);
   if (card) card.remove();
   renderLog();
+}
+
+// ══════════════════════════════════════════════════
+//  SETTLE UP  (who owes whom for shared spending)
+// ══════════════════════════════════════════════════
+// Every expense names who it was FOR and who PAID. Those two together say
+// whether one of them is carrying the other's share:
+//
+//   for Edwin,  paid by Edwin   →  nothing owed
+//   for Divya,  paid by Edwin   →  Divya owes Edwin the whole amount
+//   for Both,   paid by Edwin   →  Divya owes Edwin half
+//   for AJ,     paid by Edwin   →  Divya owes Edwin half (a child's cost is
+//                                   the parents' to share equally)
+//
+// and the mirror of each when Divya pays. Netted across every entry in the
+// period, that's a single figure: what one owes the other to be square.
+
+const SETTLE_PAIR = ['Edwin', 'Divya'];
+
+// How an expense's cost is divided between the two of them. AJ splits like
+// Both — he doesn't settle up with anyone.
+const SETTLE_SHARES = {
+  Edwin: { Edwin: 1 },
+  Divya: { Divya: 1 },
+  Both:  { Edwin: 0.5, Divya: 0.5 },
+  AJ:    { Edwin: 0.5, Divya: 0.5 },
+};
+
+// A transfer between their own accounts only counts as settling up when it
+// says so. Reading every Divya→Edwin transfer as a repayment would quietly
+// mistake a move into a joint investment for a settlement, and silently
+// wrong is the worst thing a balance like this can be.
+const SETTLE_KEYWORD = /\bsettl(e|ed|ing|ement)\b/i;
+
+// net > 0 means that person is owed money — they've paid out more than their
+// share. The two figures are always equal and opposite.
+function settleUp(esList, effAmtFn, incList, xferList) {
+  const paid  = { Edwin: 0, Divya: 0 };
+  const share = { Edwin: 0, Divya: 0 };
+  const recv  = { Edwin: 0, Divya: 0 };
+  let settled = 0, settledFrom = '';
+
+  esList.forEach(e => {
+    // The payer is out of pocket by the full amount they actually paid…
+    if (paid[e.paidBy] !== undefined) paid[e.paidBy] += Number(e.amount) || 0;
+    // …while the cost the two of them share is net of anything reimbursed.
+    const cost = effAmtFn(e);
+    const w = SETTLE_SHARES[e.forWhom] || SETTLE_SHARES.Both;
+    Object.entries(w).forEach(([p, frac]) => { share[p] += cost * frac; });
+  });
+
+  // Whoever banked a linked reimbursement got that money back in hand, so it
+  // offsets what they're owed. Usually the payer — but not always, and when
+  // it isn't, this is the difference between right and wrong.
+  (incList || []).forEach(i => {
+    if (i.reimbursesEntryId == null) return;
+    if (recv[i.receivedBy] === undefined) return;
+    if (!esList.some(e => e.id === i.reimbursesEntryId)) return;
+    recv[i.receivedBy] += Number(i.amount) || 0;
+  });
+
+  const net = {};
+  SETTLE_PAIR.forEach(p => { net[p] = paid[p] - share[p] - recv[p]; });
+
+  // Money actually handed over, tagged as a settlement, moves the balance
+  // back toward zero.
+  const ownerOf = id => (S.accounts.find(a => a.id === id) || {}).owner;
+  (xferList || []).forEach(t => {
+    if (!SETTLE_KEYWORD.test(t.desc || '')) return;
+    const from = ownerOf(t.fromAccount), to = ownerOf(t.toAccount);
+    if (!SETTLE_PAIR.includes(from) || !SETTLE_PAIR.includes(to) || from === to) return;
+    const amt = Number(t.amount) || 0;
+    net[from] += amt;    // paying reduces what you owe
+    net[to]   -= amt;
+    settled += amt;
+    settledFrom = from;
+  });
+
+  return { net, paid, share, recv, settled, settledFrom };
+}
+
+let settleExpanded = false;
+function toggleSettle() {
+  settleExpanded = !settleExpanded;
+  const card = document.getElementById('d-settle');
+  if (card) card.classList.toggle('open', settleExpanded);
+}
+
+function renderSettle(esList, effAmtFn, incList, xferList, periodLabel) {
+  const card = document.getElementById('d-settle');
+  if (!card) return;
+  const r = settleUp(esList, effAmtFn, incList, xferList);
+  const netE = Math.round(r.net.Edwin);
+
+  // Nothing shared, nothing to settle — don't take up space saying so.
+  if (!esList.length && !r.settled) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  card.classList.toggle('open', settleExpanded);
+  card.classList.toggle('square', netE === 0);
+
+  document.getElementById('d-settle-period').textContent = periodLabel ? ` · ${periodLabel}` : '';
+  document.getElementById('d-settle-amt').textContent = '₹' + fmt(Math.abs(netE));
+  document.getElementById('d-settle-who').innerHTML = netE === 0
+    ? 'All square — nothing to settle'
+    : `<b>${netE > 0 ? 'Divya' : 'Edwin'}</b> owes <b>${netE > 0 ? 'Edwin' : 'Divya'}</b>`;
+
+  const row = (label, value, muted) =>
+    `<div class="settle-row${muted ? ' muted' : ''}"><span>${label}</span><span>${value}</span></div>`;
+  const money = v => '₹' + fmt(Math.round(v));
+  document.getElementById('d-settle-detail').innerHTML =
+      row('Edwin paid', money(r.paid.Edwin))
+    + row('Edwin&rsquo;s share', money(r.share.Edwin), true)
+    + (r.recv.Edwin ? row('less reimbursed to Edwin', money(r.recv.Edwin), true) : '')
+    + row('Divya paid', money(r.paid.Divya))
+    + row('Divya&rsquo;s share', money(r.share.Divya), true)
+    + (r.recv.Divya ? row('less reimbursed to Divya', money(r.recv.Divya), true) : '')
+    + (r.settled ? row(`already settled by ${r.settledFrom}`, money(r.settled)) : '')
+    + `<div class="settle-note">Costs for Both and for AJ split half each. A transfer
+       between your accounts counts as a repayment only when its description
+       mentions “settle”.</div>`;
 }
 
 // ══════════════════════════════════════════════════
@@ -6329,6 +6495,12 @@ function renderDash() {
   document.getElementById('d-cf-expense-split').innerHTML = cardSplitHTML([
     {head:'Paid By', pairs: expByPaid}
   ]);
+
+  // ── Settle Up ──
+  // Sits at the top of the Summary and follows the period buttons like every
+  // other figure here, so Full Year gives the year-end number in one tap.
+  renderSettle(es, effAmt, inc, S.transfers.filter(t => inPeriod(t.date)),
+               PERIOD_LABELS[S.dashPeriod] || '');
 
   // ── Net Worth (always today) ──
   // "Active" excludes long-term holdings (business capital, land, gold,
