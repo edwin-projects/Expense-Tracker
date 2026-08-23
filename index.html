@@ -745,6 +745,9 @@ select.finput option { background: white; color: var(--ink); }
 .echip.saveable { background: var(--green-bg); border-color: var(--green-border-soft); color: var(--green); }
 .echip.income { background: var(--green-bg); border-color: var(--green-border-soft); color: var(--green); font-weight: 600; }
 .echip.transfer { background: var(--transfer-bg); border-color: var(--transfer-border); color: var(--transfer-ink); font-weight: 600; }
+.echip.settlement { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); font-weight: 600; }
+.xkind-note { font-size: 11.5px; color: var(--ink3); line-height: 1.5; margin-top: 8px; }
+.xkind-note:empty { display: none; }
 .echip.acct { background: var(--acct-chip-bg); border-color: var(--acct-chip-border); color: var(--ink2); }
 
 /* ── Accounts (Config) ── */
@@ -2032,6 +2035,17 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
     </div>
 
+    <div class="sec-label">Kind</div>
+    <div class="fcard">
+      <div class="pill-group">
+        <div class="pills">
+          <div class="pill p-both active" data-g="xkind" data-v="Transfer" onclick="pickPill(this); onTransferKind()">⇄ Transfer</div>
+          <div class="pill p-edwin" data-g="xkind" data-v="Settlement" onclick="pickPill(this); onTransferKind()">⚖ Settlement</div>
+        </div>
+        <div class="xkind-note" id="t-kind-note"></div>
+      </div>
+    </div>
+
     <div class="sec-label">From → To</div>
     <div class="fcard">
       <div class="frow">
@@ -2673,7 +2687,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-16-04';
+const APP_VERSION = '2026-08-16-05';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2718,6 +2732,11 @@ const DEFAULTS = {
 //     description TEXT, month TEXT, added_by TEXT,
 //     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 //   );
+//   -- OPTIONAL: marks a transfer as a settlement between the two of you.
+//   -- Not required — the flag also travels inside the transfer's description
+//   -- (see encodeXferDesc), so Settle Up works without this column.
+//   ALTER TABLE transfers ADD COLUMN IF NOT EXISTS is_settlement BOOLEAN DEFAULT FALSE;
+//
 //   -- OPTIONAL: shared "Recently Deleted" bin. Without this table the bin
 //   -- still works, but only on the device the delete happened on. Add it and
 //   -- a deleted entry shows up (and can be restored) on every device.
@@ -2963,6 +2982,13 @@ async function sendOp(op) {
     // Strip the optional field and retry once so the row at least lands
     // remotely (the link still lives in the local entry, used by the
     // dashboard's effAmt). Same idea for any future optional column we add.
+    if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'is_settlement' in op.body) {
+      const { is_settlement, ...rest } = op.body;
+      res = await doFetch(rest);
+      // The flag still travels inside the description (encodeXferDesc), so a
+      // table without the column loses nothing.
+      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) return true;
+    }
     if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'reimburses_entry_id' in op.body) {
       const { reimburses_entry_id, ...rest } = op.body;
       res = await doFetch(rest);
@@ -3095,7 +3121,11 @@ async function syncNow() {
       id: r.id, date: r.date, amount: Number(r.amount),
       fromAccount: r.from_account != null ? Number(r.from_account) : null,
       toAccount:   r.to_account   != null ? Number(r.to_account)   : null,
-      desc: r.description, month: r.month, addedBy: r.added_by
+      // Column first where it exists, otherwise the marker in the description.
+      isSettlement: r.is_settlement != null
+        ? !!r.is_settlement
+        : parseSettlementFromDesc(r.description),
+      desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by
     })), ...localOnly];
   }
   // Recently Deleted bin. Same rule as the data tables: once the queue is
@@ -3869,12 +3899,24 @@ async function submitTransfer() {
   if (!date) return toast('Select a date', 'err');
   if (!confirmIfOverdraws(Number(fromRaw), amount)) return;
 
+  const isSettlement = getTransferKind() === 'Settlement';
+  // A settlement only means anything between two different people. Catch it
+  // here rather than letting it silently do nothing to the balance.
+  if (isSettlement) {
+    const ownerOf = id => (S.accounts.find(a => a.id === id) || {}).owner;
+    const from = ownerOf(Number(fromRaw)), to = ownerOf(Number(toRaw));
+    if (!SETTLE_PAIR.includes(from) || !SETTLE_PAIR.includes(to) || from === to) {
+      return toast('A settlement must move between Edwin\u2019s and Divya\u2019s accounts', 'err');
+    }
+  }
+
   const xfer = {
     id: newId(),
     date, amount,
     fromAccount: Number(fromRaw),
     toAccount:   Number(toRaw),
     desc,
+    isSettlement,
     month: date.slice(0,7),
     addedBy: currentUser
   };
@@ -3884,11 +3926,34 @@ async function submitTransfer() {
   queueOp('transfers', 'POST', xfer.id, {
     id: xfer.id, date: xfer.date, amount: xfer.amount,
     from_account: xfer.fromAccount, to_account: xfer.toAccount,
-    description: xfer.desc, month: xfer.month, added_by: xfer.addedBy
+    description: encodeXferDesc(xfer.desc, xfer.isSettlement),
+    is_settlement: xfer.isSettlement,
+    month: xfer.month, added_by: xfer.addedBy
   });
   saveLocal();
-  await pushChanges('✓ Transfer saved');
+  await pushChanges(isSettlement ? '✓ Settlement recorded' : '✓ Transfer saved');
   resetTransferForm();
+}
+
+// Explain what the chosen kind means, and keep the note honest about the one
+// thing a settlement needs: two different people's accounts.
+function onTransferKind() {
+  const note = document.getElementById('t-kind-note');
+  if (!note) return;
+  note.textContent = getTransferKind() === 'Settlement'
+    ? 'Squares up what one of you owes the other — reduces the Settle Up balance.'
+    : '';
+}
+
+function getTransferKind() {
+  const p = document.querySelector('.pill[data-g="xkind"].active');
+  return p ? p.dataset.v : 'Transfer';
+}
+
+function setTransferKind(kind) {
+  document.querySelectorAll('.pill[data-g="xkind"]')
+    .forEach(p => p.classList.toggle('active', p.dataset.v === (kind || 'Transfer')));
+  onTransferKind();
 }
 
 function resetTransferForm() {
@@ -3899,6 +3964,7 @@ function resetTransferForm() {
   document.getElementById('t-to').value   = accountStillExists(S.lastTransferTo)   ? String(S.lastTransferTo)   : '';
   document.getElementById('t-desc').value = '';
   document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
+  setTransferKind('Transfer');
 }
 
 async function deleteTransfer(id) {
@@ -3940,11 +4006,10 @@ const SETTLE_SHARES = {
   AJ:    { Edwin: 0.5, Divya: 0.5 },
 };
 
-// A transfer between their own accounts only counts as settling up when it
-// says so. Reading every Divya→Edwin transfer as a repayment would quietly
-// mistake a move into a joint investment for a settlement, and silently
-// wrong is the worst thing a balance like this can be.
-const SETTLE_KEYWORD = /\bsettl(e|ed|ing|ement)\b/i;
+// A transfer counts as settling up only when it was recorded as one — the
+// Settlement kind on the Transfer form. Inferring it from the accounts alone
+// would quietly mistake a move into a joint investment for a repayment, and
+// silently wrong is the worst thing a balance like this can be.
 
 // net > 0 means that person is owed money — they've paid out more than their
 // share. The two figures are always equal and opposite.
@@ -3980,7 +4045,7 @@ function settleUp(esList, effAmtFn, incList, xferList) {
   // back toward zero.
   const ownerOf = id => (S.accounts.find(a => a.id === id) || {}).owner;
   (xferList || []).forEach(t => {
-    if (!SETTLE_KEYWORD.test(t.desc || '')) return;
+    if (!t.isSettlement) return;
     const from = ownerOf(t.fromAccount), to = ownerOf(t.toAccount);
     if (!SETTLE_PAIR.includes(from) || !SETTLE_PAIR.includes(to) || from === to) return;
     const amt = Number(t.amount) || 0;
@@ -4000,7 +4065,7 @@ function toggleSettle() {
   if (card) card.classList.toggle('open', settleExpanded);
 }
 
-function renderSettle(esList, effAmtFn, incList, xferList, periodLabel) {
+function renderSettle(esList, effAmtFn, incList, xferList) {
   const card = document.getElementById('d-settle');
   if (!card) return;
   const r = settleUp(esList, effAmtFn, incList, xferList);
@@ -4012,10 +4077,10 @@ function renderSettle(esList, effAmtFn, incList, xferList, periodLabel) {
   card.classList.toggle('open', settleExpanded);
   card.classList.toggle('square', netE === 0);
 
-  document.getElementById('d-settle-period').textContent = periodLabel ? ` · ${periodLabel}` : '';
+  document.getElementById('d-settle-period').textContent = ' · running balance';
   document.getElementById('d-settle-amt').textContent = '₹' + fmt(Math.abs(netE));
   document.getElementById('d-settle-who').innerHTML = netE === 0
-    ? 'All square — nothing to settle'
+    ? (r.settled ? 'All square — settled in full' : 'All square — nothing to settle')
     : `<b>${netE > 0 ? 'Divya' : 'Edwin'}</b> owes <b>${netE > 0 ? 'Edwin' : 'Divya'}</b>`;
 
   const row = (label, value, muted) =>
@@ -4029,9 +4094,10 @@ function renderSettle(esList, effAmtFn, incList, xferList, periodLabel) {
     + row('Divya&rsquo;s share', money(r.share.Divya), true)
     + (r.recv.Divya ? row('less reimbursed to Divya', money(r.recv.Divya), true) : '')
     + (r.settled ? row(`already settled by ${r.settledFrom}`, money(r.settled)) : '')
-    + `<div class="settle-note">Costs for Both and for AJ split half each. A transfer
-       between your accounts counts as a repayment only when its description
-       mentions “settle”.</div>`;
+    + `<div class="settle-note">Every entry since the beginning, not just this
+       period — a running account that clears only when you settle. Costs for
+       Both and for AJ split half each. To square up, record the payment on the
+       Transfer tab with the kind set to Settlement.</div>`;
 }
 
 // ══════════════════════════════════════════════════
@@ -5203,7 +5269,10 @@ async function saveEdit() {
     queueOp('transfers', 'PATCH', id, {
       amount: updated.amount, date: updated.date,
       from_account: updated.fromAccount, to_account: updated.toAccount,
-      description: updated.desc, month: updated.month
+      // Re-encode so an edit can't quietly strip the settlement marker.
+      description: encodeXferDesc(updated.desc, updated.isSettlement),
+      is_settlement: !!updated.isSettlement,
+      month: updated.month
     });
     saveLocal();
     await pushChanges('✓ Transfer updated');
@@ -5658,7 +5727,9 @@ function renderTransferCard(t, q) {
         <div class="entry-cat">${hl(fromName, q)} → ${hl(toName, q)}</div>
         ${t.desc ? `<div class="entry-desc">${hl(t.desc, q)}</div>` : ''}
         <div class="entry-chips">
-          <div class="echip transfer">⇄ Transfer</div>
+          ${t.isSettlement
+            ? '<div class="echip settlement">⚖ Settlement</div>'
+            : '<div class="echip transfer">⇄ Transfer</div>'}
         </div>
         ${t.addedBy ? `<div class="entry-by" style="margin-top:6px;font-size:11px;color:var(--ink3)">Added by ${hl(t.addedBy, q)}</div>` : ''}
         <div class="entry-actions">
@@ -5938,6 +6009,18 @@ function encodeIncomeDesc(desc, reimbId) {
 function stripIncomeDesc(desc) {
   return String(desc == null ? '' : desc).split(RMB_MARK)[0];
 }
+// A settlement rides in the transfer's description behind the same invisible
+// marker, for the same reason: the column may not exist on every install, and
+// the description always round-trips. An optional is_settlement column is sent
+// too, and stripped on a 400 if the table doesn't have it.
+function encodeXferDesc(desc, isSettlement) {
+  const clean = stripIncomeDesc(desc);
+  return isSettlement ? clean + RMB_MARK + 'stl:1' : clean;
+}
+function parseSettlementFromDesc(desc) {
+  return /stl:1/.test(String(desc == null ? '' : desc));
+}
+
 function parseReimbFromDesc(desc) {
   const m = String(desc == null ? '' : desc).match(/rmb:(\d+)/);
   return m ? Number(m[1]) : null;
@@ -6497,10 +6580,10 @@ function renderDash() {
   ]);
 
   // ── Settle Up ──
-  // Sits at the top of the Summary and follows the period buttons like every
-  // other figure here, so Full Year gives the year-end number in one tap.
-  renderSettle(es, effAmt, inc, S.transfers.filter(t => inPeriod(t.date)),
-               PERIOD_LABELS[S.dashPeriod] || '');
+  // Deliberately ignores the period buttons: what one of them owes the other
+  // is a running account from the first entry to today, and it clears only
+  // when a settlement is recorded — not when the calendar turns over.
+  renderSettle(S.entries, effAmt, S.income, S.transfers);
 
   // ── Net Worth (always today) ──
   // "Active" excludes long-term holdings (business capital, land, gold,
@@ -7430,7 +7513,9 @@ async function importBackup(input) {
     await sbInsert('transfers', transfersArr.slice(i, i + batch).map(t => ({
       id: t.id, date: t.date, amount: t.amount,
       from_account: t.fromAccount, to_account: t.toAccount,
-      description: t.desc, month: t.month, added_by: t.addedBy
+      description: encodeXferDesc(t.desc, t.isSettlement),
+      is_settlement: !!t.isSettlement,
+      month: t.month, added_by: t.addedBy
     })));
   }
 
