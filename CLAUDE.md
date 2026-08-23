@@ -38,6 +38,16 @@ hand-roll `/1000` in a template. Full figures are whole rupees (`Math.round`) �
 noise at these sizes; the one exception is the SMS reader's hint, which echoes the exact
 amount read out of the message.
 
+## Settle Up is a money figure — treat it as one
+Every expense names who it was FOR and who PAID; together they say whether one of them is
+carrying the other's share. Costs for `Both` and for `AJ` split half each; a cost for one
+person is owed in full by that person. Net across the period = a single figure.
+`net > 0` means that person is owed. A linked reimbursement reduces the shared cost AND is
+debited to whoever actually banked it — those are different people often enough to matter.
+A transfer between their accounts counts as a repayment only when its description says
+"settle", because silently mistaking an investment move for a settlement is the worst thing
+this number can do.
+
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
 - Numbers: use the clean sans-serif ('Outfit'), never a decorative serif. Apply
