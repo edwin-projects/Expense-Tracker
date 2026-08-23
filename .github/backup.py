@@ -118,6 +118,7 @@ transfers = [{
     'fromAccount': r.get('from_account'),
     'toAccount':   r.get('to_account'),
     'desc':        r.get('description', ''),
+    'isSettlement': bool(r.get('is_settlement')),
     'month':       r.get('month', ''),
     'addedBy':     r.get('added_by', ''),
 } for r in transfer_rows]

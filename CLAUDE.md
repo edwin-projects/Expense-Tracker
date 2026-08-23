@@ -44,9 +44,14 @@ carrying the other's share. Costs for `Both` and for `AJ` split half each; a cos
 person is owed in full by that person. Net across the period = a single figure.
 `net > 0` means that person is owed. A linked reimbursement reduces the shared cost AND is
 debited to whoever actually banked it — those are different people often enough to matter.
-A transfer between their accounts counts as a repayment only when its description says
-"settle", because silently mistaking an investment move for a settlement is the worst thing
-this number can do.
+A transfer counts as a repayment only when it was recorded with the **Settlement** kind on
+the Transfer form (`isSettlement`) — never inferred from the accounts, because silently
+mistaking an investment move for a settlement is the worst thing this number can do. The flag
+rides in an optional `is_settlement` column AND behind the description's marker
+(`encodeXferDesc`), so it works with no schema change.
+
+**Settle Up ignores the period buttons.** It is a running account from the first entry to
+today and clears only when a settlement is recorded — not when the calendar turns over.
 
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
