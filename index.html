@@ -869,18 +869,24 @@ select.finput option { background: white; color: var(--ink); }
   cursor: pointer;
 }
 .settle-card.square { border-color: var(--border); }
-.settle-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .settle-lbl {
   font-size: 10.5px; font-weight: 600; color: var(--ink3);
   text-transform: uppercase; letter-spacing: 0.12em;
+  text-align: center;
 }
-.settle-period { text-transform: none; letter-spacing: 0; font-weight: 400; }
+/* Who on the left, figure on the right, centred against each other. */
+.settle-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 8px;
+}
+/* Same size and weight as the headline figures on the cards below it. */
 .settle-amt {
-  font-size: 20px; font-weight: 700; color: var(--amber);
-  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 24px; font-weight: 600; color: var(--amber);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1;
 }
 .settle-card.square .settle-amt { color: var(--ink3); }
-.settle-who { font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
+.settle-who { font-size: 12.5px; color: var(--ink2); line-height: 1.3; }
 .settle-who b { color: var(--ink); font-weight: 600; }
 /* The working stays folded away until tapped. */
 .settle-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
@@ -2151,11 +2157,11 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     </div>
 
     <div class="settle-card" id="d-settle" onclick="toggleSettle()" style="display:none">
+      <div class="settle-lbl">Settle Up</div>
       <div class="settle-head">
-        <div class="settle-lbl">Settle Up<span class="settle-period" id="d-settle-period"></span></div>
+        <div class="settle-who" id="d-settle-who"></div>
         <div class="settle-amt" id="d-settle-amt">₹0</div>
       </div>
-      <div class="settle-who" id="d-settle-who"></div>
       <div class="settle-detail" id="d-settle-detail"></div>
     </div>
 
@@ -2687,7 +2693,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-16-05';
+const APP_VERSION = '2026-08-23-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4077,7 +4083,6 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
   card.classList.toggle('open', settleExpanded);
   card.classList.toggle('square', netE === 0);
 
-  document.getElementById('d-settle-period').textContent = ' · running balance';
   document.getElementById('d-settle-amt').textContent = '₹' + fmt(Math.abs(netE));
   document.getElementById('d-settle-who').innerHTML = netE === 0
     ? (r.settled ? 'All square — settled in full' : 'All square — nothing to settle')
