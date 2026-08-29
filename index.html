@@ -2693,7 +2693,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-23-01';
+const APP_VERSION = '2026-08-29-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2887,6 +2887,8 @@ function loadLocal() {
   if (!S.smsCards || typeof S.smsCards !== 'object') S.smsCards = {};
   // payer name → income source, learned the same way
   if (!S.smsPayees || typeof S.smsPayees !== 'object') S.smsPayees = {};
+  // merchant → { category, type }, learned from what you save
+  if (!S.smsMerchants || typeof S.smsMerchants !== 'object') S.smsMerchants = {};
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
@@ -3759,6 +3761,8 @@ async function submitExpense() {
 
   S.entries.unshift(entry);
   S.lastAccountExp = account;
+  // Whatever category this ended up under is now what this merchant means.
+  rememberSmsMerchant(entry.category, entry.type);
   // If this entry came from a pasted card SMS, tie that card's last four to
   // whichever account was actually saved — right or corrected, the next
   // message from the same card lands on the right account with no guessing.
@@ -4201,7 +4205,27 @@ function smsDate(text) {
 // Words that follow "at"/"to" in bank boilerplate but are never a merchant.
 const SMS_NOT_MERCHANT = /^(your|the|a|an|card|account|a\/c|acct|ref|ref no|upi|upi ref|info|avbl|available|bal|balance|block|dispute|call|customer|dear|no)$/i;
 
-function smsMerchant(text) {
+// Lines that are never a merchant: amounts, card/account references, dates
+// and times, balances, and the anti-fraud footer.
+const SMS_NOISE_LINE = /(INR|Rs\.?\s*\d|₹)|\b(avl|avbl|available|limit|balance|bal)\b|\b(not you|block|dispute|call|helpline|customer care|sms)\b|\b(card|a\/c|acct|account|bank)\b|\d{2}[-\/:]\d{2}|^\s*\d+\s*$|\b(spent|debited|credited|deposited|refunded|withdrawn)\b/i;
+
+// Fallback for the bare-line format. Runs only after the preposition patterns
+// have failed, so it can't override a merchant that was properly anchored.
+function smsMerchantFromLines(raw) {
+  const lines = String(raw || '').split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    if (line.length < 2 || line.length > 40) continue;
+    if (SMS_NOISE_LINE.test(line)) continue;
+    // Mostly letters — a merchant name, not a reference number.
+    const letters = (line.match(/[A-Za-z]/g) || []).length;
+    if (letters < 2 || letters / line.length < 0.6) continue;
+    if (SMS_NOT_MERCHANT.test(line)) continue;
+    return line.replace(/\s{2,}/g, ' ');
+  }
+  return '';
+}
+
+function smsMerchant(text, raw) {
   const patterns = [
     /\b(?:at|to|towards)\s+([A-Za-z0-9][A-Za-z0-9 &.'\-_*]{1,40}?)\s+on\s+\d/i,
     /\btrf\s+to\s+([A-Za-z0-9][A-Za-z0-9 &.'\-_*]{1,40}?)\s+(?:ref|on|\.)/i,
@@ -4217,7 +4241,7 @@ function smsMerchant(text) {
       if (name.length >= 2 && !SMS_NOT_MERCHANT.test(name)) return name;
     }
   }
-  return '';
+  return smsMerchantFromLines(raw);
 }
 
 // A message can name two accounts — "Acct XX8891 is debited ... account XX2211
@@ -4285,7 +4309,22 @@ function smsMatchAccount(bank, last4, isCard) {
   return bestScore >= 3 ? { account: best, learned: false } : { account: null, learned: false };
 }
 
+// Normalised key for a merchant, so "KERALA STAT" and "Kerala  Stat" are the
+// same shop.
+function smsMerchantKey(merchant) {
+  return String(merchant || '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+// What you filed this merchant under last time, if anything.
+function smsLearnedFor(merchant) {
+  const k = smsMerchantKey(merchant);
+  return (k && S.smsMerchants) ? S.smsMerchants[k] : null;
+}
+
 function smsCategory(merchant, whole) {
+  // A category you chose yourself beats the built-in guess every time.
+  const learned = smsLearnedFor(merchant);
+  if (learned && learned.category && S.categories.includes(learned.category)) return learned.category;
   const hay = (merchant + ' ' + whole);
   for (const [re, cat] of SMS_MERCHANT_CATEGORIES) {
     if (re.test(hay)) return S.categories.includes(cat) ? cat : '';
@@ -4321,14 +4360,19 @@ function parseBankSms(text) {
   const verbIndex = kind === 'income' ? t.search(creditRe) : t.search(debitRe);
   const amount   = smsAmount(t);
   const date     = smsDate(t);
-  const merchant = smsMerchant(t);
+  const merchant = smsMerchant(t, text);
   const last4    = smsCardLast4(t, verbIndex);
   const bank     = smsBank(t);
   const isCard   = /credit card|debit card|\bcard\b/i.test(t);
   const isCredit = /credit card/i.test(t);
   const { account, learned } = smsMatchAccount(bank, last4, isCredit);
   const category = kind === 'expense' ? smsCategory(merchant, t) : '';
-  const type     = category && S.types.includes(SMS_CATEGORY_TYPES[category] || '') ? SMS_CATEGORY_TYPES[category] : '';
+  const learnedM = smsLearnedFor(merchant);
+  // Prefer the type saved alongside the learned category — the built-in
+  // category→type table has no opinion about a category it's never seen.
+  let type = '';
+  if (learnedM && learnedM.category === category && S.types.includes(learnedM.type || '')) type = learnedM.type;
+  else if (category && S.types.includes(SMS_CATEGORY_TYPES[category] || '')) type = SMS_CATEGORY_TYPES[category];
 
   // Who sent the money in. Once the user tags a payer's first deposit with an
   // income source, every later deposit from that same payer arrives tagged.
@@ -4343,6 +4387,7 @@ function parseBankSms(text) {
   return {
     kind, amount, date, merchant, last4, bank, isCard, isCredit,
     account, accountLearned: learned, category, type, payer, source,
+    merchantLearned: !!(learnedM && learnedM.category),
     // A bill-payment message names the card being paid; the account it's paid
     // from is not in the message, so the user picks that side.
     toAccount: kind === 'transfer' ? account : null,
@@ -4359,12 +4404,26 @@ let __smsPendingLast4 = '';
 // Payer named in the deposit that prefilled the Income form, so saving can
 // record which income source the user filed it under.
 let __smsPendingPayer = '';
+// Merchant the expense form was prefilled from, so saving can record which
+// category you actually filed it under.
+let __smsPendingMerchant = '';
 
 function rememberSmsCard(accountId) {
   if (!__smsPendingLast4 || !accountId) return;
   if (!S.smsCards || typeof S.smsCards !== 'object') S.smsCards = {};
   S.smsCards[__smsPendingLast4] = Number(accountId);
   __smsPendingLast4 = '';
+  saveLocal();
+}
+
+// The whole point: a correction sticks. Whatever category you save an entry
+// under becomes this merchant's category next time — no need to tell anyone.
+function rememberSmsMerchant(category, type) {
+  const k = smsMerchantKey(__smsPendingMerchant);
+  __smsPendingMerchant = '';
+  if (!k || !category) return;
+  if (!S.smsMerchants || typeof S.smsMerchants !== 'object') S.smsMerchants = {};
+  S.smsMerchants[k] = { category, type: type || '' };
   saveLocal();
 }
 
@@ -4386,7 +4445,7 @@ function smsToast(p) {
   else if (p.payer)     bits.push(p.payer);
   else if (p.found.merchant) bits.push(p.merchant);
   if (p.found.account)  bits.push((p.kind === 'transfer' ? '→ ' : '') + p.account.name);
-  if (p.found.category) bits.push(p.category);
+  if (p.found.category) bits.push(p.category + (p.merchantLearned ? '' : '?'));
   if (p.found.source)   bits.push(p.source);
   const asks = [];
   if (!p.found.amount)  asks.push('add the amount');
@@ -4396,7 +4455,9 @@ function smsToast(p) {
     if (!p.found.account) asks.push('pick the card');
   } else if (!p.found.account) asks.push('pick the account');
   else if (!p.accountLearned) asks.push('check the account');
+  // Once a merchant has been filed by hand, stop second-guessing its category.
   if (!p.found.category && p.kind === 'expense') asks.push('pick a category');
+  else if (p.kind === 'expense' && p.found.category && !p.merchantLearned) asks.push('check the category');
   if (!p.found.source && p.kind === 'income') asks.push('pick a source');
   return (bits.length ? '✓ ' + bits.join(' · ') : 'Read the message')
        + (asks.length ? ' — ' + asks.join(', ') : '');
@@ -4453,6 +4514,7 @@ function applyPastedSms() {
 
   __smsPendingLast4 = p.last4 || '';
   __smsPendingPayer = p.payer || '';
+  __smsPendingMerchant = p.kind === 'expense' ? (p.merchant || '') : '';
   smsGoPage(p.kind);
 
   if (p.kind === 'income') {
