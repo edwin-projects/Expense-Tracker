@@ -38,6 +38,14 @@ hand-roll `/1000` in a template. Full figures are whole rupees (`Math.round`) �
 noise at these sizes; the one exception is the SMS reader's hint, which echoes the exact
 amount read out of the message.
 
+## The SMS reader learns from corrections
+Three maps in `S`, all written at save time from what the user actually chose, all beating the
+built-in guesses: `smsCards` (card last-4 → account), `smsPayees` (NEFT remitter → income
+source) and `smsMerchants` (merchant → {category, type}). Never ask the user to re-teach
+something they have already corrected once — when a value came from one of these maps, drop
+the "check this" nudge. Add new learning the same way rather than growing the hardcoded
+tables.
+
 ## Settle Up is a money figure — treat it as one
 Every expense names who it was FOR and who PAID; together they say whether one of them is
 carrying the other's share. Costs for `Both` and for `AJ` split half each; a cost for one
