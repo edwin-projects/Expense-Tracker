@@ -39,6 +39,15 @@ to it and dispatch `change`, so every existing handler, the SMS prefill and the 
 working untouched. A new picker follows the same rule: add the id to `PICKER_GRID_IDS`, or give
 the select a `data-inline` host, rather than hand-rolling a control.
 
+## The Log has two rows of controls, not five
+Kind (All / Expense / Income / Transfer) is a segmented control on the page because it changes
+every session. Everything else — person, type, category, added-by, and the bin — lives in one
+bottom sheet behind a Filters button that carries a count, and whatever is on shows underneath
+as a chip you can tap to drop. Account, account-type and period drill-downs from the Summary
+are chips too, not banners. Sort (`logSort`, module-level so a reload starts at newest-first)
+is the second button. A new filter belongs in the sheet and in `activeLogFilters()`; it does
+not get a row of its own.
+
 ## Numbers are Indian — always
 Grouping is Indian (`toLocaleString('en-IN')` → `12,34,567`), and compact amounts use the
 Indian scale: **thousand → lakh → crore**. A figure of a lakh or more is never scaled in
