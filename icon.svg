@@ -1,7 +1,16 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="115" fill="#262320"/>
-  <text x="256" y="170" font-family="Georgia, DejaVu Serif, Times New Roman, serif" font-size="155" font-weight="700" text-anchor="middle" dominant-baseline="central"><tspan fill="#E7D7AC">D</tspan><tspan font-family="Helvetica, FreeSans, Arial, sans-serif" font-weight="600" fill="#D8A93B" dy="12">₹</tspan><tspan fill="#E7D7AC" dy="-12">E</tspan></text>
-  <rect x="150" y="370" width="56" height="60"  rx="9" fill="#6FAE84"/>
-  <rect x="228" y="335" width="56" height="95"  rx="9" fill="#A7B45E"/>
-  <rect x="306" y="300" width="56" height="130" rx="9" fill="#D8A93B"/>
+<!-- D & E Finance — "Rise".
+     Three bars: two ivory receding, one brass leading, over a faint
+     baseline. The same three colours as the app (Vault: graphite ground,
+     ivory ink, brass accent) and the same shape as the Summary tab icon,
+     so the app and its mark agree. No gradient, bevel or drop shadow —
+     iOS rounds and lights the tile itself. The mark is centred on the
+     canvas and fills half its width, so it still reads at 58px. -->
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="D and E Finance">
+  <rect width="512" height="512" rx="115" fill="#17171a"/>
+  <g stroke-linecap="round" stroke-width="44" fill="none">
+    <path d="M150 356v-60"  stroke="#f0eee9" opacity="0.42"/>
+    <path d="M256 356v-140" stroke="#f0eee9" opacity="0.68"/>
+    <path d="M362 356v-224" stroke="#d3b168"/>
+  </g>
+  <path d="M128 400h256" stroke="#f0eee9" stroke-width="10" stroke-linecap="round" opacity="0.3"/>
 </svg>
