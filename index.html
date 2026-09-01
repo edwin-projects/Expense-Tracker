@@ -1242,6 +1242,36 @@ select.finput option { background: white; color: var(--ink); }
 .bar-total-amt.income { color: var(--green); }
 .bar-val { font-size: 12px; color: var(--ink2); width: 56px; text-align: right; flex-shrink: 0; font-weight: 500; }
 
+/* 12-month income vs expense chart. Sized to sit alongside the stat cards:
+   a short plot, the value written above each bar (rotated so all twelve
+   months fit on a phone without scrolling), month initials underneath. */
+#d-mchart { display: flex; align-items: flex-end; gap: 2px; padding: 10px 8px 6px; }
+.mc-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.mc-plot { width: 100%; height: 104px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.mc-bar { position: relative; width: 8px; border-radius: 3px 3px 0 0; }
+.mc-bar.inc { background: var(--green); }
+.mc-bar.exp { background: var(--amber); }
+.mc-lbl {
+  position: absolute; bottom: 100%; left: 50%; margin-bottom: 3px;
+  transform: translateX(-50%);
+  writing-mode: vertical-rl; rotate: 180deg;
+  font-size: 9px; font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.mc-lbl.inc { color: var(--green); }
+.mc-lbl.exp { color: var(--amber); }
+.mc-month { font-size: 9.5px; font-weight: 600; color: var(--ink3); letter-spacing: 0.02em; }
+.mc-col.current .mc-month { color: var(--ink); }
+.mc-legend {
+  display: flex; justify-content: center; gap: 16px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  font-weight: 700; color: var(--ink3); padding: 0 0 10px;
+}
+.mc-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.mc-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.mc-legend i.inc { background: var(--green); }
+.mc-legend i.exp { background: var(--amber); }
+
 /* Monthly trend */
 #d-trend { max-height: 360px; overflow-y: auto; }
 .trend-row {
@@ -2283,6 +2313,12 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
     </div>
 
+    <div class="sec-label">Income vs Expense — 12 Months</div>
+    <div class="fcard" style="padding:14px 6px 12px">
+      <div class="mc-legend"><span><i class="inc"></i>Income</span><span><i class="exp"></i>Expense</span></div>
+      <div id="d-mchart"></div>
+    </div>
+
     <div class="sec-label">Top Income Sources</div>
     <div class="fcard" style="padding:16px">
       <div id="d-inc-bars"></div>
@@ -2693,7 +2729,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-08-29-01';
+const APP_VERSION = '2026-09-01-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6913,6 +6949,25 @@ function renderDash() {
     const prev = i > 0 ? trend[i-1].nw : S.nwSnapshots[baselineKey];
     t.nwPct = (t.nw != null && prev != null && prev > 0) ? (t.nw - prev) / prev * 100 : null;
   });
+
+  // ── 12-month bar chart (same FY months as the trend table) ──
+  const mcMax = Math.max(...trend.map(t => Math.max(t.inc, t.exp)), 0);
+  // The tallest bar stops at 76% of the plot so its label always has room
+  // above it inside the card; a non-zero month never renders as nothing.
+  const mcH = v => {
+    if (!mcMax || v <= 0) return 0;
+    return Math.max(3, Math.round(v / mcMax * 76));   // % of plot height
+  };
+  document.getElementById('d-mchart').innerHTML = trend.map(t => {
+    const cur = t.key === curKey ? ' current' : '';
+    // A month with nothing in it (typically still in the future) shows an
+    // empty slot — the month keeps its place so all twelve always read across.
+    const bar = (v, cls) => v > 0
+      ? `<div class="mc-bar ${cls}" style="height:${mcH(v)}%"><span class="mc-lbl ${cls}">${fmtShort(v)}</span></div>`
+      : '';
+    return `<div class="mc-col${cur}"><div class="mc-plot">${bar(t.inc,'inc')}${bar(t.exp,'exp')}</div>`
+      + `<div class="mc-month">${t.label.split(' ')[0]}</div></div>`;
+  }).join('');
 
   document.getElementById('d-trend').innerHTML =
     `<div class="trend-row trend-head"><span class="trend-month">Month</span><span>In</span><span>Out</span><span>Net</span><span>Net Worth</span></div>` +
