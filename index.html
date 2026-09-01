@@ -2237,6 +2237,12 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       </div>
     </div>
 
+    <div class="sec-label">Income vs Expense — 12 Months</div>
+    <div class="fcard" style="padding:14px 6px 12px">
+      <div class="mc-legend"><span><i class="inc"></i>Income</span><span><i class="exp"></i>Expense</span></div>
+      <div id="d-mchart"></div>
+    </div>
+
     <div class="sec-label">Net Worth</div>
     <div class="stat-grid">
       <div class="stat-card full networth" id="d-networth-card" style="text-align:center">
@@ -2316,12 +2322,6 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <div class="stat-sub" id="d-fun-pct">0% of total</div>
         <div class="card-split" id="d-fun-split"></div>
       </div>
-    </div>
-
-    <div class="sec-label">Income vs Expense — 12 Months</div>
-    <div class="fcard" style="padding:14px 6px 12px">
-      <div class="mc-legend"><span><i class="inc"></i>Income</span><span><i class="exp"></i>Expense</span></div>
-      <div id="d-mchart"></div>
     </div>
 
     <div class="sec-label">Top Income Sources</div>
@@ -2734,7 +2734,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-02';
+const APP_VERSION = '2026-09-01-03';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
