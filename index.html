@@ -4,111 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>D&E Finance</title>
-<script>
-  // Apply persisted theme before first paint to avoid flash
-  try {
-    var t = localStorage.getItem('de_theme');
-    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-  } catch (e) {}
-</script>
 <link rel="icon" type="image/svg+xml" href="icon.svg?v=2">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  /* ── IVORY ───────────────────────────────────────────────
-     Warm paper, espresso ink, brass. The neutrals lean the way the
-     accent does, so nothing reads as stock grey, and colour is spent
-     once: brass for identity, green and red for money in and out. */
-  --bg: #f5f2ea;
-  --bg2: #ece7db;
-  --surface: #fffdf8;
-  --border: #ece6d9;
-  --border2: #ddd5c4;
-  --ink: #23201a;
-  --ink2: #6c6559;
-  --ink3: #9a9386;
-  --amber: #96701f;
-  --amber-light: #b8933c;
-  --amber-bg: #f7f0df;
-  --amber-border: #e3d7ba;
-  --red: #b04d42;
-  --green: #3d7d55;
-  --green-bg: #eaf2ec;
-  --blue: #4a6ea8;
-  --blue-bg: #edf1f7;
-  --pink: #9c5470;
-  --pink-bg: #f7edf1;
-  --teal: #2f7f74;
-  --teal-bg: #eaf3f1;
-  /* Borders for tinted chips */
-  --blue-border-soft: #c3d0e2;
-  --pink-border-soft: #e0c6d1;
-  --teal-border-soft: #bcd8d3;
-  --green-border-soft: #c2d9c9;
-  /* Acct chip neutrals */
-  --acct-chip-bg: #f1ede3;
-  --acct-chip-border: #e0d9c9;
-  --acct-liab-bg: #f9eeec;
-  --acct-liab-border: #e7cdc8;
-  /* Edit/Delete action button borders */
-  --btn-edit-border: #d3ddea;
-  --btn-del-border: #e7cdc8;
-  /* Search highlight */
-  --hl-bg: #f2e2a8;
-  --hl-ink: #23201a;
-  /* Dashboard stat cards — one surface, coloured type. No tinted boxes. */
-  --card-networth-bg: #fffdf8;
-  --card-networth-border: transparent;
-  --card-networth-ink: #3f5d84;
-  --card-liab-bg: #fffdf8;
-  --card-liab-border: transparent;
-  --card-liab-ink: #8f4238;
-  --card-liab-val: #b04d42;
-  --card-noness-bg: #fffdf8;
-  --card-noness-border: transparent;
-  --card-noness-ink: #8a6a1c;
-  --card-noness-sub: #a08334;
-  --card-ess-bg: #fffdf8;
-  --card-ess-border: transparent;
-  --card-ess-ink: #33684a;
-  --card-ess-sub: #3d7d55;
-  /* Page tints — a breath of warmth, not a colour wash */
-  --tint-add: #f5f0e8;
-  --tint-income: #f2f2e9;
-  --tint-transfer: #f1f2ec;
-  /* Transfer chip palette */
-  --transfer-bg: #eef0f6;
-  --transfer-border: #ccd4e4;
-  --transfer-ink: #4a5f9e;
-  /* Long-term asset chip */
-  --longterm-bg: #f3efe4;
-  --longterm-border: #e0d8c6;
-  --longterm-ink: #6d603f;
-  /* Dark inverted text (button/toast on dark pill) */
-  --btn-dark-text: #fffdf8;
-  /* Gradient buttons — brass for the affirmative action, oxide for the
-     destructive one. Defined per theme so both stay legible. */
-  --grad-gold: linear-gradient(135deg, #bb9038 0%, #8a6417 100%);
-  --grad-gold-ink: #fffdf8;
-  --grad-red: linear-gradient(135deg, #bf6153 0%, #8f3529 100%);
-  --grad-red-ink: #fffdf8;
-  /* Modal scrim */
-  --scrim: rgba(35,32,26,0.42);
-  --divider: rgba(35,32,26,0.07);
-  --radius: 18px;
-  --radius-sm: 12px;
-  /* Cards sit ON the paper — two-layer soft shadow, no outline. */
-  --shadow: 0 1px 2px rgba(35,32,26,0.04), 0 8px 20px rgba(35,32,26,0.05);
-  --shadow-md: 0 2px 6px rgba(35,32,26,0.06), 0 16px 34px rgba(35,32,26,0.09);
-}
-
-/* ── VAULT ──────────────────────────────────────────
+/* ── VAULT — the app's one palette ──────────────────
    Warm graphite. Depth comes from a lighter surface, never from an
    outline, and brass is the only accent — green and red are reserved
-   for money in and money out. */
-[data-theme="dark"] {
+   for money in and money out. There is no light theme: this app is
+   read at night, on a phone, and one palette is one thing to keep
+   right. Every component reads from these tokens. */
+:root {
   --bg: #131315;
   --bg2: #171719;
   --surface: #1c1c1f;
@@ -175,10 +82,11 @@
   --divider: rgba(255,255,255,0.055);
   --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 26px rgba(0,0,0,0.34);
   --shadow-md: 0 2px 6px rgba(0,0,0,0.5), 0 18px 40px rgba(0,0,0,0.5);
+  --radius: 18px;
+  --radius-sm: 12px;
 }
 
-html { background: var(--bg); transition: background 0.25s ease; color-scheme: light; }
-[data-theme="dark"] { color-scheme: dark; }
+html { background: var(--bg); color-scheme: dark; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -1065,7 +973,7 @@ select.finput option { background: white; color: var(--ink); }
 /* The hero figure is set in plain ink: it is the biggest thing on the page,
    and it does not also need a colour to be noticed. */
 .stat-card.networth .stat-val { color: var(--ink); }
-[data-theme="dark"] .stat-card.networth { box-shadow: var(--shadow); }
+.stat-card.networth { box-shadow: var(--shadow); }
 .stat-card.liab-tint { background: var(--surface); }
 .stat-card.liab-tint .stat-lbl { color: var(--card-liab-ink); }
 .stat-card.liab-tint .stat-val, .stat-card.liab-tint .stat-sub { color: var(--card-liab-val); }
@@ -1130,8 +1038,8 @@ select.finput option { background: white; color: var(--ink); }
 .stat-chip.new  { color: var(--ink2);  background: none; }
 .stat-chip:empty { display: none; }
 /* On dark, the tinted backgrounds need to ride on top of the card colour. */
-[data-theme="dark"] .stat-chip.pos { background: none; }
-[data-theme="dark"] .stat-chip.neg { background: none; }
+.stat-chip.pos { background: none; }
+.stat-chip.neg { background: none; }
 
 /* Compact delta cell on the right of each breakdown row. No background —
    the colour alone signals direction, keeping the row tucked inside the
@@ -1539,8 +1447,7 @@ select.finput option { background: white; color: var(--ink); }
      (systemThinMaterial). Translucent fill + strong wide-radius blur +
      saturation lift = the characteristic 'real glass' look; a faint inset
      highlight on the top edge gives it the lit appearance Apple uses.
-     Base rule is the light/default :root style; [data-theme=dark]
-     overrides below (the app uses no data-theme=light attribute). */
+     tuned for the app's single graphite palette. */
   background: rgba(255,255,255,0.72);
   -webkit-backdrop-filter: blur(50px) saturate(180%);
           backdrop-filter: blur(50px) saturate(180%);
@@ -1550,7 +1457,7 @@ select.finput option { background: white; color: var(--ink); }
     0 10px 30px rgba(0,0,0,0.18),
     0 0 0 0.5px rgba(0,0,0,0.04);
 }
-[data-theme="dark"] .picker-card {
+.picker-card {
   background: rgba(38,38,40,0.70);
   border: 0.5px solid rgba(255,255,255,0.10);
   box-shadow:
@@ -1842,56 +1749,33 @@ select.modal-input option { background: white; }
 }
 
 /* ── THEME TOGGLE ── */
-.theme-toggle {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--amber);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex-shrink: 0;
-  transition: transform 0.2s, background 0.25s ease, border-color 0.25s ease;
-  line-height: 1;
-}
-.theme-toggle:active { transform: scale(0.9); }
-.theme-toggle .tt-sun { display: none; }
-[data-theme="dark"] .theme-toggle .tt-sun  { display: inline; }
-[data-theme="dark"] .theme-toggle .tt-moon { display: none; }
-
-/* Dark-mode adjustments for elements whose text was hard-coded white on dark-ink */
-[data-theme="dark"] .pill.active,
-[data-theme="dark"] [data-theme="dark"] .log-chip.active { color: var(--btn-dark-text); }
-[data-theme="dark"] .btn-save-cfg,
-[data-theme="dark"] .btn-modal-save,
-[data-theme="dark"] .month-chip.sel {
+/* Elements whose text would otherwise be white on a light slab */
+.pill.active,
+.log-chip.active { color: var(--btn-dark-text); }
+.btn-save-cfg,
+.btn-modal-save,
+.month-chip.sel {
   color: var(--bg);
 }
 
 /* Select option lists (where the browser respects CSS) */
-[data-theme="dark"] select.finput option,
-[data-theme="dark"] select.modal-input option,
-[data-theme="dark"] .acct-editor select option,
-[data-theme="dark"] .cat-filter-select option {
+select.finput option,
+select.modal-input option,
+.acct-editor select option,
+.cat-filter-select option {
   background: #1f1f22;
   color: var(--ink);
 }
 
 /* Toast — base toast on dark needs a real dark bg to keep white text legible */
-[data-theme="dark"] .toast { background: #2a2a2e; color: var(--ink); border: 1px solid var(--border2); }
-[data-theme="dark"] .toast.ok { background: var(--green); color: var(--btn-dark-text); border-color: transparent; }
-[data-theme="dark"] .toast.err { background: var(--red); color: var(--btn-dark-text); border-color: transparent; }
+.toast { background: #2a2a2e; color: var(--ink); border: 1px solid var(--border2); }
+.toast.ok { background: var(--green); color: var(--btn-dark-text); border-color: transparent; }
+.toast.err { background: var(--red); color: var(--btn-dark-text); border-color: transparent; }
 
 /* Sync dot offline is too dim on dark — bump it */
-[data-theme="dark"] .sync-dot.offline { background: var(--ink2); }
+.sync-dot.offline { background: var(--ink2); }
 
-/* Body background transitions smoothly when theme flips */
-body { transition: background 0.25s ease, color 0.25s ease; }
+body { transition: background 0.25s ease; }
 </style>
 </head>
 <body>
@@ -1969,9 +1853,6 @@ body { transition: background 0.25s ease, color 0.25s ease; }
       <div class="topbar-sub">FY 2026–27</div>
     </div>
     <div class="topbar-right">
-      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
-        <span class="tt-moon">☾</span><span class="tt-sun">☀</span>
-      </button>
       <div class="sync-btn" onclick="syncNow()">
         <div class="sync-dot" id="sync-dot"></div>
         <span id="sync-label">Sync</span>
@@ -2815,7 +2696,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-06';
+const APP_VERSION = '2026-09-01-07';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2888,25 +2769,6 @@ const DEFAULTS = {
 //   GRANT SELECT, INSERT, UPDATE, DELETE ON public.transfers TO anon, authenticated, service_role;
 
 const LS_KEY = 'de_finance_v2';
-const THEME_KEY = 'de_theme';
-
-// ══════════════════════════════════════════════════
-//  THEME
-// ══════════════════════════════════════════════════
-function applyTheme(theme) {
-  if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-  else                  document.documentElement.removeAttribute('data-theme');
-}
-function getStoredTheme() {
-  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
-}
-function toggleTheme() {
-  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  applyTheme(next);
-  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
-}
-applyTheme(getStoredTheme());
-
 // ══════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════
