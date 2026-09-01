@@ -1255,16 +1255,19 @@ select.finput option { background: white; color: var(--ink); }
 .mc-plot { width: 100%; height: 104px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
 .mc-bar { position: relative; width: 8px; border-radius: 3px 3px 0 0; }
 .mc-bar.inc { background: var(--green); }
-.mc-bar.exp { background: var(--amber); }
+.mc-bar.exp { background: var(--red); }
 .mc-lbl {
   position: absolute; bottom: 100%; left: 50%; margin-bottom: 3px;
-  transform: translateX(-50%);
-  writing-mode: vertical-rl; rotate: 180deg;
-  font-size: 9px; font-weight: 600; line-height: 1;
+  /* One transform, not `rotate:` plus `transform:` — the individual rotate
+     property applies first and would leave translateX(-50%) working in the
+     rotated frame, pushing every label a full width off its bar. */
+  transform: translateX(-50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  font-size: 8.5px; font-weight: 600; line-height: 1;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .mc-lbl.inc { color: var(--green); }
-.mc-lbl.exp { color: var(--amber); }
+.mc-lbl.exp { color: var(--red); }
 .mc-month { font-size: 9.5px; font-weight: 600; color: var(--ink3); letter-spacing: 0.02em; }
 .mc-col.current .mc-month { color: var(--ink); }
 .mc-legend {
@@ -1275,7 +1278,7 @@ select.finput option { background: white; color: var(--ink); }
 .mc-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .mc-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .mc-legend i.inc { background: var(--green); }
-.mc-legend i.exp { background: var(--amber); }
+.mc-legend i.exp { background: var(--red); }
 
 /* Monthly trend */
 #d-trend { max-height: 360px; overflow-y: auto; }
@@ -2734,7 +2737,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-03';
+const APP_VERSION = '2026-09-01-04';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6991,7 +6994,7 @@ function renderDash() {
     // A month with nothing in it (typically still in the future) shows an
     // empty slot — the month keeps its place so all twelve always read across.
     const bar = (v, cls) => v > 0
-      ? `<div class="mc-bar ${cls}" style="height:${mcH(v)}%"><span class="mc-lbl ${cls}">${fmtShort(v)}</span></div>`
+      ? `<div class="mc-bar ${cls}" style="height:${mcH(v)}%"><span class="mc-lbl ${cls}">${fmtShort(v, 1)}</span></div>`
       : '';
     // Tapping a month scopes the whole Summary to it. An empty month has
     // nothing to show, so it stays inert rather than blanking the page.
@@ -7723,10 +7726,13 @@ function fmt(n) { return Number(n).toLocaleString('en-IN'); }
 // Compact amounts follow the Indian system: thousand, lakh, crore — never
 // scale a lakh-plus figure in thousands (₹1.37L, not ₹137k). Every compact
 // display in the app goes through here so the convention holds everywhere.
-function fmtShort(n) {
+// dp = digits after the decimal point on the lakh/crore scale. Two by default
+// (₹1.37L); the 12-month chart asks for one, where the labels sit close
+// together and the second digit is noise.
+function fmtShort(n, dp = 2) {
   const a = Math.abs(n);
-  if (a >= 10000000) return (n/10000000).toFixed(2).replace(/\.?0+$/,'') + 'Cr';
-  if (a >= 100000)   return (n/100000).toFixed(2).replace(/\.?0+$/,'') + 'L';
+  if (a >= 10000000) return (n/10000000).toFixed(dp).replace(/\.?0+$/,'') + 'Cr';
+  if (a >= 100000)   return (n/100000).toFixed(dp).replace(/\.?0+$/,'') + 'L';
   if (a >= 1000)     return Math.round(n/1000) + 'k';
   return String(Math.round(n));
 }
