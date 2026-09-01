@@ -1049,7 +1049,7 @@ select.finput option { background: white; color: var(--ink); }
 .mini-delta.neg { color: var(--red); }
 .mini-delta:empty { display: none; }
 .spend-bar {
-  width: 190px; height: 8px; flex-shrink: 0;
+  width: 100%; height: 8px; flex: 1 1 auto;
   background: var(--divider); border-radius: 4px;
   position: relative; overflow: visible;
 }
@@ -1071,7 +1071,7 @@ select.finput option { background: white; color: var(--ink); }
 }
 .sb-label-bg { color: var(--ink2); }
 .sb-label-fg { color: #fff; }
-.spend-wrap { display: flex; align-items: center; justify-content: center; margin: 12px 0 0; }
+.spend-wrap { display: flex; align-items: center; gap: 4px; margin: 14px 0 0; }
 /* Dashed 100% goalposts + the dark-red overflow segment beyond them */
 /* Neon 100% goalpost — sits within the bar at the overflow junction */
 .spend-bracket {
@@ -1083,9 +1083,9 @@ select.finput option { background: white; color: var(--ink); }
 .spend-overflow { height: 8px; flex-shrink: 0; background: var(--red); border-radius: 0 4px 4px 0; display: none; }
 
 /* Spend split by type ("Where it goes") */
-.typesplit-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--divider); width: 190px; margin: 2px auto 0; }
+.typesplit-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--divider); width: 100%; margin: 16px auto 0; }
 .typesplit-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0; overflow: hidden; }
-.typesplit-legend { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
+.typesplit-legend { display: flex; flex-direction: column; gap: 1px; margin: 8px auto 0; width: 100%; }
 .tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
 .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .tl-pct { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -1094,18 +1094,20 @@ select.finput option { background: white; color: var(--ink); }
    as the spend bar, stacked rows that fit inside the 172px bar width.
    Each row carries a subtle background tint of its accent colour so it
    reads as a small table aligned with the bar segments. */
-.cf-breakdown { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
-.cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 58px 28px; gap: 5px; align-items: center; font-size: 10.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 3px 4px; border-radius: 5px; box-sizing: border-box; }
+.cf-breakdown { display: flex; flex-direction: column; gap: 1px; margin: 8px auto 0; width: 100%; }
+/* The wide variant is the same block; kept so existing markup still matches. */
+.cf-breakdown.wide { width: 100%; }
+.cf-bd-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) 94px 44px; gap: 8px; align-items: center; font-size: 11.5px; color: var(--ink2); font-variant-numeric: tabular-nums; padding: 6px 0; border-radius: 0; box-sizing: border-box; text-align: left; }
 /* When a row hosts a delta, both the amount and delta cells get fixed
    widths so amounts column up across rows even when one of them has no
    delta to show. Bar above already inscribes the segment %, so we drop
    the redundant % cell. Layout: dot | label | amount | delta. */
-.cf-bd-row.with-delta { grid-template-columns: 8px minmax(0, 1fr) 60px 36px; gap: 5px; }
+.cf-bd-row.with-delta { grid-template-columns: 8px minmax(0, 1fr) 94px 44px; gap: 8px; }
 .cf-bd-row.with-delta .cf-bd-amt { text-align: right; }
 /* Account sub-rows under an expanded type — no dot column, no horizontal
    padding, so long account names get as much room as possible before being
    truncated. */
-.cf-bd-row.sub { grid-template-columns: minmax(0, 1fr) 58px 28px; padding: 3px 0; }
+.cf-bd-row.sub { grid-template-columns: minmax(0, 1fr) 94px 44px; padding: 6px 0; }
 .cf-bd-dot { width: 8px; height: 8px; border-radius: 50%; }
 .cf-bd-row > :nth-child(2) { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cf-bd-amt { font-weight: 600; color: var(--ink); text-align: right; }
@@ -2696,7 +2698,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-07';
+const APP_VERSION = '2026-09-01-08';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6608,18 +6610,13 @@ function renderDash() {
         const p = Math.round(s.pct);
         return `<div style="width:${s.pct}%;background:${s.color}">${p >= 12 ? p + '%' : ''}</div>`;
       }).join('');
-    const tintOf = hex => {
-      if (!hex || hex[0] !== '#' || hex.length < 7) return '';
-      const n = i => parseInt(hex.substr(1 + i*2, 2), 16);
-      return `rgba(${n(0)},${n(1)},${n(2)},0.08)`;
-    };
     const dpTS = S.dashPeriod;
     // Maps the segment label to its key on the prior-aggregates object so
     // each row can show its own delta against the same period last cycle.
     const typeKey = { 'Essentials': 'essentials', 'Non-Essentials': 'nonEssentials', 'Fun': 'fun' };
     const typePol = { 'Essentials': 'up-bad',     'Non-Essentials': 'up-bad',        'Fun': 'neutral' };
     document.getElementById('d-typesplit-legend').innerHTML =
-      segs.map(s => `<div class="cf-bd-row with-delta" onclick="gotoLog('Expense','${s.type.replace(/'/g, "\\'")}','','${dpTS}','d-cf-net-card')" style="cursor:pointer;background:${tintOf(s.color)}">`
+      segs.map(s => `<div class="cf-bd-row with-delta" onclick="gotoLog('Expense','${s.type.replace(/'/g, "\\'")}','','${dpTS}','d-cf-net-card')" style="cursor:pointer">`
         + `<span class="cf-bd-dot" style="background:${s.color}"></span>`
         + `<span>${escapeHtml(s.type)}</span>`
         + `<span class="cf-bd-amt">₹${fmt(Math.round(s.amt))}</span>`
