@@ -13,161 +13,168 @@
 </script>
 <link rel="icon" type="image/svg+xml" href="icon.svg?v=2">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #f7f4ef;
-  --bg2: #eeeae2;
-  --surface: #ffffff;
-  --border: #ddd9cf;
-  --border2: #ccc7bb;
-  --ink: #1c1a16;
-  --ink2: #6b6456;
-  --ink3: #9c9282;
-  --amber: #c17f2a;
-  --amber-light: #e8a84a;
-  --amber-bg: #fdf3e3;
-  --amber-border: #e8c98a;
-  --red: #c0392b;
-  --green: #2e7d52;
-  --green-bg: #e8f5ee;
-  --blue: #2d6a9f;
-  --blue-bg: #e8f0f8;
-  --pink: #a0456e;
-  --pink-bg: #f8eaf1;
-  --teal: #2d8a7a;
-  --teal-bg: #e8f5f2;
+  /* ── IVORY ───────────────────────────────────────────────
+     Warm paper, espresso ink, brass. The neutrals lean the way the
+     accent does, so nothing reads as stock grey, and colour is spent
+     once: brass for identity, green and red for money in and out. */
+  --bg: #f5f2ea;
+  --bg2: #ece7db;
+  --surface: #fffdf8;
+  --border: #ece6d9;
+  --border2: #ddd5c4;
+  --ink: #23201a;
+  --ink2: #6c6559;
+  --ink3: #9a9386;
+  --amber: #96701f;
+  --amber-light: #b8933c;
+  --amber-bg: #f7f0df;
+  --amber-border: #e3d7ba;
+  --red: #b04d42;
+  --green: #3d7d55;
+  --green-bg: #eaf2ec;
+  --blue: #4a6ea8;
+  --blue-bg: #edf1f7;
+  --pink: #9c5470;
+  --pink-bg: #f7edf1;
+  --teal: #2f7f74;
+  --teal-bg: #eaf3f1;
   /* Borders for tinted chips */
-  --blue-border-soft: #b0cce8;
-  --pink-border-soft: #e0b0c8;
-  --teal-border-soft: #a0d4cc;
-  --green-border-soft: #a0d4b8;
+  --blue-border-soft: #c3d0e2;
+  --pink-border-soft: #e0c6d1;
+  --teal-border-soft: #bcd8d3;
+  --green-border-soft: #c2d9c9;
   /* Acct chip neutrals */
-  --acct-chip-bg: #eef2f7;
-  --acct-chip-border: #c8d3e0;
-  --acct-liab-bg: #fff0f0;
-  --acct-liab-border: #ffb3b3;
+  --acct-chip-bg: #f1ede3;
+  --acct-chip-border: #e0d9c9;
+  --acct-liab-bg: #f9eeec;
+  --acct-liab-border: #e7cdc8;
   /* Edit/Delete action button borders */
-  --btn-edit-border: #c8e0f8;
-  --btn-del-border: #f0c0bb;
+  --btn-edit-border: #d3ddea;
+  --btn-del-border: #e7cdc8;
   /* Search highlight */
-  --hl-bg: #fff176;
-  --hl-ink: #1c1a16;
-  /* Tinted dashboard stat cards */
-  --card-networth-bg: #eef4fb;
-  --card-networth-border: #bcd2e6;
-  --card-networth-ink: #1a4a7a;
-  --card-liab-bg: #fff0f0;
-  --card-liab-border: #ffb3b3;
-  --card-liab-ink: #8b0000;
-  --card-liab-val: #c0392b;
-  --card-noness-bg: #fffbe6;
-  --card-noness-border: #ffe58f;
-  --card-noness-ink: #8a6d00;
-  --card-noness-sub: #b8960a;
-  --card-ess-bg: #e8f5ee;
-  --card-ess-border: #a0d4b8;
-  --card-ess-ink: #1a5c35;
-  --card-ess-sub: #2e7d52;
-  /* Page-tint backgrounds (light theme) */
-  --tint-add: #fbeeea;
-  --tint-income: #eaf3ec;
-  --tint-transfer: #eaf0f7;
+  --hl-bg: #f2e2a8;
+  --hl-ink: #23201a;
+  /* Dashboard stat cards — one surface, coloured type. No tinted boxes. */
+  --card-networth-bg: #fffdf8;
+  --card-networth-border: transparent;
+  --card-networth-ink: #3f5d84;
+  --card-liab-bg: #fffdf8;
+  --card-liab-border: transparent;
+  --card-liab-ink: #8f4238;
+  --card-liab-val: #b04d42;
+  --card-noness-bg: #fffdf8;
+  --card-noness-border: transparent;
+  --card-noness-ink: #8a6a1c;
+  --card-noness-sub: #a08334;
+  --card-ess-bg: #fffdf8;
+  --card-ess-border: transparent;
+  --card-ess-ink: #33684a;
+  --card-ess-sub: #3d7d55;
+  /* Page tints — a breath of warmth, not a colour wash */
+  --tint-add: #f5f0e8;
+  --tint-income: #f2f2e9;
+  --tint-transfer: #f1f2ec;
   /* Transfer chip palette */
-  --transfer-bg: #eef0fa;
-  --transfer-border: #c9d0ee;
-  --transfer-ink: #5b6ed8;
+  --transfer-bg: #eef0f6;
+  --transfer-border: #ccd4e4;
+  --transfer-ink: #4a5f9e;
   /* Long-term asset chip */
-  --longterm-bg: #f3f0e8;
-  --longterm-border: #ddd5c2;
-  --longterm-ink: #6b5d3f;
+  --longterm-bg: #f3efe4;
+  --longterm-border: #e0d8c6;
+  --longterm-ink: #6d603f;
   /* Dark inverted text (button/toast on dark pill) */
-  --btn-dark-text: #ffffff;
-  /* Gradient buttons — gold for the affirmative action, red for the destructive
-     one. Defined per theme so both stay legible against their own ground. */
-  --grad-gold: linear-gradient(135deg, #d9a544 0%, #b4771c 100%);
-  --grad-gold-ink: #ffffff;
-  --grad-red: linear-gradient(135deg, #d1553f 0%, #9e2b1e 100%);
-  --grad-red-ink: #ffffff;
+  --btn-dark-text: #fffdf8;
+  /* Gradient buttons — brass for the affirmative action, oxide for the
+     destructive one. Defined per theme so both stay legible. */
+  --grad-gold: linear-gradient(135deg, #bb9038 0%, #8a6417 100%);
+  --grad-gold-ink: #fffdf8;
+  --grad-red: linear-gradient(135deg, #bf6153 0%, #8f3529 100%);
+  --grad-red-ink: #fffdf8;
   /* Modal scrim */
-  --scrim: rgba(0,0,0,0.5);
-  --divider: rgba(0,0,0,0.05);
-  --radius: 16px;
-  --radius-sm: 10px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.07);
-  --shadow-md: 0 4px 24px rgba(0,0,0,0.1);
+  --scrim: rgba(35,32,26,0.42);
+  --divider: rgba(35,32,26,0.07);
+  --radius: 18px;
+  --radius-sm: 12px;
+  /* Cards sit ON the paper — two-layer soft shadow, no outline. */
+  --shadow: 0 1px 2px rgba(35,32,26,0.04), 0 8px 20px rgba(35,32,26,0.05);
+  --shadow-md: 0 2px 6px rgba(35,32,26,0.06), 0 16px 34px rgba(35,32,26,0.09);
 }
 
-/* ── GRAPHITE DARK THEME ────────────────────────────
-   True neutral charcoal — no warm/cool bias. Cards lift cleanly
-   from background, gold/green/red accents pop. */
+/* ── VAULT ──────────────────────────────────────────
+   Warm graphite. Depth comes from a lighter surface, never from an
+   outline, and brass is the only accent — green and red are reserved
+   for money in and money out. */
 [data-theme="dark"] {
-  --bg: #141416;
-  --bg2: #1a1a1c;
-  --surface: #1f1f22;
-  --border: #2a2a2e;
-  --border2: #36363a;
-  --ink: #f4f3ef;
-  --ink2: #b8b8c0;
-  --ink3: #9696a0;
-  --amber: #d4b870;
-  --amber-light: #e6cf90;
-  --amber-bg: #28241a;
-  --amber-border: #4a3e20;
-  --red: #dc7878;
-  --green: #5fa672;
-  --green-bg: #1a2620;
-  --blue: #7090dc;
-  --blue-bg: #1a2030;
-  --pink: #c2849c;
-  --pink-bg: #261b22;
-  --teal: #5fb0a3;
-  --teal-bg: #182624;
-  --blue-border-soft: #3d4d75;
-  --pink-border-soft: #4a2e3c;
-  --teal-border-soft: #2a4a44;
-  --green-border-soft: #2a4a3a;
-  --acct-chip-bg: #26262a;
-  --acct-chip-border: #36363a;
-  --acct-liab-bg: #2a1c1c;
-  --acct-liab-border: #4a2828;
-  --btn-edit-border: #2e4d72;
-  --btn-del-border: #4a2828;
-  --hl-bg: #5a4a1a;
-  --hl-ink: #f4f3ef;
-  --card-networth-bg: #1a2030;
-  --card-networth-border: #2e4d72;
-  --card-networth-ink: #a0b8e0;
-  --card-liab-bg: #2a1c1c;
-  --card-liab-border: #4a2828;
-  --card-liab-ink: #e8a0a0;
-  --card-liab-val: #e8a0a0;
-  --card-noness-bg: #28241a;
-  --card-noness-border: #4a3e20;
-  --card-noness-ink: #d4b870;
-  --card-noness-sub: #c4a85e;
-  --card-ess-bg: #1a2620;
-  --card-ess-border: #2a4a3a;
-  --card-ess-ink: #7dc095;
-  --card-ess-sub: #7dc095;
-  --tint-add: #1c1618;
-  --tint-income: #161c18;
-  --tint-transfer: #161a20;
-  --transfer-bg: #1a2030;
-  --transfer-border: #34416e;
-  --transfer-ink: #8aa0e0;
-  --longterm-bg: #24221c;
-  --longterm-border: #3e3a2a;
-  --longterm-ink: #c4ad7c;
-  --btn-dark-text: #141416;
-  --grad-gold: linear-gradient(135deg, #e3cb92 0%, #c9a040 100%);
-  --grad-gold-ink: #1a1712;
-  --grad-red: linear-gradient(135deg, #e59292 0%, #c25a5a 100%);
-  --grad-red-ink: #1a1010;
-  --scrim: rgba(0,0,0,0.7);
-  --divider: rgba(255,255,255,0.05);
-  --shadow: 0 2px 14px rgba(0,0,0,0.55);
-  --shadow-md: 0 6px 28px rgba(0,0,0,0.65);
+  --bg: #131315;
+  --bg2: #171719;
+  --surface: #1c1c1f;
+  --border: #26262a;
+  --border2: #34343a;
+  --ink: #f0eee9;
+  --ink2: #a5a29b;
+  --ink3: #7d7871;
+  --amber: #d3b168;
+  --amber-light: #e3c88e;
+  --amber-bg: #241f16;
+  --amber-border: #453a22;
+  --red: #d98b84;
+  --green: #7fbf95;
+  --green-bg: #17201a;
+  --blue: #8fa8d9;
+  --blue-bg: #191d26;
+  --pink: #c294a8;
+  --pink-bg: #221a1e;
+  --teal: #6fb3a8;
+  --teal-bg: #172220;
+  --blue-border-soft: #363f52;
+  --pink-border-soft: #3f2f37;
+  --teal-border-soft: #2a3f3c;
+  --green-border-soft: #2b3f33;
+  --acct-chip-bg: #232326;
+  --acct-chip-border: #32323a;
+  --acct-liab-bg: #241a19;
+  --acct-liab-border: #3f2a28;
+  --btn-edit-border: #333f52;
+  --btn-del-border: #3f2a28;
+  --hl-bg: #4a3d1c;
+  --hl-ink: #f0eee9;
+  --card-networth-bg: #1c1c1f;
+  --card-networth-border: transparent;
+  --card-networth-ink: #a9bde2;
+  --card-liab-bg: #1c1c1f;
+  --card-liab-border: transparent;
+  --card-liab-ink: #dfa19b;
+  --card-liab-val: #d98b84;
+  --card-noness-bg: #1c1c1f;
+  --card-noness-border: transparent;
+  --card-noness-ink: #d3b168;
+  --card-noness-sub: #b99b5c;
+  --card-ess-bg: #1c1c1f;
+  --card-ess-border: transparent;
+  --card-ess-ink: #8fcaa3;
+  --card-ess-sub: #7fbf95;
+  --tint-add: #151314;
+  --tint-income: #131513;
+  --tint-transfer: #131416;
+  --transfer-bg: #191d26;
+  --transfer-border: #333c52;
+  --transfer-ink: #9db1de;
+  --longterm-bg: #201e19;
+  --longterm-border: #37332a;
+  --longterm-ink: #c3ab79;
+  --btn-dark-text: #131315;
+  --grad-gold: linear-gradient(135deg, #e0c187 0%, #b8973f 100%);
+  --grad-gold-ink: #17140e;
+  --grad-red: linear-gradient(135deg, #e0968f 0%, #b96058 100%);
+  --grad-red-ink: #170f0e;
+  --scrim: rgba(0,0,0,0.66);
+  --divider: rgba(255,255,255,0.055);
+  --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 26px rgba(0,0,0,0.34);
+  --shadow-md: 0 2px 6px rgba(0,0,0,0.5), 0 18px 40px rgba(0,0,0,0.5);
 }
 
 html { background: var(--bg); transition: background 0.25s ease; color-scheme: light; }
@@ -178,9 +185,8 @@ html { background: var(--bg); transition: background 0.25s ease; color-scheme: l
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 15px;
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.005em;
@@ -211,7 +217,7 @@ body {
   z-index: 1000;
 }
 .setup-logo {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 38px;
   font-weight: 600;
   color: #f7f4ef;
@@ -247,7 +253,7 @@ body {
   color: #f7f4ef;
   padding: 14px 16px;
   border-radius: 12px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   outline: none;
   margin-bottom: 16px;
@@ -276,7 +282,7 @@ body {
   padding: 15px;
   background: var(--amber);
   color: #1a1814;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 16px;
   font-weight: 600;
   border: none;
@@ -345,7 +351,7 @@ body {
   color: #f7f4ef;
   cursor: pointer;
   transition: all 0.15s;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 .pin-key:active { background: #3a3528; transform: scale(0.95); }
 .pin-key.del { font-size: 18px; color: #9c9282; }
@@ -360,7 +366,7 @@ body {
   border: 1px solid var(--amber-border);
   border-radius: 12px;
   color: var(--amber);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 14px; font-weight: 600;
   cursor: pointer;
   transition: transform 0.1s, background 0.15s;
@@ -379,7 +385,7 @@ body {
   border: 2px solid #3a3528;
   background: transparent;
   color: #9c9282;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
@@ -410,7 +416,7 @@ body {
 }
 .topbar-left { display: flex; flex-direction: column; min-width: 0; }
 .topbar-title {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 18px;
   font-weight: 600;
   color: var(--ink);
@@ -475,8 +481,11 @@ body {
   border-radius: 10px;
   transition: background 0.15s ease;
 }
-.nav-icon { font-size: 22px; transition: transform 0.15s ease; }
-.nav-label { font-size: 10px; color: var(--ink3); font-weight: 500; letter-spacing: 0.04em; }
+.nav-icon { font-size: 22px; line-height: 0; color: var(--ink3); transition: transform 0.15s ease; }
+.nav-icon svg { width: 21px; height: 21px; display: block; fill: none;
+  stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.nav-item.active .nav-icon { color: var(--amber); }
+.nav-label { font-size: 8.5px; color: var(--ink3); font-weight: 600; letter-spacing: 0.13em; }
 .nav-item.active { background: var(--amber-bg); }
 .nav-item.active .nav-icon { transform: scale(1.05); }
 .nav-item.active .nav-label { color: var(--amber); font-weight: 600; }
@@ -504,18 +513,21 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 
 /* ── SECTION LABEL ── */
 .sec-label {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 600;
   color: var(--ink3);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  margin: 20px 0 8px 2px;
+  /* Wide tracking on small caps is most of what reads as "expensive" in
+     print. Paired with the extra air above, it does the work the old
+     card borders were doing: it separates sections. */
+  letter-spacing: 0.2em;
+  margin: 28px 0 10px 3px;
 }
 
 /* ── FORM CARD ── */
 .fcard {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -548,7 +560,7 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
   background: none;
   border: none;
   color: var(--ink);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   text-align: right;
   outline: none;
@@ -565,13 +577,16 @@ select.finput option { background: white; color: var(--ink); }
   border-bottom: 1px solid var(--border);
 }
 .pill-group:last-child { border-bottom: none; }
-.pill-glabel { font-size: 12px; color: var(--ink3); margin-bottom: 10px; font-weight: 500; }
+.pill-glabel {
+  font-size: 9.5px; color: var(--ink3); margin-bottom: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.17em;
+}
 .pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .pill {
   padding: 7px 16px;
   border-radius: 30px;
-  border: 1.5px solid var(--border2);
-  background: var(--bg);
+  border: 1px solid var(--border2);
+  background: none;
   color: var(--ink2);
   font-size: 13px;
   font-weight: 500;
@@ -580,11 +595,11 @@ select.finput option { background: white; color: var(--ink); }
   user-select: none;
 }
 .pill:active { transform: scale(0.95); }
-.pill.active { background: var(--ink); border-color: var(--ink); color: white; }
-.pill.active.p-edwin { background: var(--blue); border-color: var(--blue); }
-.pill.active.p-divya { background: var(--pink); border-color: var(--pink); }
-.pill.active.p-aj { background: var(--teal); border-color: var(--teal); }
-.pill.active.p-both { background: var(--amber); border-color: var(--amber); color: #1a1200; }
+.pill.active { background: var(--amber); border-color: var(--amber); color: var(--btn-dark-text); font-weight: 600; }
+.pill.active.p-edwin { background: var(--blue-bg); border-color: var(--blue-border-soft); color: var(--blue); }
+.pill.active.p-divya { background: var(--pink-bg); border-color: var(--pink-border-soft); color: var(--pink); }
+.pill.active.p-aj { background: var(--teal-bg); border-color: var(--teal-border-soft); color: var(--teal); }
+.pill.active.p-both { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
 .pill.active[data-g="saving"][data-v="Yes"] { background: var(--red); border-color: var(--red); color: #fff; }
 .pill.active[data-g="saving"][data-v="No"]  { background: var(--green); border-color: var(--green); color: #fff; }
 
@@ -594,7 +609,7 @@ select.finput option { background: white; color: var(--ink); }
   padding: 17px;
   background: var(--ink);
   color: var(--bg);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 16px;
   font-weight: 600;
   border: none;
@@ -621,8 +636,8 @@ select.finput option { background: white; color: var(--ink); }
 .log-chip {
   padding: 7px 16px;
   border-radius: 20px;
-  border: 1.5px solid var(--border2);
-  background: var(--surface);
+  border: 1px solid var(--border);
+  background: none;
   color: var(--ink2);
   font-size: 12.5px;
   font-weight: 500;
@@ -631,7 +646,7 @@ select.finput option { background: white; color: var(--ink); }
   flex-shrink: 0;
   transition: all 0.15s;
 }
-.log-chip.active { background: var(--ink); border-color: var(--ink); color: white; }
+.log-chip.active { background: var(--amber); border-color: var(--amber); color: var(--btn-dark-text); font-weight: 600; }
 
 .cat-select-wrap {
   position: relative;
@@ -656,7 +671,7 @@ select.finput option { background: white; color: var(--ink); }
   border-radius: 10px;
   padding: 9px 32px 9px 14px;
   font-size: 13px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   color: var(--ink2);
   cursor: pointer;
   outline: none;
@@ -668,14 +683,18 @@ select.finput option { background: white; color: var(--ink); }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--amber-bg);
-  border: 1px solid var(--amber-border);
-  border-radius: 10px;
-  padding: 8px 14px;
-  margin-bottom: 10px;
-  font-size: 13px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  padding: 4px 3px 10px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
 }
-#log-total-bar .ltb-label { color: var(--ink2); font-weight: 500; }
+#log-total-bar .ltb-label {
+  color: var(--ink3); font-weight: 600; font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: 0.17em;
+}
 #log-total-bar .ltb-amt { color: var(--amber); font-weight: 700; font-size: 15px; }
 
 .log-search-wrap {
@@ -698,7 +717,7 @@ select.finput option { background: white; color: var(--ink); }
   background: transparent;
   padding: 10px 0;
   font-size: 14px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   color: var(--ink);
 }
 .log-search-input::placeholder { color: var(--ink2); }
@@ -753,16 +772,16 @@ select.finput option { background: white; color: var(--ink); }
 /* ── Accounts (Config) ── */
 .acct-row {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  padding: 11px 14px; border-bottom: 1px solid var(--divider);
 }
 .acct-row:last-child { border-bottom: none; }
 .acct-row-main { flex: 1; min-width: 0; }
 .acct-row-name { font-size: 14px; color: var(--ink); font-weight: 600; }
 .acct-row-sub { font-size: 11.5px; color: var(--ink3); margin-top: 2px; }
-.acct-row-bal { font-family: 'Inter', system-ui, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; color: var(--ink); flex-shrink: 0; }
+.acct-row-bal { font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; color: var(--ink); flex-shrink: 0; }
 .acct-row-bal.liab { color: var(--red); }
 .acct-row-right { flex-shrink: 0; text-align: right; }
-.acct-row-limit { font-family: 'Inter', system-ui, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; color: var(--green); margin-top: 2px; }
+.acct-row-limit { font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; color: var(--green); margin-top: 2px; }
 .acct-row-limit span { color: var(--ink3); font-weight: 500; font-size: 11px; }
 .acct-section-head {
   font-size: 11px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em;
@@ -787,18 +806,18 @@ select.finput option { background: white; color: var(--ink); }
 }
 .acct-mtm input {
   flex: 1; padding: 6px 10px; border: 1px solid var(--border2); border-radius: 8px;
-  font-family: 'Inter', system-ui, sans-serif; font-size: 13px; background: var(--surface); color: var(--ink);
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 13px; background: var(--surface); color: var(--ink);
 }
 .acct-mtm input::placeholder { color: var(--ink3); }
 .acct-mtm button {
   padding: 6px 12px; border-radius: 8px; border: 1.5px solid var(--green);
-  background: var(--green-bg); color: var(--green); font-family: 'Inter', system-ui, sans-serif;
+  background: var(--green-bg); color: var(--green); font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 12px; font-weight: 600; cursor: pointer;
 }
 .pin-set-row { display: flex; align-items: center; gap: 8px; }
 .pin-set-row input {
   flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--border2);
-  border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; font-size: 15px;
+  border-radius: 8px; font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 15px;
   letter-spacing: 4px; text-align: center; background: var(--surface);
   color: var(--ink);
 }
@@ -808,7 +827,7 @@ select.finput option { background: white; color: var(--ink); }
 .pin-set-row input::placeholder { letter-spacing: 0; font-size: 13px; color: var(--ink3); }
 .pin-set-row button {
   flex-shrink: 0; padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--ink);
-  background: var(--ink); color: var(--btn-dark-text); font-family: 'Inter', system-ui, sans-serif;
+  background: var(--ink); color: var(--btn-dark-text); font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .acct-editor {
@@ -819,7 +838,7 @@ select.finput option { background: white; color: var(--ink); }
 .acct-editor .frow:last-of-type { border-bottom: none; }
 .acct-editor select, .acct-editor input[type="text"], .acct-editor input[type="number"], .acct-editor input[type="date"] {
   flex: 1; padding: 8px 10px; border: 1px solid var(--border2); border-radius: 8px;
-  font-family: 'Inter', system-ui, sans-serif; font-size: 14px; background: var(--surface); color: var(--ink);
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 14px; background: var(--surface); color: var(--ink);
 }
 .acct-editor input::placeholder { color: var(--ink3); }
 .acct-editor-actions { display: flex; gap: 8px; margin-top: 12px; }
@@ -848,7 +867,7 @@ select.finput option { background: white; color: var(--ink); }
   padding: 5px 10px;
   border-radius: 8px;
   font-size: 12px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   cursor: pointer;
   display: inline-block;
   white-space: nowrap;
@@ -861,17 +880,17 @@ select.finput option { background: white; color: var(--ink); }
    its place by staying one line until you ask for the working. */
 .settle-card {
   background: var(--surface);
-  border: 1px solid var(--amber-border);
-  border-radius: 14px;
-  padding: 12px 15px;
-  margin: 14px 0 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px 15px;
+  margin: 16px 0 4px;
   box-shadow: var(--shadow);
   cursor: pointer;
 }
 .settle-card.square { border-color: var(--border); }
 .settle-lbl {
-  font-size: 10.5px; font-weight: 600; color: var(--ink3);
-  text-transform: uppercase; letter-spacing: 0.12em;
+  font-size: 9.5px; font-weight: 600; color: var(--ink3);
+  text-transform: uppercase; letter-spacing: 0.2em;
   text-align: center;
 }
 /* Who on the left, figure on the right, centred against each other. */
@@ -881,7 +900,7 @@ select.finput option { background: white; color: var(--ink); }
 }
 /* Same size and weight as the headline figures on the cards below it. */
 .settle-amt {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 24px; font-weight: 600; color: var(--amber);
   font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1;
 }
@@ -906,7 +925,7 @@ select.finput option { background: white; color: var(--ink); }
   border: none;
   background: transparent;
   color: var(--ink);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   line-height: 1.5;
   padding: 14px 16px 6px;
@@ -922,7 +941,7 @@ select.finput option { background: white; color: var(--ink); }
   border: none;
   border-radius: 11px;
   padding: 12px 14px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
@@ -974,7 +993,7 @@ select.finput option { background: white; color: var(--ink); }
   padding: 4px 10px;
   border-radius: 8px;
   font-size: 11.5px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -983,7 +1002,7 @@ select.finput option { background: white; color: var(--ink); }
 
 .entry-right { text-align: right; flex-shrink: 0; }
 .entry-amount {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
   font-size: 18px;
   color: var(--ink);
@@ -1004,12 +1023,13 @@ select.finput option { background: white; color: var(--ink); }
 .period-row { display: flex; gap: 6px; margin: 14px 0 16px; }
 .period-btn {
   flex: 1;
-  padding: 10px 4px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border2);
-  background: var(--surface);
-  color: var(--ink2);
-  font-family: 'Inter', system-ui, sans-serif;
+  padding: 9px 4px 8px;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1.5px solid transparent;
+  background: none;
+  color: var(--ink3);
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -1017,13 +1037,13 @@ select.finput option { background: white; color: var(--ink); }
   white-space: nowrap;
   transition: all 0.15s;
 }
-.period-btn.active { background: var(--ink); border-color: var(--ink); color: white; }
+.period-btn.active { background: none; border-bottom-color: var(--amber); color: var(--ink); font-weight: 600; }
 #month-picker { margin: -8px 0 16px; }
 .month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .month-chip {
   text-align: center; padding: 8px 0; border-radius: 9px;
-  border: 1.5px solid var(--border2); background: var(--surface);
-  font-family: 'Inter', system-ui, sans-serif; font-size: 12.5px; color: var(--ink2);
+  border: 1px solid var(--border); background: none;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 12.5px; color: var(--ink2);
   cursor: pointer; font-variant-numeric: tabular-nums;
 }
 .month-chip.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
@@ -1031,48 +1051,56 @@ select.finput option { background: white; color: var(--ink); }
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .stat-card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 16px 16px 17px;
   box-shadow: var(--shadow);
   position: relative;
 }
 .stat-card.full { grid-column: 1/-1; }
-.stat-card.amber { background: var(--amber-bg); border-color: var(--amber-border); }
-.stat-card.green { background: var(--green-bg); border-color: var(--green-border-soft); }
-.stat-card.networth { background: var(--card-networth-bg); border-color: var(--card-networth-border); }
-.stat-card.networth .stat-lbl, .stat-card.networth .stat-val { color: var(--card-networth-ink); }
-[data-theme="dark"] .stat-card.networth { box-shadow: 0 0 0 1px rgba(212,184,112,0.32), var(--shadow); }
-.stat-card.liab-tint { background: var(--card-liab-bg); border-color: var(--card-liab-border); }
+.stat-card.amber { background: var(--surface); }
+.stat-card.green { background: var(--surface); }
+.stat-card.networth { background: var(--surface); }
+.stat-card.networth .stat-lbl { color: var(--amber); }
+/* The hero figure is set in plain ink: it is the biggest thing on the page,
+   and it does not also need a colour to be noticed. */
+.stat-card.networth .stat-val { color: var(--ink); }
+[data-theme="dark"] .stat-card.networth { box-shadow: var(--shadow); }
+.stat-card.liab-tint { background: var(--surface); }
 .stat-card.liab-tint .stat-lbl { color: var(--card-liab-ink); }
 .stat-card.liab-tint .stat-val, .stat-card.liab-tint .stat-sub { color: var(--card-liab-val); }
-.stat-card.noness { background: var(--card-noness-bg); border-color: var(--card-noness-border); }
+.stat-card.noness { background: var(--surface); }
 .stat-card.noness .stat-lbl, .stat-card.noness .stat-val { color: var(--card-noness-ink); }
 .stat-card.noness .stat-sub { color: var(--card-noness-sub); }
-.stat-card.ess { background: var(--card-ess-bg); border-color: var(--card-ess-border); }
+.stat-card.ess { background: var(--surface); }
 .stat-card.ess .stat-lbl, .stat-card.ess .stat-val { color: var(--card-ess-ink); }
 .stat-card.ess .stat-sub { color: var(--card-ess-sub); }
-.stat-card.fun { background: var(--card-liab-bg); border-color: var(--card-liab-border); }
+.stat-card.fun { background: var(--surface); }
 .stat-card.fun .stat-lbl { color: var(--card-liab-ink); }
 .stat-card.fun .stat-val, .stat-card.fun .stat-sub { color: var(--card-liab-val); }
-.stat-card.deficit { background: var(--card-liab-bg); border-color: var(--card-liab-border); }
-.stat-card.surplus { background: var(--green-bg); border-color: var(--green-border-soft); }
-.stat-card.longterm { background: var(--longterm-bg); border-color: var(--longterm-border); }
+.stat-card.deficit { background: var(--surface); }
+.stat-card.surplus { background: var(--surface); }
+.stat-card.longterm { background: var(--surface); }
 .stat-card.longterm .stat-lbl, .stat-card.longterm .stat-val, .stat-card.longterm .stat-sub { color: var(--longterm-ink); }
-.stat-card.red { background: var(--card-liab-bg); border-color: var(--card-liab-border); }
-.stat-lbl { font-size: 11px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 600; }
+.stat-card.red { background: var(--surface); }
+.stat-lbl { font-size: 9.5px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.17em; margin-bottom: 8px; font-weight: 600; }
 .stat-val {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 24px;
+  /* One light, large figure per card. Contrast between the figure and
+     everything around it is what makes a number look considered. */
+  font-weight: 300;
+  font-size: 26px;
   color: var(--ink);
   line-height: 1;
   letter-spacing: -0.02em;
   display: inline-block;
   vertical-align: middle;
 }
-.stat-sub { font-size: 12px; color: var(--ink3); margin-top: 5px; }
+.stat-sub { font-size: 11.5px; color: var(--ink3); margin-top: 6px; }
+/* The one true hero on the Summary. */
+.stat-card.networth .stat-val { font-size: 38px; font-weight: 200; letter-spacing: -0.035em; }
+.stat-card.full .stat-val { font-size: 32px; font-weight: 200; letter-spacing: -0.03em; }
 
 /* Period-over-period delta chip — anchored to the top-right corner of the
    card so it's "tucked to the side" of the value without affecting flow.
@@ -1087,24 +1115,23 @@ select.finput option { background: white; color: var(--ink); }
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 600;
+  padding: 0;
+  font-size: 10.5px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--ink3);
-  background: var(--bg2);
-  border: 1px solid var(--border);
+  background: none;
+  border: none;
   white-space: nowrap;
 }
-.stat-chip.pos  { color: var(--green); background: rgba(95,166,114,0.12); border-color: transparent; }
-.stat-chip.neg  { color: var(--red);   background: rgba(220,120,120,0.12); border-color: transparent; }
-.stat-chip.flat { color: var(--ink3);  background: var(--bg2); }
-.stat-chip.new  { color: var(--ink2);  background: var(--bg2); }
+.stat-chip.pos  { color: var(--green); background: none; }
+.stat-chip.neg  { color: var(--red);   background: none; }
+.stat-chip.flat { color: var(--ink3);  background: none; }
+.stat-chip.new  { color: var(--ink2);  background: none; }
 .stat-chip:empty { display: none; }
 /* On dark, the tinted backgrounds need to ride on top of the card colour. */
-[data-theme="dark"] .stat-chip.pos { background: rgba(95,166,114,0.18); }
-[data-theme="dark"] .stat-chip.neg { background: rgba(220,120,120,0.18); }
+[data-theme="dark"] .stat-chip.pos { background: none; }
+[data-theme="dark"] .stat-chip.neg { background: none; }
 
 /* Compact delta cell on the right of each breakdown row. No background —
    the colour alone signals direction, keeping the row tucked inside the
@@ -1114,16 +1141,18 @@ select.finput option { background: white; color: var(--ink); }
 .mini-delta.neg { color: var(--red); }
 .mini-delta:empty { display: none; }
 .spend-bar {
-  width: 172px; height: 24px; flex-shrink: 0;
-  background: var(--border); border-radius: 12px;
+  width: 190px; height: 8px; flex-shrink: 0;
+  background: var(--divider); border-radius: 4px;
   position: relative; overflow: visible;
 }
 .spend-fill {
   position: absolute; left: 0; top: 0; height: 100%;
-  border-radius: 12px; overflow: hidden;
+  border-radius: 4px; overflow: hidden;
   transition: width .3s ease, left .3s ease;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff;
+  /* The percentages live in the rows beneath — a 8px rule is a proportion,
+     not a label. */
+  font-size: 0; color: transparent;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .sb-label {
@@ -1143,11 +1172,11 @@ select.finput option { background: white; color: var(--ink); }
   display: none;
 }
 .spend-bar.over .spend-bracket { display: block; }
-.spend-overflow { height: 24px; flex-shrink: 0; background: #8c1a0c; border-radius: 0 12px 12px 0; display: none; }
+.spend-overflow { height: 8px; flex-shrink: 0; background: var(--red); border-radius: 0 4px 4px 0; display: none; }
 
 /* Spend split by type ("Where it goes") */
-.typesplit-bar { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: var(--border); width: 172px; margin: 0 auto; }
-.typesplit-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.typesplit-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--divider); width: 190px; margin: 2px auto 0; }
+.typesplit-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0; overflow: hidden; }
 .typesplit-legend { display: flex; flex-direction: column; gap: 2px; margin: 4px auto 0; width: 172px; }
 .tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
 .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -1176,23 +1205,25 @@ select.finput option { background: white; color: var(--ink); }
 
 #backup-reminder {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin: 10px 14px 0; padding: 10px 12px;
-  background: var(--amber-bg); border: 1px solid var(--amber-border);
-  border-radius: 10px;
+  margin: 10px 16px 0; padding: 11px 2px;
+  background: none; border: none;
+  border-top: 1px solid var(--amber-border);
+  border-bottom: 1px solid var(--amber-border);
+  border-radius: 0;
 }
 #backup-reminder-text {
-  flex: 1; min-width: 150px; font-size: 12.5px; font-weight: 600;
-  color: var(--amber); cursor: pointer;
+  flex: 1; min-width: 150px; font-size: 12px; font-weight: 500;
+  letter-spacing: 0.01em; color: var(--amber); cursor: pointer;
 }
 #backup-reminder button {
-  flex-shrink: 0; border: 1px solid var(--amber-border); background: var(--surface);
-  color: var(--amber); font-family: 'Inter', system-ui, sans-serif; font-size: 11.5px;
+  flex-shrink: 0; border: 1px solid var(--amber-border); background: none;
+  color: var(--amber); font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 11.5px;
   font-weight: 600; padding: 5px 10px; border-radius: 7px; cursor: pointer;
 }
 #backup-reminder button.br-dismiss { color: var(--ink3); border-color: var(--border2); padding: 5px 8px; }
 
 /* Per-person split inside a stat card */
-.card-split { margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--border); }
+.card-split { margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--divider); }
 .card-split:empty { display: none; }
 .card-split-head { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink3); font-weight: 700; margin: 5px 0 2px; }
 .card-split-head:first-child { margin-top: 0; }
@@ -1284,8 +1315,8 @@ select.finput option { background: white; color: var(--ink); }
 #d-trend { max-height: 360px; overflow-y: auto; }
 .trend-row {
   display: grid; grid-template-columns: 0.95fr 0.82fr 0.82fr 0.95fr 1.65fr;
-  gap: 4px; align-items: center; padding: 9px 14px;
-  border-bottom: 1px solid var(--border);
+  gap: 4px; align-items: center; padding: 10px 14px;
+  border-bottom: 1px solid var(--divider);
   font-size: 12.5px; font-variant-numeric: tabular-nums;
 }
 .trend-row:last-child { border-bottom: none; }
@@ -1314,12 +1345,12 @@ select.finput option { background: white; color: var(--ink); }
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--divider);
 }
 .split-item:last-child { border-bottom: none; }
 .split-name { font-size: 14px; color: var(--ink); font-weight: 500; }
 .split-pct { font-size: 12px; color: var(--ink3); margin-top: 2px; }
-.split-amt { font-family: 'Inter', system-ui, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 17px; color: var(--ink); }
+.split-amt { font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 17px; color: var(--ink); }
 .split-util { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 1px; }
 
 /* ── Account groups (Summary) ── */
@@ -1336,7 +1367,7 @@ select.finput option { background: white; color: var(--ink); }
   border-radius: 10px; padding: 1px 7px; margin-left: 7px;
 }
 .acct-group-total {
-  font-family: 'Inter', system-ui, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600;
   font-size: 17px; color: var(--ink);
   display: flex; align-items: center; gap: 8px;
 }
@@ -1393,7 +1424,7 @@ select.finput option { background: white; color: var(--ink); }
   padding: 5px 12px;
   border-radius: 8px;
   font-size: 12px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   cursor: pointer;
 }
 .btn-cfg-edit {
@@ -1403,7 +1434,7 @@ select.finput option { background: white; color: var(--ink); }
   padding: 5px 12px;
   border-radius: 8px;
   font-size: 12px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   cursor: pointer;
 }
 .btn-add-row {
@@ -1441,7 +1472,7 @@ select.finput option { background: white; color: var(--ink); }
   color: var(--ink);
   padding: 10px 14px;
   border-radius: 10px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   outline: none;
 }
@@ -1454,7 +1485,7 @@ select.finput option { background: white; color: var(--ink); }
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   cursor: pointer;
 }
 
@@ -1556,7 +1587,7 @@ select.finput option { background: white; color: var(--ink); }
   border: none;
   border-radius: 10px;
   color: var(--ink);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 16px;
   outline: none;
 }
@@ -1565,7 +1596,7 @@ select.finput option { background: white; color: var(--ink); }
   padding: 6px 4px;
   color: var(--amber); font-size: 15px; font-weight: 600;
   cursor: pointer; flex-shrink: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 .picker-list {
   flex: 1; overflow-y: auto;
@@ -1579,7 +1610,7 @@ select.finput option { background: white; color: var(--ink); }
   cursor: pointer;
   display: flex; align-items: center; gap: 12px;
   border-bottom: 0.5px solid rgba(128,128,128,0.14);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 .picker-item:last-child { border-bottom: none; }
 .picker-item:active { background: rgba(128,128,128,0.14); }
@@ -1665,7 +1696,7 @@ select.finput option { background: white; color: var(--ink); }
   flex: 1; min-width: 0; width: 100%;
   background: none; border: none;
   color: var(--ink);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   text-align: right;
   outline: none;
@@ -1706,7 +1737,7 @@ select.finput option { background: white; color: var(--ink); }
           mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
 }
 .modal-title {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 18px;
   font-weight: 600;
   color: var(--ink);
@@ -1735,7 +1766,7 @@ select.finput option { background: white; color: var(--ink); }
   color: var(--ink);
   padding: 11px 14px;
   border-radius: 10px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   outline: none;
   -webkit-appearance: none;
@@ -1754,11 +1785,11 @@ select.modal-input option { background: white; }
   cursor: pointer;
   transition: all 0.15s;
 }
-.modal-pill.active { background: var(--ink); border-color: var(--ink); color: white; }
-.modal-pill.active.mp-edwin { background: var(--blue); border-color: var(--blue); }
-.modal-pill.active.mp-divya { background: var(--pink); border-color: var(--pink); }
-.modal-pill.active.mp-aj { background: var(--teal); border-color: var(--teal); }
-.modal-pill.active.mp-both { background: var(--amber); border-color: var(--amber); color: #1a1200; }
+.modal-pill.active { background: var(--amber); border-color: var(--amber); color: var(--btn-dark-text); font-weight: 600; }
+.modal-pill.active.mp-edwin { background: var(--blue-bg); border-color: var(--blue-border-soft); color: var(--blue); }
+.modal-pill.active.mp-divya { background: var(--pink-bg); border-color: var(--pink-border-soft); color: var(--pink); }
+.modal-pill.active.mp-aj { background: var(--teal-bg); border-color: var(--teal-border-soft); color: var(--teal); }
+.modal-pill.active.mp-both { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
 .modal-pill.active[data-mg="saving"][data-mv="Yes"] { background: var(--red); border-color: var(--red); color: #fff; }
 .modal-pill.active[data-mg="saving"][data-mv="No"]  { background: var(--green); border-color: var(--green); color: #fff; }
 .btn-modal-save {
@@ -1766,7 +1797,7 @@ select.modal-input option { background: white; }
   padding: 15px;
   background: var(--ink);
   color: white;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-size: 16px;
   font-weight: 600;
   border: none;
@@ -1806,7 +1837,7 @@ select.modal-input option { background: white; }
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   cursor: pointer;
 }
 
@@ -1835,19 +1866,7 @@ select.modal-input option { background: white; }
 
 /* Dark-mode adjustments for elements whose text was hard-coded white on dark-ink */
 [data-theme="dark"] .pill.active,
-[data-theme="dark"] .log-chip.active,
-[data-theme="dark"] .period-btn.active,
-[data-theme="dark"] .modal-pill.active {
-  color: var(--bg);
-}
-[data-theme="dark"] .pill.active.p-edwin,
-[data-theme="dark"] .pill.active.p-divya,
-[data-theme="dark"] .pill.active.p-aj,
-[data-theme="dark"] .modal-pill.active.mp-edwin,
-[data-theme="dark"] .modal-pill.active.mp-divya,
-[data-theme="dark"] .modal-pill.active.mp-aj {
-  color: var(--btn-dark-text);
-}
+[data-theme="dark"] [data-theme="dark"] .log-chip.active { color: var(--btn-dark-text); }
 [data-theme="dark"] .btn-save-cfg,
 [data-theme="dark"] .btn-modal-save,
 [data-theme="dark"] .month-chip.sel {
@@ -1963,7 +1982,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
   </div>
 
   <div id="backup-reminder" style="display:none">
-    <span id="backup-reminder-text" onclick="exportBackup()">📦 Weekly backup due — tap to download</span>
+    <span id="backup-reminder-text" onclick="exportBackup()">Weekly backup due — tap to download</span>
     <button onclick="runSave(this, shareBackup, 'Sharing…')">✉ Email</button>
     <button class="br-dismiss" onclick="dismissBackupReminder()">✕</button>
   </div>
@@ -2734,32 +2753,32 @@ body { transition: background 0.25s ease, color 0.25s ease; }
   <div class="bottom-nav">
     <div class="nav-item active" onclick="goPage('add',this)">
       <div class="nav-active-bar"></div>
-      <div class="nav-icon" style="color:var(--red)">−₹</div>
+      <div class="nav-icon" style="color:var(--red)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
       <div class="nav-label">EXPENSE</div>
     </div>
     <div class="nav-item" onclick="goPage('income',this)">
       <div class="nav-active-bar"></div>
-      <div class="nav-icon" style="color:var(--green)">＋₹</div>
+      <div class="nav-icon" style="color:var(--green)"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
       <div class="nav-label">INCOME</div>
     </div>
     <div class="nav-item" onclick="goPage('transfer',this)">
       <div class="nav-active-bar"></div>
-      <div class="nav-icon" style="color:var(--transfer-ink)">⇄</div>
+      <div class="nav-icon" style="color:var(--transfer-ink)"><svg viewBox="0 0 24 24"><path d="M4 8h16l-3.5-3.5M20 16H4l3.5 3.5"/></svg></div>
       <div class="nav-label">TRANSFER</div>
     </div>
     <div class="nav-item" onclick="goPage('log',this)">
       <div class="nav-active-bar"></div>
-      <div class="nav-icon">📋</div>
+      <div class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4.5" y="3" width="15" height="18" rx="2.5"/><path d="M8.5 8.5h7M8.5 12.5h7M8.5 16.5h4"/></svg></div>
       <div class="nav-label">LOG</div>
     </div>
     <div class="nav-item" onclick="goPage('dash',this)">
       <div class="nav-active-bar"></div>
-      <div class="nav-icon">📊</div>
+      <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M5 19.5V11M12 19.5V4.5M19 19.5v-6"/></svg></div>
       <div class="nav-label">SUMMARY</div>
     </div>
     <div class="nav-item" onclick="goPage('cfg',this)">
       <div class="nav-active-bar"></div>
-      <div class="nav-icon">⚙️</div>
+      <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.2v2.3M12 18.5v2.3M3.2 12h2.3M18.5 12h2.3M5.9 5.9l1.7 1.7M16.4 16.4l1.7 1.7M18.1 5.9l-1.7 1.7M7.6 16.4l-1.7 1.7"/></svg></div>
       <div class="nav-label">CONFIG</div>
     </div>
   </div>
@@ -2796,7 +2815,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-05';
+const APP_VERSION = '2026-09-01-06';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3664,13 +3683,16 @@ const ASSET_TYPE_COLORS = {
 // (net-worth breakdown) so they reference the same metal everywhere.
 const GOLD_BAR  = 'linear-gradient(135deg, #b08949 0%, #d8c082 35%, #f0e2b6 50%, #d8c082 65%, #b08949 100%)';
 const GOLD_DOT  = 'radial-gradient(circle at 32% 28%, #f5e8c4 0%, #d8c082 50%, #b08949 100%)';
-const GOLD_TINT = 'rgba(216,192,130,0.16)';
+const GOLD_TINT = 'transparent';
 const GOLD_TEXT = '#5e4818';
 
 // Owner colours / tints used by the owner splits inside the Net Worth
 // and Long-term Holdings cards.
 const OWNER_COLORS = { Edwin: 'var(--blue)', Divya: 'var(--pink)', AJ: 'var(--teal)', Joint: 'var(--amber)', Both: 'var(--amber)' };
-const OWNER_TINTS  = { Edwin: 'rgba(45,106,159,0.08)', Divya: 'rgba(160,69,110,0.08)', AJ: 'rgba(45,138,122,0.08)', Joint: 'rgba(193,127,42,0.08)', Both: 'rgba(193,127,42,0.08)' };
+// Tints are deliberately transparent: the coloured dot in front of each
+// row carries the identity, and a tinted band behind every line reads as
+// another box. Kept as a map so a row can be tinted again if ever needed.
+const OWNER_TINTS  = { Edwin: 'transparent', Divya: 'transparent', AJ: 'transparent', Joint: 'transparent', Both: 'transparent' };
 
 // Builds account <option>s grouped into <optgroup>s by type. The native
 // picker (incl. iOS) renders each group label as a bold section header.
@@ -6479,7 +6501,9 @@ function renderTypeBreakdown(boxId, barId, legendId, accts, total, expandedType,
     .map(s => ({ ...s, color: ASSET_TYPE_COLORS[s.type] || TYPE_FALLBACK[fb++ % TYPE_FALLBACK.length] }));
   const barBg   = s => s.type === 'Investment' ? GOLD_BAR  : s.color;
   const dotBg   = s => s.type === 'Investment' ? GOLD_DOT  : s.color;
-  const rowTint = s => s.type === 'Investment' ? GOLD_TINT : tintOf(s.color);
+  // No band behind the row — the dot in front of it already says which
+  // slice this is, and stacked tints were the busiest thing on the screen.
+  const rowTint = () => 'transparent';
   document.getElementById(barId).innerHTML =
     tsegs.map(s => {
       const p = Math.round(s.pct);
@@ -6664,9 +6688,9 @@ function renderDash() {
       // 'Spent' here mirrors the Expenses headline (net of reimbursements)
       // so the breakdown numbers add up to the bar above and the user's
       // mental model: 'of my real earnings, this much actually went out'.
-      { color: 'var(--red)',   tint: 'rgba(192,57,43,0.08)',   label: 'Spent',    amt: realExpense, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')`, prevKey: 'expense',  polarity: 'up-bad'  },
+      { color: 'var(--red)',   tint: 'transparent',   label: 'Spent',    amt: realExpense, pct: spendPct, isNeg: over, tap: `gotoLog('Expense','','','${dp}','d-cf-net-card')`, prevKey: 'expense',  polarity: 'up-bad'  },
       ...(invTotal > 0 ? [{ color: GOLD_DOT, tint: GOLD_TINT, label: 'Invested', amt: invTotal, pct: invPct, tap: `gotoInvested('${dp}','d-cf-net-card')`, prevKey: 'invested', polarity: 'up-good' }] : []),
-      { color: 'var(--green)', tint: 'rgba(46,125,82,0.08)',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0, prevKey: 'savings', polarity: 'up-good' },
+      { color: 'var(--green)', tint: 'transparent',   label: 'Savings',  amt: savAmt,   pct: savPct,   isNeg: savAmt < 0, prevKey: 'savings', polarity: 'up-good' },
     ].sort((a, b) => b.amt - a.amt);
     breakdown.innerHTML = rows.map(rw => {
       const sign    = rw.amt < 0 ? '−' : '';
@@ -7595,8 +7619,8 @@ function checkBackupReminder() {
   const due = !S.lastBackupAt || (Date.now() - S.lastBackupAt) > WEEK;
   banner.style.display = (due && !backupReminderDismissed) ? 'flex' : 'none';
   document.getElementById('backup-reminder-text').textContent = S.lastBackupAt
-    ? `📦 Weekly backup due (last ${daysAgo(S.lastBackupAt)}) — tap to download`
-    : '📦 Back up your data — tap to download';
+    ? `Weekly backup due (last ${daysAgo(S.lastBackupAt)}) — tap to download`
+    : 'Back up your data — tap to download';
 }
 
 function dismissBackupReminder() {
