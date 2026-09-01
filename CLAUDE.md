@@ -72,9 +72,9 @@ today and clears only when a settlement is recorded — not when the calendar tu
 
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
-- **Two themes, one skeleton.** `:root` is **Ivory** (warm paper, espresso ink, brass) and
-  `[data-theme="dark"]` is **Vault** (warm graphite, ivory ink, brass). Every component reads
-  from the tokens; never hard-code a colour in a rule.
+- **One palette, dark only.** `:root` is **Vault** — warm graphite, ivory ink, brass. There is
+  no light theme and no theme toggle: don't add one back, and don't hard-code a colour in a
+  rule. Every component reads from the tokens.
 - **Depth, not outlines.** Cards carry a surface and a soft shadow — no 1px fences, no tinted
   boxes inside boxes. Rows inside a card are separated by `--divider` hairlines, sections by
   whitespace and a small-caps label.
