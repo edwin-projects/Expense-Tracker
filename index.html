@@ -1596,6 +1596,63 @@ select.finput option { background: white; color: var(--ink); }
   text-align: center; color: var(--ink3); padding: 24px;
   font-size: 14px;
 }
+/* ── Tile grid inside the picker ─────────────────────────────────
+   Long lists (categories, income sources, accounts) show every option
+   at once as tappable tiles instead of a list you have to scroll: the
+   handful you actually use on top, everything else in a tighter grid
+   below, and the search field still filters both. */
+.picker-grid {
+  display: grid; gap: 7px;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  padding: 4px 12px 10px;
+}
+.picker-grid.sm { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
+.picker-grid.wide { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.picker-tile {
+  font-family: inherit; font-size: 13px; font-weight: 500; line-height: 1.25;
+  color: var(--ink); background: var(--bg2);
+  border: 1.5px solid var(--border2); border-radius: 10px;
+  padding: 9px 7px; min-height: 42px; cursor: pointer; text-align: center;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  /* Two lines, then ellipsis — 'Clothing & Accessories' must not blow the
+     row open — with the box model doing the vertical centring. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  -webkit-box-pack: center; -webkit-box-align: center; overflow: hidden;
+}
+.picker-grid.sm .picker-tile { font-size: 11.5px; min-height: 36px; padding: 7px 4px; }
+.picker-tile { overflow-wrap: break-word; }
+.picker-tile:active { transform: scale(0.96); }
+.picker-tile.selected {
+  background: var(--amber); border-color: var(--amber);
+  color: #1a1200; font-weight: 600;
+}
+.picker-tile.two {
+  display: flex; flex-direction: column; gap: 2px; -webkit-line-clamp: none;
+}
+.picker-tile .pt-main { font-weight: 600; line-height: 1.2; }
+.picker-tile .pt-meta { font-size: 10.5px; font-weight: 500; color: var(--ink3); line-height: 1.2; }
+.picker-tile.selected .pt-meta { color: rgba(26,18,0,0.72); }
+.picker-grid-lbl {
+  padding: 10px 16px 2px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink3);
+}
+
+/* Inline chip row — for the short lists (Type, Frequency) that fit on one
+   line in the form itself, so they need no overlay at all. Same pills the
+   People rows use. */
+/* Every option shares the row equally, so Type and Frequency each stay on
+   one line at phone width however long the words are. */
+.chip-row { display: flex; gap: 6px; }
+.chip-row .pill {
+  flex: 1 1 auto; min-width: 0; text-align: center;
+  padding: 8px 5px; font-size: 12.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chip-row .pill.add {
+  flex: 0 0 30px; color: var(--amber); border-color: var(--amber-border); font-weight: 600;
+}
 .picker-group {
   padding: 12px 16px 4px;
   font-size: 11px; font-weight: 600;
@@ -1937,13 +1994,15 @@ body { transition: background 0.25s ease, color 0.25s ease; }
         <span class="flabel">Category</span>
         <select class="finput" id="f-cat" onchange="handleAddNew(this,'cat')"></select>
       </div>
-      <div class="frow">
-        <span class="flabel">Type</span>
-        <select class="finput" id="f-type" onchange="handleAddNew(this,'type')"></select>
+      <div class="pill-group">
+        <div class="pill-glabel">Type</div>
+        <div class="pills chip-row" data-inline-for="f-type"></div>
+        <select class="finput" id="f-type" data-inline="pending" onchange="handleAddNew(this,'type')"></select>
       </div>
-      <div class="frow">
-        <span class="flabel">Frequency</span>
-        <select class="finput" id="f-freq" onchange="handleAddNew(this,'freq')"></select>
+      <div class="pill-group">
+        <div class="pill-glabel">Frequency</div>
+        <div class="pills chip-row" data-inline-for="f-freq"></div>
+        <select class="finput" id="f-freq" data-inline="pending" onchange="handleAddNew(this,'freq')"></select>
       </div>
     </div>
 
@@ -2715,7 +2774,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
     <div class="picker-head">
       <div class="picker-search-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input class="picker-search" id="picker-search" placeholder="Search" autocomplete="off" oninput="filterPickerOptions(this.value)">
+        <input class="picker-search" id="picker-search" placeholder="Search" autocomplete="off" onfocus="onPickerSearchFocus()" oninput="filterPickerOptions(this.value)">
       </div>
       <button class="picker-close" type="button" onclick="closePicker()" aria-label="Close">Done</button>
     </div>
@@ -2737,7 +2796,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-04';
+const APP_VERSION = '2026-09-01-05';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7802,6 +7861,7 @@ function toast(msg, type='') {
 // setCategoryFilter / etc.) fire untouched.
 
 let __pickerTarget = null;
+let __pickerKbUp = false;   // has the search field been tapped this open?
 
 // Positions the popover card relative to the trigger that opened it, so it
 // "drops" from where the user tapped — not pinned to the top. Vertical
@@ -7813,7 +7873,10 @@ function positionPicker(triggerEl) {
   if (!card || !triggerEl) return;
   const r = triggerEl.getBoundingClientRect();
   const vw = window.innerWidth, vh = window.innerHeight;
-  const KB = 310;                 // reserved keyboard height
+  // Reserve room for the on-screen keyboard only once the search field has
+  // been tapped. Before that there is no keyboard, and the extra height is
+  // what lets a full tile grid show without scrolling.
+  const KB = __pickerKbUp ? 310 : 110;
   const margin = 8;
   const availBottom = vh - KB - margin;   // lowest the card may extend to
 
@@ -7831,6 +7894,12 @@ function positionPicker(triggerEl) {
     top = Math.max(margin, availBottom - 340);
     maxH = availBottom - top;
   }
+  // A tile grid exists to show the whole list at once, so it doesn't hang off
+  // the trigger — it takes the screen, starting below the app header.
+  if (__pickerTarget && PICKER_GRID_IDS.has(__pickerTarget.id) && !__pickerKbUp) {
+    top = Math.min(64, Math.max(margin, r.bottom + 6));
+    maxH = availBottom - top;
+  }
   card.style.left = left + 'px';
   card.style.width = width + 'px';
   card.style.top = top + 'px';
@@ -7839,6 +7908,7 @@ function positionPicker(triggerEl) {
 
 function openSearchablePicker(selectEl, triggerEl) {
   __pickerTarget = selectEl;
+  __pickerKbUp = false;
   const overlay = document.getElementById('picker-overlay');
   const search = document.getElementById('picker-search');
   search.value = '';
@@ -7855,10 +7925,121 @@ function openSearchablePicker(selectEl, triggerEl) {
   // to a native iOS menu than the search-first behaviour we had before.
 }
 
+// Fields whose picker shows every option as a tile grid rather than a list:
+// the ones with enough options that scrolling a list was the whole problem.
+const PICKER_GRID_IDS = new Set([
+  'f-cat', 'edit-cat', 'cat-filter-select',
+  'i-source', 'edit-source',
+  'f-account', 'i-account', 't-from', 't-to',
+  'edit-account', 'edit-from', 'edit-to',
+]);
+
+// The handful you actually use, learned from your own log — they sit on top
+// so the common pick is one tap without reading past the first row. Returns
+// option VALUES, most-used first.
+function pickerFrequentValues(sel, n = 6) {
+  const tally = (list, key) => list.reduce((m, r) => {
+    const k = r && r[key] != null ? String(r[key]) : '';
+    if (k) m[k] = (m[k] || 0) + 1;
+    return m;
+  }, {});
+  let counts = null;
+  if (['f-cat','edit-cat','cat-filter-select'].includes(sel.id)) counts = tally(S.entries, 'category');
+  else if (['i-source','edit-source'].includes(sel.id))          counts = tally(S.income, 'source');
+  else if (['f-account','i-account','t-from','t-to','edit-account','edit-from','edit-to'].includes(sel.id)) {
+    counts = tally(S.entries, 'account');
+    [[S.income,'account'], [S.transfers,'fromAccount'], [S.transfers,'toAccount']].forEach(([list, key]) => {
+      const t = tally(list, key);
+      Object.keys(t).forEach(k => { counts[k] = (counts[k] || 0) + t[k]; });
+    });
+  }
+  if (!counts) return [];
+  const live = new Set([...sel.options].map(o => o.value).filter(Boolean));
+  return Object.entries(counts)
+    .filter(([k]) => live.has(k))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([k]) => k);
+}
+
+function renderPickerTile(o, idx, small) {
+  const selected = !!o.value && o.value === __pickerTarget.value;
+  // Account options read "HDFC Savings (Edwin · ₹1.2L)". In a tile the
+  // parenthetical goes underneath in smaller type so the name stays legible.
+  const m = /^(.*?)\s*\((.*)\)\s*$/.exec(o.text);
+  const body = m
+    ? `<span class="pt-main">${escapeHtml(m[1])}</span><span class="pt-meta">${escapeHtml(m[2])}</span>`
+    : escapeHtml(o.text);
+  return `<button type="button" class="picker-tile${small ? ' sm' : ''}${m ? ' two' : ''}${selected ? ' selected' : ''}"`
+    + ` onclick="selectPickerOption(${idx})">${body}</button>`;
+}
+
+// Grid layout: your most-used first, then everything else — inside its
+// <optgroup> headings where the select has them (the account lists do).
+// A search query collapses it to one flat grid of matches.
+function renderPickerGrid(allOpts, matches, q) {
+  const html = [];
+  const used = new Set();
+  // Options carrying a detail line (the accounts, "Name (Owner · balance)")
+  // need a wider tile than a one-word category does.
+  const grid = (opts, small) => {
+    if (!opts.length) return '';
+    const wide = opts.some(o => /\(.*\)\s*$/.test(o.text));
+    const cls = wide ? 'picker-grid wide' : ('picker-grid' + (small ? ' sm' : ''));
+    return `<div class="${cls}">`
+      + opts.map(o => renderPickerTile(o, allOpts.indexOf(o), wide ? false : small)).join('')
+      + '</div>';
+  };
+  const byValue = v => allOpts.find(o => o.value === v);
+
+  // Worth a "Most used" row only when it is shorter than the full list —
+  // two of five accounts, yes; six of seven income sources, no.
+  const choices = allOpts.filter(o => o.value && o.value !== '__add__').length;
+  if (!q) {
+    const freq = pickerFrequentValues(__pickerTarget).map(byValue).filter(Boolean);
+    if (freq.length >= 2 && choices > freq.length + 1) {
+      freq.forEach(o => used.add(o));
+      html.push('<div class="picker-grid-lbl">Most used</div>', grid(freq, false));
+    }
+  }
+
+  let body = '';
+  for (const node of __pickerTarget.children) {
+    if (node.tagName === 'OPTGROUP') {
+      const inner = [...node.children].filter(o => o.value && matches(o) && !used.has(o));
+      if (!inner.length) continue;
+      body += `<div class="picker-grid-lbl">${escapeHtml(node.label || '')}</div>` + grid(inner, true);
+    }
+  }
+  // Flat options (no optgroups): one grid under a heading only when the
+  // "Most used" row above it needs separating from the rest.
+  const flat = [...__pickerTarget.children]
+    .filter(n => n.tagName === 'OPTION' && n.value && n.value !== '__add__' && matches(n) && !used.has(n));
+  if (flat.length) {
+    if (used.size) html.push('<div class="picker-grid-lbl">Everything else</div>');
+    html.push(grid(flat, used.size > 0));
+  }
+  if (body) html.push(body);
+
+  // "＋ Add new…" stays a full-width row at the bottom — it is an action,
+  // not one of the choices.
+  const addOpt = [...__pickerTarget.options].find(o => o.value === '__add__');
+  if (addOpt && matches(addOpt)) html.push(renderPickerItem(addOpt, allOpts.indexOf(addOpt)));
+
+  return { html: html.join(''), any: used.size > 0 || flat.length > 0 || !!body };
+}
+
 function renderPickerOptions(query) {
   if (!__pickerTarget) return;
   const q = (query || '').toLowerCase().trim();
   const allOpts = [...__pickerTarget.options];
+  if (PICKER_GRID_IDS.has(__pickerTarget.id)) {
+    const matches = o => !q || o.text.toLowerCase().includes(q);
+    const out = renderPickerGrid(allOpts, matches, q);
+    document.getElementById('picker-list').innerHTML =
+      out.any ? out.html : '<div class="picker-empty">No matches</div>';
+    return;
+  }
   // Walk the select's direct children so we can preserve <optgroup>
   // headers (Bank Accounts, Cash, etc.) - flat .options drops them.
   const html = [];
@@ -7910,6 +8091,14 @@ function selectPickerOption(optIdx) {
 function closePicker() {
   document.getElementById('picker-overlay').classList.remove('show');
   __pickerTarget = null;
+  __pickerKbUp = false;
+}
+
+// Tapping Search raises the keyboard, so re-clamp the card above it.
+function onPickerSearchFocus() {
+  if (__pickerKbUp) return;
+  __pickerKbUp = true;
+  positionPicker(document.querySelector(`.pick-btn[data-target="${__pickerTarget?.id}"]`));
 }
 
 function syncPickBtnText(btn, selectEl) {
@@ -7966,10 +8155,59 @@ function enhanceSearchableSelect(selectEl) {
   });
 }
 
+// Short lists (Type, Frequency) don't need an overlay at all — they fit on
+// one line in the form. The <select> stays in the DOM as the state holder,
+// exactly as with the searchable picker, so every existing handler, the SMS
+// prefill and the edit flow keep working untouched; the chips just write to
+// it and fire 'change'.
+function enhanceInlineChips(selectEl) {
+  const host = document.querySelector(`[data-inline-for="${selectEl.id}"]`);
+  if (!host) return;
+
+  const draw = () => {
+    host.innerHTML = [...selectEl.options]
+      .filter(o => o.value)                 // drop the 'Select…' placeholder
+      .map(o => {
+        const add = o.value === '__add__';
+        // "＋ Add new type…" shrinks to a bare ＋ — it's an action, and the
+        // row should read as the choices, not as a sentence.
+        const label = add ? '＋' : o.text;
+        return `<div class="pill${add ? ' add' : ''}${o.value === selectEl.value ? ' active' : ''}"`
+          + ` data-v="${escapeHtml(o.value)}">${escapeHtml(label)}</div>`;
+      }).join('');
+  };
+
+  if (selectEl.dataset.inline === 'on') { draw(); return; }
+  selectEl.dataset.inline = 'on';
+  selectEl.style.display = 'none';
+
+  host.addEventListener('click', e => {
+    const chip = e.target.closest('.pill');
+    if (!chip) return;
+    selectEl.value = chip.dataset.v;
+    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+    draw();
+  });
+
+  // Option lists are rebuilt wholesale by buildSelects, and values are set
+  // programmatically (reset, edit, SMS prefill) without firing 'change'.
+  new MutationObserver(draw).observe(selectEl, { childList: true });
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  Object.defineProperty(selectEl, 'value', {
+    configurable: true,
+    get() { return desc.get.call(this); },
+    set(v) { desc.set.call(this, v); draw(); }
+  });
+  draw();
+}
+
 function enhanceAllSearchableSelects(root) {
   const scope = root || document;
   scope.querySelectorAll('select.finput, select.modal-input, .acct-editor select, #cat-filter-select')
-    .forEach(enhanceSearchableSelect);
+    .forEach(el => {
+      if (el.dataset.inline) enhanceInlineChips(el);
+      else enhanceSearchableSelect(el);
+    });
 }
 
 
