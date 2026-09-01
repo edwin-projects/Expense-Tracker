@@ -1,9 +1,16 @@
 name: Weekly Data Backup
 
 on:
-  schedule:
-    - cron: '30 17 * * 0'   # 11:00 PM IST (UTC+5:30) every Sunday
-  workflow_dispatch:          # Allow manual trigger from GitHub Actions tab
+  # The schedule is off. Backups are taken manually from the app
+  # (CONFIG → Email / Share Backup), so this job had nothing to do but fail
+  # every Sunday on the unset secrets — and a permanently red scheduled job
+  # teaches you to ignore failure mail, which is worse than no job at all.
+  #
+  # To switch it back on: set the five repository secrets (the script names
+  # them if any are missing), then uncomment the two lines below.
+  # schedule:
+  #   - cron: '30 17 * * 0'   # 11:00 PM IST (UTC+5:30) every Sunday
+  workflow_dispatch:          # Still runnable on demand from the Actions tab
 
 jobs:
   backup:
