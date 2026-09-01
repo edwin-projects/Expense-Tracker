@@ -30,6 +30,15 @@ Every delete moves the record into the Recently Deleted bin (`S.trash`, synced v
 `deleted_items` table) instead of dropping it. Nothing auto-purges. Keep it that way: if you add
 a new record type, give it the same treatment via `trashRecord()` / `restoreFromTrash()`.
 
+## Pickers show every option — no scrolling to find one
+Long lists (category, income source, accounts) open as a tile grid inside the searchable
+picker: the six you use most, learned from the log via `pickerFrequentValues()`, then the rest.
+Short lists (type, frequency) are chip rows in the form itself and open nothing at all. In both
+cases the `<select>` stays in the DOM as the single source of truth — the tiles and chips write
+to it and dispatch `change`, so every existing handler, the SMS prefill and the edit modal keep
+working untouched. A new picker follows the same rule: add the id to `PICKER_GRID_IDS`, or give
+the select a `data-inline` host, rather than hand-rolling a control.
+
 ## Numbers are Indian — always
 Grouping is Indian (`toLocaleString('en-IN')` → `12,34,567`), and compact amounts use the
 Indian scale: **thousand → lakh → crore**. A figure of a lakh or more is never scaled in
