@@ -2775,7 +2775,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-10';
+const APP_VERSION = '2026-09-01-11';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2868,6 +2868,9 @@ let S = {
   dashPeriod: 'month',
   dashMonths: [],
   logFilter: 'All',
+  // Who the expense was FOR (logFilter) and who actually paid for it
+  // (logPaidBy) are different questions, so they filter separately.
+  logPaidBy: 'All',
   logCategoryFilter: 'All',
   logSearch: '',
   logKind: 'All',
@@ -2954,6 +2957,7 @@ function loadLocal() {
   if (!S.smsMerchants || typeof S.smsMerchants !== 'object') S.smsMerchants = {};
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
+  if (typeof S.logPaidBy !== 'string') S.logPaidBy = 'All';
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
@@ -5068,6 +5072,7 @@ function activeLogFilters() {
   const out = [];
   if (S.logKind === 'Deleted') out.push({ label: 'Recently deleted', clear: "setLogKindValue('All')" });
   if (S.logFilter !== 'All')   out.push({ label: `For ${S.logFilter}`, clear: "clearOneLogFilter('person')" });
+  if (S.logPaidBy !== 'All')   out.push({ label: `Paid by ${S.logPaidBy}`, clear: "clearOneLogFilter('paidBy')" });
   if (S.logType !== 'All')     out.push({ label: S.logType, clear: "clearOneLogFilter('type')" });
   if (S.logCategoryFilter !== 'All') out.push({ label: S.logCategoryFilter, clear: "clearOneLogFilter('category')" });
   if (S.logAddedBy !== 'All')  out.push({ label: `Added by ${S.logAddedBy}`, clear: "clearOneLogFilter('addedBy')" });
@@ -5107,6 +5112,7 @@ function setLogKindValue(k) {
 
 function clearOneLogFilter(which) {
   if (which === 'person')   S.logFilter = 'All';
+  if (which === 'paidBy')   S.logPaidBy = 'All';
   if (which === 'type')     S.logType = 'All';
   if (which === 'category') S.logCategoryFilter = 'All';
   if (which === 'addedBy')  S.logAddedBy = 'All';
@@ -5118,6 +5124,7 @@ function clearOneLogFilter(which) {
 function pickLogFilter(which, val) {
   if (which === 'kind')     S.logKind = val;
   if (which === 'person')   S.logFilter = val;
+  if (which === 'paidBy')   S.logPaidBy = val;
   if (which === 'type')     S.logType = val;
   if (which === 'category') S.logCategoryFilter = val;
   if (which === 'addedBy')  S.logAddedBy = val;
@@ -5169,6 +5176,9 @@ function renderLogSheet(mode) {
     + group('For whom', 'person',
         [['All','Anyone'], ['Edwin','Edwin'], ['Divya','Divya'], ['AJ','AJ'], ['Both','Both']],
         S.logFilter)
+    + group('Paid by', 'paidBy',
+        [['All','Anyone'], ['Edwin','Edwin'], ['Divya','Divya']],
+        S.logPaidBy)
     + group('Type', 'type',
         [['All','All'], ['Essentials','Essentials'], ['Non-Essentials','Non-Ess.'], ['Fun','Fun'], ['Saveable','Saveable']],
         S.logType)
@@ -5247,6 +5257,7 @@ function setLogAccountFilter(id) {
   S.logAcctTypeFilter = null;
   S.logKind = 'All';
   S.logFilter = 'All';
+  S.logPaidBy = 'All';
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
@@ -5271,6 +5282,7 @@ function clearAllLogFilters() {
   logSort = 'newest';
   S.logKind = 'All';
   S.logFilter = 'All';
+  S.logPaidBy = 'All';
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
@@ -5299,6 +5311,7 @@ function gotoLog(kind, type, acctType, period, anchor) {
   S.logType = type || 'All';
   S.logAcctTypeFilter = acctType || null;
   S.logFilter = 'All';
+  S.logPaidBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
@@ -5317,6 +5330,7 @@ function gotoInvested(period, anchor) {
   S.logKind = 'Transfer';
   S.logType = 'All';
   S.logFilter = 'All';
+  S.logPaidBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
@@ -5833,6 +5847,11 @@ function renderLog() {
       if (x._kind === 'expense')  return x.forWhom    === S.logFilter;
       return true; // transfers don't have a person field
     });
+  }
+  if (S.logPaidBy !== 'All') {
+    // Only expenses name a payer; income has a receiver and a transfer has
+    // two accounts, so neither can answer "who paid for this".
+    items = items.filter(x => x._kind === 'expense' && x.paidBy === S.logPaidBy);
   }
   if (S.logCategoryFilter !== 'All') {
     items = items.filter(x => x._kind === 'expense' && x.category === S.logCategoryFilter);
