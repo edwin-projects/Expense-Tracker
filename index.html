@@ -1246,7 +1246,12 @@ select.finput option { background: white; color: var(--ink); }
    a short plot, the value written above each bar (rotated so all twelve
    months fit on a phone without scrolling), month initials underneath. */
 #d-mchart { display: flex; align-items: flex-end; gap: 2px; padding: 10px 8px 6px; }
-.mc-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.mc-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 2px 0 3px; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
+.mc-col.tappable { cursor: pointer; }
+.mc-col.tappable:active { background: var(--amber-bg); }
+.mc-col.sel { background: var(--amber-bg); box-shadow: inset 0 0 0 1px var(--amber-border); }
+.mc-col.sel .mc-month { color: var(--ink); }
 .mc-plot { width: 100%; height: 104px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
 .mc-bar { position: relative; width: 8px; border-radius: 3px 3px 0 0; }
 .mc-bar.inc { background: var(--green); }
@@ -2729,7 +2734,7 @@ body { transition: background 0.25s ease, color 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-01';
+const APP_VERSION = '2026-09-01-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -5894,6 +5899,26 @@ function openMonthPicker(el) {
   renderDash();
 }
 
+// Tap a month in the 12-month chart → scope the whole Summary to that month.
+// It routes through the same 'months' period the Months ▾ picker uses, so the
+// cards, the category tables and the Log filter all follow along, and the
+// picker opens showing which month is selected.
+function dashMonthFromChart(key) {
+  S.dashPeriod = 'months';
+  S.dashMonths = [key];
+  saveLocal();
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('period-months-btn');
+  if (btn) btn.classList.add('active');
+  const picker = document.getElementById('month-picker');
+  if (picker) picker.style.display = 'block';
+  buildMonthChips();
+  renderDash();
+  // Land on the figures that just changed, not halfway down the page.
+  const cards = document.querySelector('#page-dash .stat-card');
+  if (cards) cards.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function toggleMonthChip(key) {
   const i = S.dashMonths.indexOf(key);
   if (i >= 0) S.dashMonths.splice(i, 1); else S.dashMonths.push(key);
@@ -6958,6 +6983,9 @@ function renderDash() {
     if (!mcMax || v <= 0) return 0;
     return Math.max(3, Math.round(v / mcMax * 76));   // % of plot height
   };
+  // A month is highlighted when the Summary is already scoped to exactly it.
+  const mcSelKey = (S.dashPeriod === 'months' && (S.dashMonths || []).length === 1)
+    ? S.dashMonths[0] : null;
   document.getElementById('d-mchart').innerHTML = trend.map(t => {
     const cur = t.key === curKey ? ' current' : '';
     // A month with nothing in it (typically still in the future) shows an
@@ -6965,7 +6993,12 @@ function renderDash() {
     const bar = (v, cls) => v > 0
       ? `<div class="mc-bar ${cls}" style="height:${mcH(v)}%"><span class="mc-lbl ${cls}">${fmtShort(v)}</span></div>`
       : '';
-    return `<div class="mc-col${cur}"><div class="mc-plot">${bar(t.inc,'inc')}${bar(t.exp,'exp')}</div>`
+    // Tapping a month scopes the whole Summary to it. An empty month has
+    // nothing to show, so it stays inert rather than blanking the page.
+    const live = t.inc > 0 || t.exp > 0;
+    const sel = t.key === mcSelKey ? ' sel' : '';
+    const tap = live ? ` tappable" onclick="dashMonthFromChart('${t.key}')` : '';
+    return `<div class="mc-col${cur}${sel}${tap}"><div class="mc-plot">${bar(t.inc,'inc')}${bar(t.exp,'exp')}</div>`
       + `<div class="mc-month">${t.label.split(' ')[0]}</div></div>`;
   }).join('');
 
