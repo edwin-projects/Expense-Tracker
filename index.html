@@ -605,6 +605,106 @@ select.finput option { background: white; color: var(--ink); }
 }
 #log-total-bar .ltb-amt { color: var(--amber); font-weight: 700; font-size: 15px; }
 
+/* ── Log controls ────────────────────────────────────────────────
+   One segmented control for the thing you change every session, then a
+   single row: search, Filters (with a count), Sort. Everything else lives
+   in a sheet, and whatever is actually on shows as a removable chip. */
+.log-seg {
+  display: flex; gap: 3px; margin: 14px 0 10px;
+  background: var(--bg2); border-radius: 12px; padding: 3px;
+}
+.seg-btn {
+  flex: 1; text-align: center; padding: 8px 2px; border-radius: 9px;
+  font-size: 12.5px; font-weight: 500; color: var(--ink2);
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.seg-btn.active { background: var(--amber); color: var(--btn-dark-text); font-weight: 600; }
+
+.log-controls { display: flex; gap: 8px; align-items: stretch; margin-bottom: 10px; }
+.log-controls .log-search-wrap { flex: 1; min-width: 0; margin: 0; }
+.log-ctrl {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1.5px solid var(--border2); border-radius: 12px;
+  padding: 0 12px; color: var(--ink); font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 13px; cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.log-ctrl svg {
+  width: 16px; height: 16px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.log-ctrl:active { transform: scale(0.96); }
+.log-ctrl.on { border-color: var(--amber); color: var(--amber); }
+.log-ctrl-n {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--amber); color: var(--btn-dark-text);
+  font-size: 10.5px; font-weight: 700; display: none;
+  align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
+}
+.log-ctrl.on .log-ctrl-n { display: inline-flex; }
+
+/* Active filters — one chip each, tap the ✕ to drop just that one. */
+.log-active { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.log-active:empty { display: none; }
+.lf-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--amber-bg); border: 1px solid var(--amber-border);
+  color: var(--amber); border-radius: 20px;
+  padding: 5px 10px 5px 12px; font-size: 11.5px; font-weight: 500; cursor: pointer;
+}
+.lf-chip .lf-x { opacity: 0.75; font-size: 12px; }
+.lf-chip.clear { background: none; border-color: var(--border2); color: var(--ink3); }
+
+/* Bottom sheet — filters and sort share it. */
+.log-sheet-overlay {
+  display: none; position: fixed; inset: 0; z-index: 420;
+  background: var(--scrim); align-items: flex-end; justify-content: center;
+}
+.log-sheet-overlay.show { display: flex; }
+.log-sheet {
+  width: 100%; max-width: 520px; max-height: 82vh; overflow-y: auto;
+  background: var(--bg2); border-radius: 20px 20px 0 0;
+  padding: 12px 16px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -14px 40px rgba(0,0,0,0.5);
+  animation: sheetUp 0.22s cubic-bezier(0.32,0.72,0,1);
+}
+@keyframes sheetUp { from { transform: translateY(14px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.log-sheet-grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border2); margin: 0 auto 14px; }
+.log-sheet h4 {
+  margin: 0 0 9px; font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.17em; text-transform: uppercase; color: var(--ink3);
+}
+.log-sheet h4:not(:first-of-type) { margin-top: 18px; }
+.lf-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; }
+.lf-tiles.sm { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
+.lf-tile {
+  border: 1.5px solid var(--border2); border-radius: 10px; padding: 9px 5px;
+  font-size: 12px; color: var(--ink2); text-align: center; cursor: pointer;
+  min-height: 38px; display: flex; align-items: center; justify-content: center;
+  overflow-wrap: break-word; transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.lf-tile.on { background: var(--amber); border-color: var(--amber); color: var(--btn-dark-text); font-weight: 600; }
+.lf-foot { display: flex; gap: 9px; margin-top: 20px; }
+.lf-foot button {
+  flex: 1; font-family: 'Outfit', system-ui, sans-serif; font-size: 14px; font-weight: 600;
+  padding: 13px; border-radius: 12px; cursor: pointer;
+  border: 1.5px solid var(--border2); background: none; color: var(--ink2);
+}
+.lf-foot button.go {
+  flex: 2; background: var(--amber); border-color: var(--amber); color: var(--btn-dark-text);
+}
+/* Sort — a list, because these are orders, not values. */
+.lf-sort { display: flex; flex-direction: column; }
+.lf-sort > div {
+  display: flex; align-items: center; gap: 11px; padding: 13px 2px;
+  font-size: 14.5px; color: var(--ink); border-bottom: 1px solid var(--divider); cursor: pointer;
+}
+.lf-sort > div:last-child { border-bottom: none; }
+.lf-sort .lf-tick { width: 14px; color: var(--amber); visibility: hidden; }
+.lf-sort > div.on { color: var(--amber); font-weight: 600; }
+.lf-sort > div.on .lf-tick { visibility: visible; }
+.lf-sort small { margin-left: auto; font-size: 11px; color: var(--ink3); font-weight: 400; }
+
 .log-search-wrap {
   position: relative;
   display: flex;
@@ -2088,57 +2188,29 @@ body { transition: background 0.25s ease; }
     <div id="log-back-banner" onclick="returnToSummary()" style="display:none;position:fixed;bottom:88px;left:50%;transform:translateX(-50%);padding:11px 20px;background:var(--blue);border:none;border-radius:24px;font-size:13px;color:#fff;font-weight:600;cursor:pointer;align-items:center;gap:6px;z-index:55;box-shadow:0 6px 18px rgba(0,0,0,0.25);white-space:nowrap">
       ← Back to Summary
     </div>
-    <div class="log-live-only" style="display:flex;justify-content:flex-end;margin:14px 0 0">
-      <button onclick="clearAllLogFilters()" style="background:none;border:1px solid var(--border2);color:var(--ink2);padding:6px 13px;border-radius:15px;font-size:11.5px;font-family:'Inter',system-ui,sans-serif;font-weight:600;cursor:pointer">✕ Clear all filters</button>
+    <!-- Kind is the one filter that changes every session, so it stays out
+         as a segmented control. Everything else is behind Filters. -->
+    <div class="log-seg" id="log-seg">
+      <div class="seg-btn active" data-k="All" onclick="setLogKind(this)">All</div>
+      <div class="seg-btn" data-k="Expense" onclick="setLogKind(this)">Expense</div>
+      <div class="seg-btn" data-k="Income" onclick="setLogKind(this)">Income</div>
+      <div class="seg-btn" data-k="Transfer" onclick="setLogKind(this)">Transfer</div>
     </div>
-    <div class="log-bar">
-      <div class="log-chip active" data-k="All" onclick="setLogKind(this)">All</div>
-      <div class="log-chip" data-k="Expense" onclick="setLogKind(this)">Expense</div>
-      <div class="log-chip" data-k="Income" onclick="setLogKind(this)">Income</div>
-      <div class="log-chip" data-k="Transfer" onclick="setLogKind(this)">Transfer</div>
-      <div class="log-chip log-chip-deleted" id="log-chip-deleted" data-k="Deleted" onclick="setLogKind(this)">🗑 Deleted</div>
-    </div>
-    <div class="log-bar log-live-only">
-      <div class="log-chip active" data-f="All" onclick="setLogFilter(this)">All</div>
-      <div class="log-chip" data-f="Edwin" onclick="setLogFilter(this)">Edwin</div>
-      <div class="log-chip" data-f="Divya" onclick="setLogFilter(this)">Divya</div>
-      <div class="log-chip" data-f="AJ" onclick="setLogFilter(this)">AJ</div>
-      <div class="log-chip" data-f="Both" onclick="setLogFilter(this)">Both</div>
-    </div>
-    <div class="log-bar log-live-only">
-      <div class="log-chip active" data-t="All" onclick="setLogTypeFilter(this)">All Types</div>
-      <div class="log-chip" data-t="Essentials" onclick="setLogTypeFilter(this)">Essentials</div>
-      <div class="log-chip" data-t="Non-Essentials" onclick="setLogTypeFilter(this)">Non-Essentials</div>
-      <div class="log-chip" data-t="Fun" onclick="setLogTypeFilter(this)">Fun</div>
-      <div class="log-chip" data-t="Saveable" onclick="setLogTypeFilter(this)">Saveable</div>
-    </div>
-    <div class="log-bar log-live-only">
-      <div class="log-chip active" data-by="All" onclick="setLogAddedBy(this)">Added by anyone</div>
-      <div class="log-chip" data-by="Edwin" onclick="setLogAddedBy(this)">Added by Edwin</div>
-      <div class="log-chip" data-by="Divya" onclick="setLogAddedBy(this)">Added by Divya</div>
-    </div>
-    <div id="log-account-banner" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;margin:0 0 10px;font-size:12.5px;color:var(--amber);align-items:center;gap:8px">
-      <span id="log-account-banner-text"></span>
-      <button onclick="clearLogAccountFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
-    </div>
-    <div id="log-accttype-banner" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;margin:0 0 10px;font-size:12.5px;color:var(--amber);align-items:center;gap:8px">
-      <span id="log-accttype-banner-text"></span>
-      <button onclick="clearLogAcctTypeFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
-    </div>
-    <div id="log-period-banner" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;margin:0 0 10px;font-size:12.5px;color:var(--amber);align-items:center;gap:8px">
-      <span id="log-period-banner-text"></span>
-      <button onclick="clearLogPeriodFilter()" style="margin-left:auto;background:none;border:none;color:var(--amber);font-weight:600;cursor:pointer">✕ Clear</button>
-    </div>
-    <div class="cat-select-wrap log-live-only">
-      <select id="cat-filter-select" class="cat-filter-select" onchange="setCategoryFilter(this.value)">
-        <option value="All">All Categories</option>
-      </select>
-    </div>
-    <div class="log-search-wrap">
+    <div class="log-controls">
+      <div class="log-search-wrap">
       <span class="log-search-icon">⌕</span>
       <input id="log-search-input" class="log-search-input" type="search" placeholder="Search expenses…" oninput="setLogSearch(this.value)">
       <button class="log-search-clear" id="log-search-clear" onclick="clearLogSearch()" style="display:none">✕</button>
+      </div>
+      <button class="log-ctrl" id="log-filter-btn" onclick="openLogSheet('filters')" aria-label="Filters">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        <span class="log-ctrl-n" id="log-filter-count"></span>
+      </button>
+      <button class="log-ctrl" id="log-sort-btn" onclick="openLogSheet('sort')" aria-label="Sort">
+        <svg viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M17 20V4M17 4l3 3"/></svg>
+      </button>
     </div>
+    <div class="log-active" id="log-active"></div>
     <div id="log-total-bar" style="display:none"></div>
     <div id="log-list"></div>
   </div>
@@ -2683,6 +2755,11 @@ body { transition: background 0.25s ease; }
     <div class="picker-list" id="picker-list"></div>
   </div>
 </div>
+<!-- Log filters / sort. One sheet, two modes; contents built in
+     renderLogSheet() from the current state. -->
+<div class="log-sheet-overlay" id="log-sheet-overlay" onclick="if(event.target===this) closeLogSheet()">
+  <div class="log-sheet" id="log-sheet"></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2698,7 +2775,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-09';
+const APP_VERSION = '2026-09-01-10';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4937,6 +5014,183 @@ async function scanBackupForDeleted(input) {
 // ══════════════════════════════════════════════════
 //  LOG
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  LOG FILTERS & SORT
+// ══════════════════════════════════════════════════
+// Kind lives in the segmented control on the page; everything else opens in
+// one sheet and reports back as removable chips, so the Log starts with two
+// rows of controls instead of five.
+
+// Sort is deliberately module-level, not in S: like the Log's filters it is
+// ephemeral, so a reload always starts you at newest-first and you never
+// inherit an order you forgot you set.
+let logSort = 'newest';
+const LOG_SORTS = [
+  { key: 'newest',   label: 'Newest first',   hint: 'date' },
+  { key: 'oldest',   label: 'Oldest first',   hint: 'date' },
+  { key: 'biggest',  label: 'Biggest first',  hint: 'amount' },
+  { key: 'smallest', label: 'Smallest first', hint: 'amount' },
+  { key: 'category', label: 'Category A–Z',   hint: 'name' },
+  { key: 'added',    label: 'Recently added', hint: 'entry order' },
+];
+const logSortLabel = () => (LOG_SORTS.find(o => o.key === logSort) || LOG_SORTS[0]).label.toLowerCase();
+
+// What a row is called, for the A–Z order: an expense by its category, an
+// income by its source, a transfer by the word Transfer.
+function logSortName(x) {
+  if (x._kind === 'expense') return (x.category || '').toLowerCase();
+  if (x._kind === 'income')  return (x.source   || '').toLowerCase();
+  return 'transfer';
+}
+
+function applyLogSort(items) {
+  const byDate = (a, b) => (b.date || '').localeCompare(a.date || '') || (Number(b.id) || 0) - (Number(a.id) || 0);
+  switch (logSort) {
+    case 'oldest':   return items.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (Number(a.id) || 0) - (Number(b.id) || 0));
+    case 'biggest':  return items.sort((a, b) => Number(b.amount) - Number(a.amount) || byDate(a, b));
+    case 'smallest': return items.sort((a, b) => Number(a.amount) - Number(b.amount) || byDate(a, b));
+    case 'category': return items.sort((a, b) => logSortName(a).localeCompare(logSortName(b)) || byDate(a, b));
+    case 'added':    return items.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+    default:         return items.sort(byDate);
+  }
+}
+
+function setLogSort(key) {
+  logSort = key;
+  closeLogSheet();
+  renderLog();
+}
+
+// Every filter that is currently narrowing the list, as {label, clear}.
+// Kind is excluded — the segment already shows it — except for Deleted,
+// which has no segment of its own.
+function activeLogFilters() {
+  const out = [];
+  if (S.logKind === 'Deleted') out.push({ label: 'Recently deleted', clear: "setLogKindValue('All')" });
+  if (S.logFilter !== 'All')   out.push({ label: `For ${S.logFilter}`, clear: "clearOneLogFilter('person')" });
+  if (S.logType !== 'All')     out.push({ label: S.logType, clear: "clearOneLogFilter('type')" });
+  if (S.logCategoryFilter !== 'All') out.push({ label: S.logCategoryFilter, clear: "clearOneLogFilter('category')" });
+  if (S.logAddedBy !== 'All')  out.push({ label: `Added by ${S.logAddedBy}`, clear: "clearOneLogFilter('addedBy')" });
+  if (S.logAccountFilter != null) {
+    const a = S.accounts.find(x => x.id === S.logAccountFilter);
+    if (a) out.push({ label: a.name, clear: 'clearLogAccountFilter()' });
+  }
+  if (S.logInvestedOnly)       out.push({ label: 'Money invested', clear: 'clearLogAcctTypeFilter()' });
+  else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
+  if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
+  return out;
+}
+
+function renderLogChips() {
+  const host = document.getElementById('log-active');
+  if (!host) return;
+  const active = activeLogFilters();
+  host.innerHTML = active.map(f =>
+      `<span class="lf-chip" onclick="${f.clear}">${escapeHtml(f.label)}<span class="lf-x">✕</span></span>`).join('')
+    + (active.length > 1 ? `<span class="lf-chip clear" onclick="clearAllLogFilters()">Clear all</span>` : '');
+
+  const btn = document.getElementById('log-filter-btn');
+  const n = document.getElementById('log-filter-count');
+  if (btn && n) {
+    btn.classList.toggle('on', active.length > 0);
+    n.textContent = active.length || '';
+  }
+  const sortBtn = document.getElementById('log-sort-btn');
+  if (sortBtn) sortBtn.classList.toggle('on', logSort !== 'newest');
+}
+
+function setLogKindValue(k) {
+  S.logKind = k;
+  closeLogSheet();
+  renderLog();
+}
+
+function clearOneLogFilter(which) {
+  if (which === 'person')   S.logFilter = 'All';
+  if (which === 'type')     S.logType = 'All';
+  if (which === 'category') S.logCategoryFilter = 'All';
+  if (which === 'addedBy')  S.logAddedBy = 'All';
+  renderLog();
+}
+
+// One-line setters used by the sheet's tiles. Each re-renders the sheet in
+// place so you can set several filters before dismissing it.
+function pickLogFilter(which, val) {
+  if (which === 'kind')     S.logKind = val;
+  if (which === 'person')   S.logFilter = val;
+  if (which === 'type')     S.logType = val;
+  if (which === 'category') S.logCategoryFilter = val;
+  if (which === 'addedBy')  S.logAddedBy = val;
+  renderLog();
+  renderLogSheet('filters');
+}
+
+let __logSheetMode = 'filters';
+
+function openLogSheet(mode) {
+  __logSheetMode = mode;
+  renderLogSheet(mode);
+  document.getElementById('log-sheet-overlay').classList.add('show');
+}
+
+function closeLogSheet() {
+  document.getElementById('log-sheet-overlay').classList.remove('show');
+}
+
+function renderLogSheet(mode) {
+  const box = document.getElementById('log-sheet');
+  if (!box) return;
+  const esc = v => escapeHtml(String(v)).replace(/'/g, "\\'");
+  const grab = '<div class="log-sheet-grab"></div>';
+
+  if (mode === 'sort') {
+    box.innerHTML = grab + '<h4>Sort by</h4><div class="lf-sort">'
+      + LOG_SORTS.map(o => `<div class="${o.key === logSort ? 'on' : ''}" onclick="setLogSort('${o.key}')">`
+          + `<span class="lf-tick">✓</span>${o.label}<small>${o.hint}</small></div>`).join('')
+      + '</div><div class="lf-foot"><button class="go" onclick="closeLogSheet()">Done</button></div>';
+    return;
+  }
+
+  const group = (title, which, opts, current, small) =>
+    `<h4>${title}</h4><div class="lf-tiles${small ? ' sm' : ''}">`
+    + opts.map(([val, label]) =>
+        `<div class="lf-tile${val === current ? ' on' : ''}" onclick="pickLogFilter('${which}','${esc(val)}')">`
+        + `${escapeHtml(label)}</div>`).join('')
+    + '</div>';
+
+  const usedCats = [...new Set(S.entries.map(e => e.category).filter(Boolean))].sort();
+  const binLabel = S.trash.length ? `Deleted (${S.trash.length})` : 'Deleted';
+  const count = logMatchCount();
+
+  box.innerHTML = grab
+    + group('Kind', 'kind',
+        [['All','All'], ['Expense','Expense'], ['Income','Income'], ['Transfer','Transfer'], ['Deleted', binLabel]],
+        S.logKind)
+    + group('For whom', 'person',
+        [['All','Anyone'], ['Edwin','Edwin'], ['Divya','Divya'], ['AJ','AJ'], ['Both','Both']],
+        S.logFilter)
+    + group('Type', 'type',
+        [['All','All'], ['Essentials','Essentials'], ['Non-Essentials','Non-Ess.'], ['Fun','Fun'], ['Saveable','Saveable']],
+        S.logType)
+    + group('Added by', 'addedBy',
+        [['All','Anyone'], ['Edwin','Edwin'], ['Divya','Divya']],
+        S.logAddedBy)
+    + group('Category', 'category',
+        [['All','All'], ...usedCats.map(c => [c, c])],
+        S.logCategoryFilter, true)
+    + '<div class="lf-foot">'
+    + '<button onclick="clearAllLogFilters();renderLogSheet(\'filters\')">Clear all</button>'
+    + `<button class="go" onclick="closeLogSheet()">Show ${count} ${count === 1 ? 'entry' : 'entries'}</button>`
+    + '</div>';
+}
+
+// How many rows the current filters match — the number on the sheet's
+// button, so you know what you are about to see before you dismiss it.
+function logMatchCount() {
+  const el = document.getElementById('log-list');
+  return el ? el.querySelectorAll('.entry-card, .trash-card').length : 0;
+}
+
 function setLogFilter(el) {
   el.parentElement.querySelectorAll('.log-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
@@ -4945,8 +5199,6 @@ function setLogFilter(el) {
 }
 
 function setLogKind(el) {
-  el.parentElement.querySelectorAll('.log-chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
   S.logKind = el.dataset.k;
   renderLog();
 }
@@ -5016,6 +5268,7 @@ function clearLogPeriodFilter() {
 
 // Reset every Log filter and show the full history
 function clearAllLogFilters() {
+  logSort = 'newest';
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logType = 'All';
@@ -5185,17 +5438,12 @@ function setLogCategoryFilterGo(cat) {
   goToLog();
 }
 
+// The category filter moved into the Log's filter sheet, so there is no
+// standalone select to populate — this only tidies a filter whose category
+// no longer exists (renamed or deleted in Config).
 function renderCategoryBar() {
-  const sel = document.getElementById('cat-filter-select');
-  const usedCats = [...new Set(S.entries.map(e => e.category))].sort();
-  if (S.logCategoryFilter !== 'All' && !usedCats.includes(S.logCategoryFilter)) {
-    S.logCategoryFilter = 'All';
-  }
-  sel.innerHTML = `<option value="All">All Categories</option>` +
-    usedCats.map(c => `<option value="${c}"${S.logCategoryFilter === c ? ' selected' : ''}>${c}</option>`).join('');
-  sel.value = S.logCategoryFilter;
-  sel.className = 'cat-filter-select' + (S.logCategoryFilter !== 'All' ? ' active' : '');
-  enhanceSearchableSelect(sel);
+  const usedCats = new Set(S.entries.map(e => e.category));
+  if (S.logCategoryFilter !== 'All' && !usedCats.has(S.logCategoryFilter)) S.logCategoryFilter = 'All';
 }
 
 // HTML-escapes text, then wraps search matches. Escaping first means any
@@ -5518,18 +5766,12 @@ function clearLogSearch() {
 function renderLog() {
   renderCategoryBar();
   document.getElementById('log-back-banner').style.display = S.logReturnAnchor ? 'flex' : 'none';
-  // Keep all filter chips in sync with state (covers Summary drill-downs)
-  document.querySelectorAll('#page-log .log-chip').forEach(c => {
-    let on = false;
-    if (c.dataset.k != null)      on = c.dataset.k === S.logKind;
-    else if (c.dataset.f != null) on = c.dataset.f === S.logFilter;
-    else if (c.dataset.t != null) on = c.dataset.t === S.logType;
-    else if (c.dataset.by != null) on = c.dataset.by === S.logAddedBy;
-    c.classList.toggle('active', on);
-  });
-  // Keep the bin's chip count live wherever the Log is rendered.
-  const delChip = document.getElementById('log-chip-deleted');
-  if (delChip) delChip.textContent = S.trash.length ? `🗑 Deleted (${S.trash.length})` : '🗑 Deleted';
+  // The segment shows Kind; a Summary drill-down can set it, so read it back
+  // from state rather than from whatever was last tapped.
+  document.querySelectorAll('#page-log .seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.k === S.logKind));
+  // Everything else appears as a chip, with a count on the Filters button.
+  renderLogChips();
 
   // Recently Deleted is its own view: binned records aren't part of any
   // total and can't be edited, so the person/type/category filters and the
@@ -5539,57 +5781,18 @@ function renderLog() {
   document.getElementById('log-search-input').placeholder =
     trashMode ? 'Search deleted entries…' : 'Search expenses…';
   if (trashMode) {
-    ['log-account-banner','log-accttype-banner','log-period-banner'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
     renderTrashList();
     return;
   }
 
   const list = document.getElementById('log-list');
   const totalBar = document.getElementById('log-total-bar');
-  const acctBanner = document.getElementById('log-account-banner');
 
-  // Show/hide account-filter banner
-  if (S.logAccountFilter != null) {
-    const a = S.accounts.find(x => x.id === S.logAccountFilter);
-    if (a) {
-      document.getElementById('log-account-banner-text').textContent = `Filtering by account: ${a.name}`;
-      acctBanner.style.display = 'flex';
-    } else {
-      S.logAccountFilter = null;
-      acctBanner.style.display = 'none';
-    }
-  } else {
-    acctBanner.style.display = 'none';
-  }
-
-  // Show/hide account-type filter banner (set when tapping a row in the
-  // Net Worth "where it's parked" breakdown). The Invested-mode banner
-  // takes priority — same DOM slot, different label so the user knows
-  // they're seeing the precise 'money invested this period' subset and
-  // not just every transfer touching an investment account.
-  const typeBanner = document.getElementById('log-accttype-banner');
-  if (S.logInvestedOnly) {
-    document.getElementById('log-accttype-banner-text').textContent = 'Filtering: money invested (transfers into investments/assets)';
-    typeBanner.style.display = 'flex';
-  } else if (S.logAcctTypeFilter) {
-    const label = ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter;
-    document.getElementById('log-accttype-banner-text').textContent = `Filtering by account type: ${label}`;
-    typeBanner.style.display = 'flex';
-  } else {
-    typeBanner.style.display = 'none';
-  }
-
-  // Show/hide period-filter banner (inherited from a Summary breakdown tap)
-  const periodBanner = document.getElementById('log-period-banner');
-  if (S.logPeriod !== 'all') {
-    document.getElementById('log-period-banner-text').textContent =
-      `Showing: ${PERIOD_LABELS[S.logPeriod] || S.logPeriod}`;
-    periodBanner.style.display = 'flex';
-  } else {
-    periodBanner.style.display = 'none';
+  // The account / account-type / period drill-downs used to each own an
+  // amber banner. They are chips in the row above now (see activeLogFilters),
+  // so a stale account id is all that is left to tidy up here.
+  if (S.logAccountFilter != null && !S.accounts.some(a => a.id === S.logAccountFilter)) {
+    S.logAccountFilter = null;
   }
 
   // Build merged stream
@@ -5649,9 +5852,9 @@ function renderLog() {
     items = items.filter(x => x._searchSrc.some(v => v && String(v).toLowerCase().includes(q)));
   }
 
-  // Newest first: by date, then by id (created-at) so same-day entries
-  // — expense, income or transfer — keep a stable latest-first order.
-  items.sort((a,b) => (b.date||'').localeCompare(a.date||'') || (Number(b.id)||0) - (Number(a.id)||0));
+  // Whatever order the Sort sheet last asked for; newest-first by default,
+  // which is date then id (created-at) so same-day rows stay stable.
+  applyLogSort(items);
 
   // Totals bar (transfers are excluded from cash-flow totals by design)
   if (items.length) {
@@ -5660,15 +5863,15 @@ function renderLog() {
     const xfrTotal = items.filter(x => x._kind === 'transfer').reduce((s,x) => s + Number(x.amount), 0);
     let inner = '';
     if (S.logKind === 'Income') {
-      inner = `<span class="ltb-label">${items.length} income</span><span class="ltb-amt" style="color:var(--green)">+₹${incTotal.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} income · ${logSortLabel()}</span><span class="ltb-amt" style="color:var(--green)">+₹${incTotal.toLocaleString('en-IN')}</span>`;
     } else if (S.logKind === 'Expense') {
-      inner = `<span class="ltb-label">${items.length} expense${items.length !== 1 ? 's' : ''}</span><span class="ltb-amt">₹${expTotal.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} expense${items.length !== 1 ? 's' : ''} · ${logSortLabel()}</span><span class="ltb-amt">₹${expTotal.toLocaleString('en-IN')}</span>`;
     } else if (S.logKind === 'Transfer') {
-      inner = `<span class="ltb-label">${items.length} transfer${items.length !== 1 ? 's' : ''}</span><span class="ltb-amt" style="color:var(--transfer-ink)">₹${xfrTotal.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} transfer${items.length !== 1 ? 's' : ''} · ${logSortLabel()}</span><span class="ltb-amt" style="color:var(--transfer-ink)">₹${xfrTotal.toLocaleString('en-IN')}</span>`;
     } else {
       const net = incTotal - expTotal;
       const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
-      inner = `<span class="ltb-label">${items.length} entries</span><span class="ltb-amt" style="color:${netColor}">${net>=0?'+':''}₹${net.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} entries · ${logSortLabel()}</span><span class="ltb-amt" style="color:${netColor}">${net>=0?'+':''}₹${net.toLocaleString('en-IN')}</span>`;
     }
     totalBar.innerHTML = inner;
     totalBar.style.display = 'flex';
@@ -7811,7 +8014,7 @@ function openSearchablePicker(selectEl, triggerEl) {
 // Fields whose picker shows every option as a tile grid rather than a list:
 // the ones with enough options that scrolling a list was the whole problem.
 const PICKER_GRID_IDS = new Set([
-  'f-cat', 'edit-cat', 'cat-filter-select',
+  'f-cat', 'edit-cat',
   'i-source', 'edit-source',
   'f-account', 'i-account', 't-from', 't-to',
   'edit-account', 'edit-from', 'edit-to',
@@ -7827,7 +8030,7 @@ function pickerFrequentValues(sel, n = 6) {
     return m;
   }, {});
   let counts = null;
-  if (['f-cat','edit-cat','cat-filter-select'].includes(sel.id)) counts = tally(S.entries, 'category');
+  if (['f-cat','edit-cat'].includes(sel.id)) counts = tally(S.entries, 'category');
   else if (['i-source','edit-source'].includes(sel.id))          counts = tally(S.income, 'source');
   else if (['f-account','i-account','t-from','t-to','edit-account','edit-from','edit-to'].includes(sel.id)) {
     counts = tally(S.entries, 'account');
@@ -8086,7 +8289,7 @@ function enhanceInlineChips(selectEl) {
 
 function enhanceAllSearchableSelects(root) {
   const scope = root || document;
-  scope.querySelectorAll('select.finput, select.modal-input, .acct-editor select, #cat-filter-select')
+  scope.querySelectorAll('select.finput, select.modal-input, .acct-editor select')
     .forEach(el => {
       if (el.dataset.inline) enhanceInlineChips(el);
       else enhanceSearchableSelect(el);
