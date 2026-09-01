@@ -72,7 +72,19 @@ today and clears only when a settlement is recorded — not when the calendar tu
 
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
-- Numbers: use the clean sans-serif ('Outfit'), never a decorative serif. Apply
-  `font-variant-numeric: tabular-nums` so digits stay the same width and align
+- **Two themes, one skeleton.** `:root` is **Ivory** (warm paper, espresso ink, brass) and
+  `[data-theme="dark"]` is **Vault** (warm graphite, ivory ink, brass). Every component reads
+  from the tokens; never hard-code a colour in a rule.
+- **Depth, not outlines.** Cards carry a surface and a soft shadow — no 1px fences, no tinted
+  boxes inside boxes. Rows inside a card are separated by `--divider` hairlines, sections by
+  whitespace and a small-caps label.
+- **Spend the colour once.** Brass (`--amber`) is the accent and marks selection; green and red
+  mean money in and money out and nothing else. Person colours (blue / pink / teal) appear only
+  as tints behind a name, never as a saturated slab.
+- **Type.** 'Outfit' throughout, loaded from Google Fonts. One large light figure per card
+  (weight 200–300), labels at 9.5px uppercase with 0.17–0.2em tracking, everything between
+  quiet. Apply `font-variant-numeric: tabular-nums` so digits stay the same width and align
   cleanly in columns/rows — figures must not visually "dance" up and down.
+- **Icons are line icons.** Inline SVG at 1.6px stroke, `currentColor`. No emoji in the UI —
+  they render as another vendor's artwork and undo everything above.
 - The ₹ symbol and all numeric values follow the same standard sans-serif styling.
