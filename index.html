@@ -2775,7 +2775,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-11';
+const APP_VERSION = '2026-09-01-12';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2871,6 +2871,9 @@ let S = {
   // Who the expense was FOR (logFilter) and who actually paid for it
   // (logPaidBy) are different questions, so they filter separately.
   logPaidBy: 'All',
+  // A single calendar month, 'YYYY-MM', or 'all'. Separate from logPeriod,
+  // which is the period a Summary drill-down arrived with.
+  logMonth: 'all',
   logCategoryFilter: 'All',
   logSearch: '',
   logKind: 'All',
@@ -2958,6 +2961,7 @@ function loadLocal() {
   if (!Array.isArray(S.pendingOps)) S.pendingOps = [];
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (typeof S.logPaidBy !== 'string') S.logPaidBy = 'All';
+  if (typeof S.logMonth !== 'string') S.logMonth = 'all';
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
@@ -5082,8 +5086,26 @@ function activeLogFilters() {
   }
   if (S.logInvestedOnly)       out.push({ label: 'Money invested', clear: 'clearLogAcctTypeFilter()' });
   else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
+  if (S.logMonth !== 'all')    out.push({ label: logMonthLabel(S.logMonth), clear: "clearOneLogFilter('month')" });
   if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
   return out;
+}
+
+// Every month the books actually contain, newest first — no empty months
+// in the picker, and no arbitrary cut-off at the financial year.
+function logMonthsList() {
+  const keys = new Set();
+  [...S.entries, ...S.income, ...S.transfers].forEach(r => {
+    const k = (r.date || '').slice(0, 7);
+    if (k) keys.add(k);
+  });
+  return [...keys].sort().reverse();
+}
+
+function logMonthLabel(key) {
+  const [y, m] = key.split('-');
+  return new Date(Number(y), Number(m) - 1, 1)
+    .toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
 
 function renderLogChips() {
@@ -5113,6 +5135,7 @@ function setLogKindValue(k) {
 function clearOneLogFilter(which) {
   if (which === 'person')   S.logFilter = 'All';
   if (which === 'paidBy')   S.logPaidBy = 'All';
+  if (which === 'month')    S.logMonth = 'all';
   if (which === 'type')     S.logType = 'All';
   if (which === 'category') S.logCategoryFilter = 'All';
   if (which === 'addedBy')  S.logAddedBy = 'All';
@@ -5125,6 +5148,9 @@ function pickLogFilter(which, val) {
   if (which === 'kind')     S.logKind = val;
   if (which === 'person')   S.logFilter = val;
   if (which === 'paidBy')   S.logPaidBy = val;
+  // A named month and a drill-down period are two answers to the same
+  // question, so picking one drops the other rather than intersecting them.
+  if (which === 'month')  { S.logMonth = val; if (val !== 'all') S.logPeriod = 'all'; }
   if (which === 'type')     S.logType = val;
   if (which === 'category') S.logCategoryFilter = val;
   if (which === 'addedBy')  S.logAddedBy = val;
@@ -5173,6 +5199,9 @@ function renderLogSheet(mode) {
     + group('Kind', 'kind',
         [['All','All'], ['Expense','Expense'], ['Income','Income'], ['Transfer','Transfer'], ['Deleted', binLabel]],
         S.logKind)
+    + group('Month', 'month',
+        [['all','All time'], ...logMonthsList().map(k => [k, logMonthLabel(k)])],
+        S.logMonth, true)
     + group('For whom', 'person',
         [['All','Anyone'], ['Edwin','Edwin'], ['Divya','Divya'], ['AJ','AJ'], ['Both','Both']],
         S.logFilter)
@@ -5261,6 +5290,7 @@ function setLogAccountFilter(id) {
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
+  S.logMonth = 'all';
   S.logInvestedOnly = false;
   S.logPeriod = 'all';
   S.logReturnAnchor = 'd-accounts-card';
@@ -5283,6 +5313,7 @@ function clearAllLogFilters() {
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logPaidBy = 'All';
+  S.logMonth = 'all';
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
@@ -5312,6 +5343,7 @@ function gotoLog(kind, type, acctType, period, anchor) {
   S.logAcctTypeFilter = acctType || null;
   S.logFilter = 'All';
   S.logPaidBy = 'All';
+  S.logMonth = 'all';
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
@@ -5331,6 +5363,7 @@ function gotoInvested(period, anchor) {
   S.logType = 'All';
   S.logFilter = 'All';
   S.logPaidBy = 'All';
+  S.logMonth = 'all';
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
@@ -5847,6 +5880,9 @@ function renderLog() {
       if (x._kind === 'expense')  return x.forWhom    === S.logFilter;
       return true; // transfers don't have a person field
     });
+  }
+  if (S.logMonth !== 'all') {
+    items = items.filter(x => (x.date || '').slice(0, 7) === S.logMonth);
   }
   if (S.logPaidBy !== 'All') {
     // Only expenses name a payer; income has a receiver and a transfer has
