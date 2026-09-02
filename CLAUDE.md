@@ -86,6 +86,14 @@ that produced it — kind, Paid by, For whom — so the figure can be counted ag
 Each column adds to its "Owed to" total, and the two totals differ by the balance. Keep it that way: a line nobody can verify does not belong on the card,
 and neither does a paragraph explaining the maths in place of showing it.
 
+## A figure that goes somewhere says so
+Half the numbers on the Summary drill into the Log and half don't, and they used to look
+identical. One cue, app-wide: a figure inside a row that carries a tap handler gets a hairline
+underline in `--ink3` (and the row dims while pressed). Controls — buttons, chips, pills, tiles,
+the segmented control — already read as controls and stay unmarked. The rule keys off
+`[onclick]` in CSS, so a new drill-down inherits the cue for free; if you add one, put the
+figure in the element the selector list already covers rather than inventing a marker.
+
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
 - **One palette, dark only.** `:root` is **Vault** — warm graphite, ivory ink, brass. There is
