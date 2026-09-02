@@ -927,12 +927,29 @@ select.finput option { background: white; color: var(--ink); }
 .settle-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .settle-card.open .settle-detail { display: block; }
 .settle-row {
-  display: flex; justify-content: space-between; gap: 10px;
-  font-size: 12px; color: var(--ink2); padding: 3px 0;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--ink2); padding: 9px 0;
+  border-bottom: 1px solid var(--divider);
   font-variant-numeric: tabular-nums;
 }
-.settle-row.muted { color: var(--ink3); }
-.settle-note { font-size: 10.5px; color: var(--ink3); line-height: 1.5; margin-top: 8px; }
+.settle-row:last-child { border-bottom: none; }
+.settle-row .sr-name { flex: 1; min-width: 0; }
+.settle-row .sr-name small { display: block; font-size: 10.5px; color: var(--ink3); }
+.settle-row .sr-fig { color: var(--ink); font-weight: 500; white-space: nowrap; }
+.settle-row .sr-go { color: var(--ink3); font-size: 13px; }
+.settle-row.muted, .settle-row.muted .sr-fig { color: var(--ink3); }
+/* The line each block adds up to, and the balance the two blocks produce. */
+.settle-row.subtotal { border-bottom: none; border-top: 1px solid var(--divider); }
+.settle-row.subtotal .sr-name { color: var(--ink); font-weight: 600; }
+.settle-row.subtotal .sr-fig { color: var(--amber); font-weight: 600; }
+.settle-row.net { border-top: 1px solid var(--divider); padding-top: 12px; }
+.settle-row.net .sr-name { color: var(--ink); font-weight: 600; font-size: 13.5px; }
+.settle-row.net .sr-fig { color: var(--amber); font-weight: 600; font-size: 16px; }
+.settle-block-lbl {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
+  color: var(--ink3); margin: 16px 0 2px;
+}
+.settle-sub-note { font-size: 10.5px; color: var(--ink3); padding: 2px 0 0; }
 
 /* ── Paste-a-bank-SMS box ─────────────────────────────────────────── */
 .sms-paste {
@@ -2797,7 +2814,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-14';
+const APP_VERSION = '2026-09-01-15';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2896,6 +2913,8 @@ let S = {
   // A single calendar month, 'YYYY-MM', or 'all'. Separate from logPeriod,
   // which is the period a Summary drill-down arrived with.
   logMonth: 'all',
+  // Set by the Settle Up card's "settled" line: transfers marked Settlement.
+  logSettleOnly: false,
   logCategoryFilter: 'All',
   logSearch: '',
   logKind: 'All',
@@ -2984,6 +3003,7 @@ function loadLocal() {
   if (!Array.isArray(S.dashMonths)) S.dashMonths = [];
   if (typeof S.logPaidBy !== 'string') S.logPaidBy = 'All';
   if (typeof S.logMonth !== 'string') S.logMonth = 'all';
+  if (typeof S.logSettleOnly !== 'boolean') S.logSettleOnly = false;
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
@@ -4125,6 +4145,15 @@ function settleUp(esList, effAmtFn, incList, xferList) {
   const recv  = { Edwin: 0, Divya: 0 };
   let settled = 0, settledFrom = '';
 
+  // The same balance, decomposed the way a person would ask it: what did I
+  // cover for you. For each expense I paid, the other's share of it is a
+  // claim of mine — so the two totals differ by exactly the net, and every
+  // line is one Log filter away from the entries behind it.
+  const blank = () => ({ forOther: 0, both: 0, bothGross: 0, aj: 0, ajGross: 0,
+                         otherBanked: 0, netted: 0, total: 0 });
+  const claim = { Edwin: blank(), Divya: blank() };
+  const otherOf = p => (p === 'Edwin' ? 'Divya' : 'Edwin');
+
   esList.forEach(e => {
     // The payer is out of pocket by the full amount they actually paid…
     if (paid[e.paidBy] !== undefined) paid[e.paidBy] += Number(e.amount) || 0;
@@ -4132,6 +4161,16 @@ function settleUp(esList, effAmtFn, incList, xferList) {
     const cost = effAmtFn(e);
     const w = SETTLE_SHARES[e.forWhom] || SETTLE_SHARES.Both;
     Object.entries(w).forEach(([p, frac]) => { share[p] += cost * frac; });
+
+    // Ledger side: only what one of the pair paid can be a claim.
+    const c = claim[e.paidBy];
+    if (!c) return;
+    c.netted += Math.max(0, (Number(e.amount) || 0) - cost);
+    const theirs = w[otherOf(e.paidBy)] || 0;
+    if (!theirs) return;                       // paid for themselves
+    if (e.forWhom === 'Both')    { c.both += cost * theirs; c.bothGross += cost; }
+    else if (e.forWhom === 'AJ') { c.aj   += cost * theirs; c.ajGross   += cost; }
+    else                           c.forOther += cost * theirs;
   });
 
   // Whoever banked a linked reimbursement got that money back in hand, so it
@@ -4140,8 +4179,17 @@ function settleUp(esList, effAmtFn, incList, xferList) {
   (incList || []).forEach(i => {
     if (i.reimbursesEntryId == null) return;
     if (recv[i.receivedBy] === undefined) return;
-    if (!esList.some(e => e.id === i.reimbursesEntryId)) return;
+    const src = esList.find(e => e.id === i.reimbursesEntryId);
+    if (!src) return;
     recv[i.receivedBy] += Number(i.amount) || 0;
+    // Banked by the person who did NOT pay: they are holding cash that
+    // belongs to the payer, so it is one more thing the payer is owed.
+    if (claim[src.paidBy] && src.paidBy !== i.receivedBy && claim[i.receivedBy]) {
+      claim[src.paidBy].otherBanked += Number(i.amount) || 0;
+    }
+  });
+  SETTLE_PAIR.forEach(p => {
+    claim[p].total = claim[p].forOther + claim[p].both + claim[p].aj + claim[p].otherBanked;
   });
 
   const net = {};
@@ -4161,7 +4209,7 @@ function settleUp(esList, effAmtFn, incList, xferList) {
     settledFrom = from;
   });
 
-  return { net, paid, share, recv, settled, settledFrom };
+  return { net, paid, share, recv, claim, settled, settledFrom };
 }
 
 let settleExpanded = false;
@@ -4188,21 +4236,67 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
     ? (r.settled ? 'All square — settled in full' : 'All square — nothing to settle')
     : `<b>${netE > 0 ? 'Divya' : 'Edwin'}</b> owes <b>${netE > 0 ? 'Edwin' : 'Divya'}</b>`;
 
-  const row = (label, value, muted) =>
-    `<div class="settle-row${muted ? ' muted' : ''}"><span>${label}</span><span>${value}</span></div>`;
   const money = v => '₹' + fmt(Math.round(v));
+  const other = p => (p === 'Edwin' ? 'Divya' : 'Edwin');
+
+  // One line of the ledger. `tap` carries the Log filter that produces it,
+  // so any figure here can be checked against the entries themselves.
+  const line = (label, sub, value, tap, cls) =>
+      `<div class="settle-row${cls ? ' ' + cls : ''}"${tap ? ` onclick="event.stopPropagation();${tap}"` : ''}>`
+    + `<span class="sr-name">${label}${sub ? `<small>${sub}</small>` : ''}</span>`
+    + `<span class="sr-fig">${value}</span>`
+    + (tap ? '<span class="sr-go">›</span>' : '')
+    + '</div>';
+
+  // A person's side of the ledger: everything they carried for the other.
+  const block = p => {
+    const c = r.claim[p], o = other(p);
+    const rows = [];
+    if (c.forOther) rows.push(line(`Spending for ${o}`, `${p} paid, all of it ${o}&rsquo;s`,
+      money(c.forOther), `gotoSettleLine('${p}','${o}')`));
+    if (c.both) rows.push(line(`Shared, half ${o}&rsquo;s`, `${p} paid ${money(c.bothGross)} for Both`,
+      money(c.both), `gotoSettleLine('${p}','Both')`));
+    if (c.aj) rows.push(line(`AJ, half ${o}&rsquo;s`, `${p} paid ${money(c.ajGross)} for AJ`,
+      money(c.aj), `gotoSettleLine('${p}','AJ')`));
+    if (c.otherBanked) rows.push(line(`Reimbursement banked by ${o}`,
+      `for an expense ${p} paid`, money(c.otherBanked), '', 'muted'));
+    if (!rows.length) return '';
+    const netNote = c.netted
+      ? `<div class="settle-sub-note">already net of ${money(c.netted)} reimbursed</div>` : '';
+    return `<div class="settle-block-lbl">${p} covered for ${o}</div>`
+      + rows.join('') + netNote
+      + line(`${o} owes ${p}`, '', money(c.total), '', 'subtotal');
+  };
+
+  const settledRow = r.settled
+    ? line(`Settled by ${r.settledFrom}`, 'transfers marked Settlement',
+        '−' + money(r.settled), 'gotoSettlements()')
+    : '';
+
   document.getElementById('d-settle-detail').innerHTML =
-      row('Edwin paid', money(r.paid.Edwin))
-    + row('Edwin&rsquo;s share', money(r.share.Edwin), true)
-    + (r.recv.Edwin ? row('less reimbursed to Edwin', money(r.recv.Edwin), true) : '')
-    + row('Divya paid', money(r.paid.Divya))
-    + row('Divya&rsquo;s share', money(r.share.Divya), true)
-    + (r.recv.Divya ? row('less reimbursed to Divya', money(r.recv.Divya), true) : '')
-    + (r.settled ? row(`already settled by ${r.settledFrom}`, money(r.settled)) : '')
-    + `<div class="settle-note">Every entry since the beginning, not just this
-       period — a running account that clears only when you settle. Costs for
-       Both and for AJ split half each. To square up, record the payment on the
-       Transfer tab with the kind set to Settlement.</div>`;
+      block('Edwin') + block('Divya') + settledRow
+    + line(netE === 0 ? 'Net · all square' : `Net · ${netE > 0 ? 'Divya' : 'Edwin'} owes`, '',
+        money(Math.abs(netE)), '', 'net');
+}
+
+// Tapping a ledger line opens the Log on exactly the entries behind it:
+// the same two filters the figure was built from, over all time.
+function gotoSettleLine(paidBy, forWhom) {
+  clearAllLogFilters();
+  S.logKind = 'Expense';
+  S.logPaidBy = paidBy;
+  S.logFilter = forWhom;
+  S.logReturnAnchor = 'd-settle';
+  goToLog();
+}
+
+// The settlements themselves — transfers recorded with the Settlement kind.
+function gotoSettlements() {
+  clearAllLogFilters();
+  S.logKind = 'Transfer';
+  S.logSettleOnly = true;
+  S.logReturnAnchor = 'd-settle';
+  goToLog();
 }
 
 // ══════════════════════════════════════════════════
@@ -5108,6 +5202,7 @@ function activeLogFilters() {
   }
   if (S.logInvestedOnly)       out.push({ label: 'Money invested', clear: 'clearLogAcctTypeFilter()' });
   else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
+  if (S.logSettleOnly)         out.push({ label: 'Settlements', clear: "clearOneLogFilter('settleOnly')" });
   if (S.logMonth !== 'all')    out.push({ label: logMonthLabel(S.logMonth), clear: "clearOneLogFilter('month')" });
   if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
   return out;
@@ -5178,6 +5273,7 @@ function clearOneLogFilter(which) {
   if (which === 'person')   S.logFilter = 'All';
   if (which === 'paidBy')   S.logPaidBy = 'All';
   if (which === 'month')    S.logMonth = 'all';
+  if (which === 'settleOnly') S.logSettleOnly = false;
   if (which === 'type')     S.logType = 'All';
   if (which === 'category') S.logCategoryFilter = 'All';
   if (which === 'addedBy')  S.logAddedBy = 'All';
@@ -5333,6 +5429,7 @@ function setLogAccountFilter(id) {
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logMonth = 'all';
+  S.logSettleOnly = false;
   S.logInvestedOnly = false;
   S.logPeriod = 'all';
   S.logReturnAnchor = 'd-accounts-card';
@@ -5352,6 +5449,7 @@ function clearLogPeriodFilter() {
 // Reset every Log filter and show the full history
 function clearAllLogFilters() {
   logSort = 'newest';
+  S.logSettleOnly = false;
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logPaidBy = 'All';
@@ -5385,6 +5483,7 @@ function gotoLog(kind, type, acctType, period, anchor) {
   S.logAcctTypeFilter = acctType || null;
   S.logFilter = 'All';
   S.logPaidBy = 'All';
+  S.logSettleOnly = false;
   S.logMonth = 'all';
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
@@ -5405,6 +5504,7 @@ function gotoInvested(period, anchor) {
   S.logType = 'All';
   S.logFilter = 'All';
   S.logPaidBy = 'All';
+  S.logSettleOnly = false;
   S.logMonth = 'all';
   S.logCategoryFilter = 'All';
   S.logAddedBy = 'All';
@@ -5922,6 +6022,9 @@ function renderLog() {
       if (x._kind === 'expense')  return x.forWhom    === S.logFilter;
       return true; // transfers don't have a person field
     });
+  }
+  if (S.logSettleOnly) {
+    items = items.filter(x => x._kind === 'transfer' && x.isSettlement);
   }
   if (S.logMonth !== 'all') {
     items = items.filter(x => (x.date || '').slice(0, 7) === S.logMonth);
