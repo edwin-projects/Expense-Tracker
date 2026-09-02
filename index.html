@@ -599,6 +599,14 @@ select.finput option { background: white; color: var(--ink); }
   margin-bottom: 12px;
   font-size: 12.5px;
 }
+.ltb-note {
+  flex-basis: 100%; order: 3; margin-top: 4px;
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0.01em;
+  text-transform: none; color: var(--ink3);
+}
+#log-total-bar .ltb-label { order: 1; }
+#log-total-bar .ltb-amt { order: 2; }
+#log-total-bar { flex-wrap: wrap; }
 #log-total-bar .ltb-label {
   color: var(--ink3); font-weight: 600; font-size: 9.5px;
   text-transform: uppercase; letter-spacing: 0.17em;
@@ -1018,6 +1026,9 @@ select.finput option { background: white; color: var(--ink); }
   letter-spacing: -0.02em;
 }
 .entry-date { font-size: 11.5px; color: var(--ink3); margin-top: 3px; }
+/* The "gross … reimbursed" line under a netted expense. Its own class, not
+   a borrowed .entry-date — it is not a date. */
+.entry-reimb { font-size: 11.5px; color: var(--ink3); margin-top: 3px; }
 .entry-by { font-size: 11px; color: var(--ink3); margin-top: 4px; }
 .no-data {
   text-align: center;
@@ -2775,7 +2786,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-12';
+const APP_VERSION = '2026-09-01-13';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -5108,6 +5119,26 @@ function logMonthLabel(key) {
     .toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
 
+// Reimbursements, keyed by the expense they were tagged to. The Summary
+// builds the same map inline (effAmt); the Log uses this one so the two
+// always net the same way — an expense that was fully reimbursed cost
+// nothing, and must count as nothing in every total.
+function reimbursementsByExpense() {
+  const m = new Map();
+  S.income.forEach(i => {
+    if (!isReimbursementSource(i.source) || i.reimbursesEntryId == null) return;
+    const k = Number(i.reimbursesEntryId);
+    m.set(k, (m.get(k) || 0) + Number(i.amount));
+  });
+  return m;
+}
+
+// What an expense actually cost, floored at zero: an over-reimbursement
+// never turns an expense into income.
+function effectiveExpense(e, map) {
+  return Math.max(0, Number(e.amount) - ((map || reimbursementsByExpense()).get(e.id) || 0));
+}
+
 function renderLogChips() {
   const host = document.getElementById('log-active');
   if (!host) return;
@@ -5911,22 +5942,38 @@ function renderLog() {
   // which is date then id (created-at) so same-day rows stay stable.
   applyLogSort(items);
 
-  // Totals bar (transfers are excluded from cash-flow totals by design)
+  // Totals bar (transfers are excluded from cash-flow totals by design).
+  // Money that came back does not count on either side: an expense is netted
+  // by whatever was tagged as reimbursing it, and the reimbursement income
+  // that did the netting is not income. Counting both would credit the same
+  // rupee twice, and would put the Log out of step with the Summary.
   if (items.length) {
-    const expTotal = items.filter(x => x._kind === 'expense').reduce((s,x) => s + Number(x.amount), 0);
-    const incTotal = items.filter(x => x._kind === 'income') .reduce((s,x) => s + Number(x.amount), 0);
+    const reimbMap = reimbursementsByExpense();
+    const expTotal = items.filter(x => x._kind === 'expense')
+      .reduce((s,x) => s + effectiveExpense(x, reimbMap), 0);
+    const incRows  = items.filter(x => x._kind === 'income');
+    const incTotal = incRows.filter(x => !isReimbursementSource(x.source))
+      .reduce((s,x) => s + Number(x.amount), 0);
     const xfrTotal = items.filter(x => x._kind === 'transfer').reduce((s,x) => s + Number(x.amount), 0);
+    // How much of what is on screen was netted away, so the figure can say
+    // why it is smaller than the rows appear to add up to.
+    const nettedOff = items.filter(x => x._kind === 'expense')
+      .reduce((s,x) => s + (Number(x.amount) - effectiveExpense(x, reimbMap)), 0)
+      + incRows.filter(x => isReimbursementSource(x.source)).reduce((s,x) => s + Number(x.amount), 0);
+    const note = nettedOff > 0
+      ? `<span class="ltb-note">net of ₹${Math.round(nettedOff).toLocaleString('en-IN')} reimbursed</span>`
+      : '';
     let inner = '';
     if (S.logKind === 'Income') {
-      inner = `<span class="ltb-label">${items.length} income · ${logSortLabel()}</span><span class="ltb-amt" style="color:var(--green)">+₹${incTotal.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} income · ${logSortLabel()}</span>${note}<span class="ltb-amt" style="color:var(--green)">+₹${incTotal.toLocaleString('en-IN')}</span>`;
     } else if (S.logKind === 'Expense') {
-      inner = `<span class="ltb-label">${items.length} expense${items.length !== 1 ? 's' : ''} · ${logSortLabel()}</span><span class="ltb-amt">₹${expTotal.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} expense${items.length !== 1 ? 's' : ''} · ${logSortLabel()}</span>${note}<span class="ltb-amt">₹${expTotal.toLocaleString('en-IN')}</span>`;
     } else if (S.logKind === 'Transfer') {
-      inner = `<span class="ltb-label">${items.length} transfer${items.length !== 1 ? 's' : ''} · ${logSortLabel()}</span><span class="ltb-amt" style="color:var(--transfer-ink)">₹${xfrTotal.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} transfer${items.length !== 1 ? 's' : ''} · ${logSortLabel()}</span>${note}<span class="ltb-amt" style="color:var(--transfer-ink)">₹${xfrTotal.toLocaleString('en-IN')}</span>`;
     } else {
       const net = incTotal - expTotal;
       const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
-      inner = `<span class="ltb-label">${items.length} entries · ${logSortLabel()}</span><span class="ltb-amt" style="color:${netColor}">${net>=0?'+':''}₹${net.toLocaleString('en-IN')}</span>`;
+      inner = `<span class="ltb-label">${items.length} entries · ${logSortLabel()}</span>${note}<span class="ltb-amt" style="color:${netColor}">${net>=0?'+':''}₹${net.toLocaleString('en-IN')}</span>`;
     }
     totalBar.innerHTML = inner;
     totalBar.style.display = 'flex';
@@ -5964,7 +6011,7 @@ function renderExpenseCard(e, q) {
   const headlineAmt  = reimbAmt > 0 ? net : gross;
   const headlineStr  = '₹' + headlineAmt.toLocaleString('en-IN');
   const reimbSubLine = reimbAmt > 0
-    ? `<div class="entry-date" style="color:var(--ink3)">gross ₹${fmt(Math.round(gross))} · ₹${fmt(Math.round(reimbAmt))} reimbursed</div>`
+    ? `<div class="entry-reimb">gross ₹${fmt(Math.round(gross))} · ₹${fmt(Math.round(reimbAmt))} reimbursed</div>`
     : '';
   return `
     <div class="entry-card" id="entry-${e.id}">
