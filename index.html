@@ -1323,14 +1323,25 @@ select.finput option { background: white; color: var(--ink); }
 .mc-month { font-size: 9.5px; font-weight: 600; color: var(--ink3); letter-spacing: 0.02em; }
 .mc-col.current .mc-month { color: var(--ink); }
 .mc-legend {
-  display: flex; justify-content: center; gap: 16px;
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
-  font-weight: 700; color: var(--ink3); padding: 0 0 10px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 12px; padding: 0 10px 14px;
 }
-.mc-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.mc-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
-.mc-legend i.inc { background: var(--green); }
-.mc-legend i.exp { background: var(--red); }
+.mc-leg-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mc-leg-side.exp { align-items: flex-end; text-align: right; }
+.mc-leg-lbl {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.17em;
+  font-weight: 600; color: var(--ink3);
+}
+.mc-leg-lbl i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.mc-leg-lbl i.inc { background: var(--green); }
+.mc-leg-lbl i.exp { background: var(--red); }
+.mc-leg-amt {
+  font-size: 19px; font-weight: 300; letter-spacing: -0.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.mc-leg-amt.inc { color: var(--green); }
+.mc-leg-amt.exp { color: var(--red); }
 
 /* Monthly trend */
 #d-trend { max-height: 360px; overflow-y: auto; }
@@ -2286,7 +2297,7 @@ body { transition: background 0.25s ease; }
 
     <div class="sec-label">Income vs Expense — 12 Months</div>
     <div class="fcard" style="padding:14px 6px 12px">
-      <div class="mc-legend"><span><i class="inc"></i>Income</span><span><i class="exp"></i>Expense</span></div>
+      <div class="mc-legend" id="d-mchart-legend"></div>
       <div id="d-mchart"></div>
     </div>
 
@@ -2786,7 +2797,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-13';
+const APP_VERSION = '2026-09-01-14';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7233,6 +7244,16 @@ function renderDash() {
     if (!mcMax || v <= 0) return 0;
     return Math.max(3, Math.round(v / mcMax * 76));   // % of plot height
   };
+  // The twelve months, added up — the same rows the bars are drawn from, so
+  // the header can never disagree with the chart under it.
+  const mcInc = trend.reduce((a, t) => a + t.inc, 0);
+  const mcExp = trend.reduce((a, t) => a + t.exp, 0);
+  document.getElementById('d-mchart-legend').innerHTML =
+      `<div class="mc-leg-side inc"><span class="mc-leg-lbl"><i class="inc"></i>Income</span>`
+    + `<span class="mc-leg-amt inc">₹${fmtShort(mcInc, 1)}</span></div>`
+    + `<div class="mc-leg-side exp"><span class="mc-leg-lbl"><i class="exp"></i>Expense</span>`
+    + `<span class="mc-leg-amt exp">₹${fmtShort(mcExp, 1)}</span></div>`;
+
   // A month is highlighted when the Summary is already scoped to exactly it.
   const mcSelKey = (S.dashPeriod === 'months' && (S.dashMonths || []).length === 1)
     ? S.dashMonths[0] : null;
