@@ -79,6 +79,12 @@ rides in an optional `is_settlement` column AND behind the description's marker
 **Settle Up ignores the period buttons.** It is a running account from the first entry to
 today and clears only when a settlement is recorded — not when the calendar turns over.
 
+**Every line of the breakdown is checkable.** The card decomposes the balance as what each
+person covered for the other (`settleUp()` returns `claim`), and each line taps through to the
+Log with the filters that produced it — kind, Paid by, For whom — so the figure can be counted
+against the entries. Keep it that way: a line nobody can verify does not belong on the card,
+and neither does a paragraph explaining the maths in place of showing it.
+
 ## Design Principles
 - Aesthetic: premium and minimal, not flowery or decorative. Favour elegance and restraint.
 - **One palette, dark only.** `:root` is **Vault** — warm graphite, ivory ink, brass. There is
