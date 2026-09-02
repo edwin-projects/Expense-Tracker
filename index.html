@@ -613,6 +613,47 @@ select.finput option { background: white; color: var(--ink); }
 }
 #log-total-bar .ltb-amt { color: var(--amber); font-weight: 700; font-size: 15px; }
 
+/* ── What is tappable, and what is just a number ──────────────────
+   Controls look like controls already — buttons, chips, pills, tiles. The
+   misleading case is data: a figure that quietly drills into the Log reads
+   exactly like one that does nothing. So there is one cue, everywhere, and
+   nothing else on the page uses it: a figure that goes somewhere carries a
+   hairline underline in the quietest ink, and the row dims while pressed.
+   It keys off the tap handler being present, so a new drill-down inherits
+   the cue for free — and it costs no layout, which a trailing chevron does
+   in the grid-based rows. */
+.cf-bd-row[onclick], .split-item[onclick], .settle-row[onclick], .bar-item[onclick],
+.acct-row[onclick], .trend-row[onclick], .tl-item[onclick], .card-split-row[onclick],
+.sb-cell[onclick] { cursor: pointer; }
+
+.cf-bd-row[onclick] .cf-bd-amt,
+.card-split-row[onclick] .csr-val,
+.split-item[onclick] .split-amt,
+.bar-item[onclick] .bar-val,
+.settle-row[onclick] .sr-fig,
+.acct-row[onclick] .acct-row-bal,
+.sb-cell[onclick] .sb-amt,
+.mc-col.tappable .mc-month {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ink3) 60%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+.cf-bd-row[onclick]:active, .split-item[onclick]:active, .settle-row[onclick]:active,
+.bar-item[onclick]:active, .acct-row[onclick]:active, .trend-row[onclick]:active,
+.tl-item[onclick]:active, .card-split-row[onclick]:active, .sb-cell[onclick]:active {
+  opacity: 0.6;
+}
+
+/* The Settle Up card opens and closes, so it discloses rather than links. */
+.settle-card > .settle-lbl::after {
+  content: '\2304'; color: var(--ink3); opacity: 0.5;
+  font-size: 12px; margin-left: 6px; display: inline-block;
+  transition: transform 0.18s ease;
+}
+.settle-card.open > .settle-lbl::after { transform: rotate(180deg); }
+
 /* ── Log controls ────────────────────────────────────────────────
    One segmented control for the thing you change every session, then a
    single row: search, Filters (with a count), Sort. Everything else lives
@@ -936,7 +977,6 @@ select.finput option { background: white; color: var(--ink); }
 .settle-row .sr-name { flex: 1; min-width: 0; }
 .settle-row .sr-name small { display: block; font-size: 10.5px; color: var(--ink3); }
 .settle-row .sr-fig { color: var(--ink); font-weight: 500; white-space: nowrap; }
-.settle-row .sr-go { color: var(--ink3); font-size: 13px; }
 .settle-row.muted, .settle-row.muted .sr-fig { color: var(--ink3); }
 /* The line each block adds up to, and the balance the two blocks produce. */
 .settle-row.subtotal { border-bottom: none; border-top: 1px solid var(--divider); }
@@ -2838,7 +2878,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-16';
+const APP_VERSION = '2026-09-01-17';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4269,7 +4309,6 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
       `<div class="settle-row${cls ? ' ' + cls : ''}"${tap ? ` onclick="event.stopPropagation();${tap}"` : ''}>`
     + `<span class="sr-name">${label}${sub ? `<small>${sub}</small>` : ''}</span>`
     + `<span class="sr-fig">${value}</span>`
-    + (tap ? '<span class="sr-go">›</span>' : '')
     + '</div>';
 
   // The balance sheet: rows are whose cost it was, columns are who paid it.
