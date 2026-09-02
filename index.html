@@ -949,6 +949,30 @@ select.finput option { background: white; color: var(--ink); }
   font-size: 9px; font-weight: 600; letter-spacing: 0.17em; text-transform: uppercase;
   color: var(--ink3); margin: 16px 0 2px;
 }
+/* Balance sheet: whose cost down the side, who paid across the top. */
+.sb { margin-top: 4px; }
+.sb-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px; gap: 6px;
+  align-items: center; padding: 10px 0; border-bottom: 1px solid var(--divider);
+}
+.sb-row:last-child { border-bottom: none; }
+.sb-lbl { font-size: 12.5px; color: var(--ink2); min-width: 0; }
+.sb-lbl small { display: block; font-size: 10px; color: var(--ink3); }
+.sb-cell {
+  text-align: right; font-size: 12.5px; color: var(--ink); font-weight: 500;
+  font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.sb-cell.empty { color: var(--ink3); font-weight: 400; cursor: default; }
+.sb-amt { display: block; }
+.sb-of { display: block; font-size: 9.5px; color: var(--ink3); font-weight: 400; }
+.sb-row.head { padding: 4px 0 9px; border-bottom: 1px solid var(--divider); }
+.sb-row.head .sb-lbl, .sb-row.head .sb-cell {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink3); line-height: 1.35; cursor: default;
+}
+.sb-row.total { border-bottom: none; border-top: 1px solid var(--divider); }
+.sb-row.total .sb-lbl { color: var(--ink); font-weight: 600; }
+.sb-row.total .sb-cell { color: var(--amber); font-weight: 600; cursor: default; }
 .settle-sub-note { font-size: 10.5px; color: var(--ink3); padding: 2px 0 0; }
 
 /* ── Paste-a-bank-SMS box ─────────────────────────────────────────── */
@@ -2814,7 +2838,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-15';
+const APP_VERSION = '2026-09-01-16';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4248,25 +4272,46 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
     + (tap ? '<span class="sr-go">›</span>' : '')
     + '</div>';
 
-  // A person's side of the ledger: everything they carried for the other.
-  const block = p => {
-    const c = r.claim[p], o = other(p);
-    const rows = [];
-    if (c.forOther) rows.push(line(`Spending for ${o}`, `${p} paid, all of it ${o}&rsquo;s`,
-      money(c.forOther), `gotoSettleLine('${p}','${o}')`));
-    if (c.both) rows.push(line(`Shared, half ${o}&rsquo;s`, `${p} paid ${money(c.bothGross)} for Both`,
-      money(c.both), `gotoSettleLine('${p}','Both')`));
-    if (c.aj) rows.push(line(`AJ, half ${o}&rsquo;s`, `${p} paid ${money(c.ajGross)} for AJ`,
-      money(c.aj), `gotoSettleLine('${p}','AJ')`));
-    if (c.otherBanked) rows.push(line(`Reimbursement banked by ${o}`,
-      `for an expense ${p} paid`, money(c.otherBanked), '', 'muted'));
-    if (!rows.length) return '';
-    const netNote = c.netted
-      ? `<div class="settle-sub-note">already net of ${money(c.netted)} reimbursed</div>` : '';
-    return `<div class="settle-block-lbl">${p} covered for ${o}</div>`
-      + rows.join('') + netNote
-      + line(`${o} owes ${p}`, '', money(c.total), '', 'subtotal');
+  // The balance sheet: rows are whose cost it was, columns are who paid it.
+  // Each cell holds the amount that counts toward the balance — the other
+  // person's share — with the spending it came out of underneath, so the
+  // halving is on the page rather than taken on trust. Every cell with a
+  // figure opens the Log on exactly those entries.
+  const cell = (payer, forWhom, amt, gross) => {
+    if (!amt) return '<div class="sb-cell empty">—</div>';
+    return `<div class="sb-cell" onclick="event.stopPropagation();gotoSettleLine('${payer}','${forWhom}')">`
+      + `<span class="sb-amt">${money(amt)}</span>`
+      + (gross ? `<span class="sb-of">of ${money(gross)}</span>` : '')
+      + '</div>';
   };
+
+  const E = r.claim.Edwin, D = r.claim.Divya;
+  const sheetRow = (label, left, right) =>
+    `<div class="sb-row"><div class="sb-lbl">${label}</div>${left}${right}</div>`;
+
+  const rows = [];
+  if (E.forOther) rows.push(sheetRow('For Divya',
+    cell('Edwin', 'Divya', E.forOther), '<div class="sb-cell empty">—</div>'));
+  if (D.forOther) rows.push(sheetRow('For Edwin',
+    '<div class="sb-cell empty">—</div>', cell('Divya', 'Edwin', D.forOther)));
+  if (E.both || D.both) rows.push(sheetRow('Both <small>half each</small>',
+    cell('Edwin', 'Both', E.both, E.bothGross), cell('Divya', 'Both', D.both, D.bothGross)));
+  if (E.aj || D.aj) rows.push(sheetRow('AJ <small>half each</small>',
+    cell('Edwin', 'AJ', E.aj, E.ajGross), cell('Divya', 'AJ', D.aj, D.ajGross)));
+  if (E.otherBanked || D.otherBanked) rows.push(sheetRow('Held by the other <small>reimbursement</small>',
+    E.otherBanked ? `<div class="sb-cell"><span class="sb-amt">${money(E.otherBanked)}</span></div>` : '<div class="sb-cell empty">—</div>',
+    D.otherBanked ? `<div class="sb-cell"><span class="sb-amt">${money(D.otherBanked)}</span></div>` : '<div class="sb-cell empty">—</div>'));
+
+  const sheet =
+      '<div class="sb">'
+    + `<div class="sb-row head"><div class="sb-lbl">Whose cost</div>`
+    + `<div class="sb-cell">Edwin<br>paid</div><div class="sb-cell">Divya<br>paid</div></div>`
+    + rows.join('')
+    + `<div class="sb-row total"><div class="sb-lbl">Owed to</div>`
+    + `<div class="sb-cell"><span class="sb-amt">${money(E.total)}</span></div>`
+    + `<div class="sb-cell"><span class="sb-amt">${money(D.total)}</span></div></div>`
+    + '</div>'
+    + ((E.netted + D.netted) ? `<div class="settle-sub-note">costs shown are already net of ${money(E.netted + D.netted)} reimbursed</div>` : '');
 
   const settledRow = r.settled
     ? line(`Settled by ${r.settledFrom}`, 'transfers marked Settlement',
@@ -4274,8 +4319,8 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
     : '';
 
   document.getElementById('d-settle-detail').innerHTML =
-      block('Edwin') + block('Divya') + settledRow
-    + line(netE === 0 ? 'Net · all square' : `Net · ${netE > 0 ? 'Divya' : 'Edwin'} owes`, '',
+      sheet + settledRow
+    + line(netE === 0 ? 'Difference · all square' : `Difference · ${netE > 0 ? 'Divya' : 'Edwin'} owes`, '',
         money(Math.abs(netE)), '', 'net');
 }
 

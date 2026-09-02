@@ -79,10 +79,11 @@ rides in an optional `is_settlement` column AND behind the description's marker
 **Settle Up ignores the period buttons.** It is a running account from the first entry to
 today and clears only when a settlement is recorded — not when the calendar turns over.
 
-**Every line of the breakdown is checkable.** The card decomposes the balance as what each
-person covered for the other (`settleUp()` returns `claim`), and each line taps through to the
-Log with the filters that produced it — kind, Paid by, For whom — so the figure can be counted
-against the entries. Keep it that way: a line nobody can verify does not belong on the card,
+**Every line of the breakdown is checkable.** The card is a balance sheet: rows are whose cost
+it was, columns are who paid (`settleUp()` returns `claim`). A cell holds the other person's
+share, with the spending it came out of underneath, and taps through to the Log with the filters
+that produced it — kind, Paid by, For whom — so the figure can be counted against the entries.
+Each column adds to its "Owed to" total, and the two totals differ by the balance. Keep it that way: a line nobody can verify does not belong on the card,
 and neither does a paragraph explaining the maths in place of showing it.
 
 ## Design Principles
