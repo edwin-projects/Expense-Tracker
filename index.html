@@ -1386,7 +1386,20 @@ select.finput option { background: white; color: var(--ink); }
   font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em;
   font-weight: 600; color: var(--ink3);
 }
-.mc-fy { margin-left: auto; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.mc-fy { font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+/* The year's net bookends the title row: label above, figure under it, hard
+   right — the corner the eye lands on first on every other card here. */
+.mc-head-net { margin-left: auto; text-align: right; align-self: flex-start; }
+.mc-head-net .k {
+  display: block; font-size: 8px; text-transform: uppercase; letter-spacing: 0.16em;
+  font-weight: 600; color: var(--ink3);
+}
+.mc-head-net .v {
+  font-size: 17px; font-weight: 400; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.mc-head-net .v.pos { color: var(--green); }
+.mc-head-net .v.neg { color: var(--red); }
 .mc-total { display: flex; align-items: center; gap: 5px; margin: 0 1px 15px; }
 .mc-amt {
   font-weight: 300; font-size: 23px; letter-spacing: -0.02em; line-height: 1;
@@ -2885,7 +2898,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-05-01';
+const APP_VERSION = '2026-09-05-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7443,6 +7456,7 @@ function renderDash() {
   // the header can never disagree with the chart under it.
   const mcInc = trend.reduce((a, t) => a + t.inc, 0);
   const mcExp = trend.reduce((a, t) => a + t.exp, 0);
+  const mcNet = mcInc - mcExp;
   const mcNetTxt = v => (v >= 0 ? '+' : '−') + fmtShort(Math.abs(v), 1);
   // A month is highlighted when the Summary is already scoped to exactly it.
   const mcSelKey = (S.dashPeriod === 'months' && (S.dashMonths || []).length === 1)
@@ -7469,7 +7483,10 @@ function renderDash() {
   });
   document.getElementById('d-mchart').innerHTML =
       `<div class="mc-head"><span class="mc-title">Income &amp; expenses</span>`
-    + `<span class="mc-fy">FY ${fyY}–${String(fyY + 1).slice(2)}</span></div>`
+    + `<span class="mc-fy">FY ${fyY}–${String(fyY + 1).slice(2)}</span>`
+    + `<span class="mc-head-net"><span class="k">Net YTD</span>`
+    + `<span class="v ${mcNet >= 0 ? 'pos' : 'neg'}">`
+    + `${mcNet >= 0 ? '+' : '−'}₹${fmtShort(Math.abs(mcNet), 1)}</span></span></div>`
     + `<div class="mc-total"><span class="mc-amt inc">₹${fmtShort(mcInc, 1)}</span>`
     + `<span class="mc-cap">in</span>`
     + `<span class="mc-amt exp">₹${fmtShort(mcExp, 1)}</span><span class="mc-cap">out</span>`
