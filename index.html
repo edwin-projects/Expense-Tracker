@@ -2889,7 +2889,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-05-05';
+const APP_VERSION = '2026-09-05-06';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -6368,8 +6368,9 @@ function openMonthPicker(el) {
 
 // Tap a month in the 12-month chart → scope the whole Summary to that month.
 // It routes through the same 'months' period the Months ▾ picker uses, so the
-// cards, the category tables and the Log filter all follow along, and the
-// picker opens showing which month is selected.
+// cards, the category tables and the Log filter all follow along. The picker
+// is left however the user had it — tapping a bar is already the answer it
+// would have asked for.
 function dashMonthFromChart(key) {
   S.dashPeriod = 'months';
   S.dashMonths = [key];
@@ -6377,8 +6378,9 @@ function dashMonthFromChart(key) {
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('period-months-btn');
   if (btn) btn.classList.add('active');
-  const picker = document.getElementById('month-picker');
-  if (picker) picker.style.display = 'block';
+  // The chips are rebuilt so the picker is right whenever it is next opened,
+  // but the picker itself stays shut: the tap already said which month, and
+  // dropping a twelve-tile grid over the page answers a question nobody asked.
   buildMonthChips();
   renderDash();
   // Land on the figures that just changed, not halfway down the page.
