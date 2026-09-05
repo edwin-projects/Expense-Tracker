@@ -24,6 +24,10 @@
   --ink: #f0eee9;
   --ink2: #a5a29b;
   --ink3: #7d7871;
+  /* Every bar on the Summary is drawn at the weight of the 12-month chart's
+     columns, so a proportion reads the same wherever it appears. */
+  --bar-h: 18px;
+  --bar-r: 5px;
   --amber: #d3b168;
   --amber-light: #e3c88e;
   --amber-bg: #241f16;
@@ -1241,16 +1245,16 @@ select.finput option { background: white; color: var(--ink); }
 .mini-delta.neg { color: var(--red); }
 .mini-delta:empty { display: none; }
 .spend-bar {
-  width: 100%; height: 8px; flex: 1 1 auto;
-  background: var(--divider); border-radius: 4px;
+  width: 100%; height: var(--bar-h); flex: 1 1 auto;
+  background: var(--divider); border-radius: var(--bar-r);
   position: relative; overflow: visible;
 }
 .spend-fill {
   position: absolute; left: 0; top: 0; height: 100%;
-  border-radius: 4px; overflow: hidden;
+  border-radius: var(--bar-r); overflow: hidden;
   transition: width .3s ease, left .3s ease;
   display: flex; align-items: center; justify-content: center;
-  /* The percentages live in the rows beneath — a 8px rule is a proportion,
+  /* The percentages live in the rows beneath — the bar is a proportion,
      not a label. */
   font-size: 0; color: transparent;
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -1267,15 +1271,15 @@ select.finput option { background: white; color: var(--ink); }
 /* Dashed 100% goalposts + the dark-red overflow segment beyond them */
 /* Neon 100% goalpost — sits within the bar at the overflow junction */
 .spend-bracket {
-  position: absolute; right: 0; top: 4px; bottom: 4px; width: 2px;
+  position: absolute; right: 0; top: 5px; bottom: 5px; width: 2px;
   background: repeating-linear-gradient(to bottom, #e6ff00 0 3px, transparent 3px 6px);
   display: none;
 }
 .spend-bar.over .spend-bracket { display: block; }
-.spend-overflow { height: 8px; flex-shrink: 0; background: var(--red); border-radius: 0 4px 4px 0; display: none; }
+.spend-overflow { height: var(--bar-h); flex-shrink: 0; background: var(--red); border-radius: 0 var(--bar-r) var(--bar-r) 0; display: none; }
 
 /* Spend split by type ("Where it goes") */
-.typesplit-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--divider); width: 100%; margin: 16px auto 0; }
+.typesplit-bar { display: flex; height: var(--bar-h); border-radius: var(--bar-r); overflow: hidden; background: var(--divider); width: 100%; margin: 16px auto 0; }
 .typesplit-bar > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0; overflow: hidden; }
 .typesplit-legend { display: flex; flex-direction: column; gap: 1px; margin: 8px auto 0; width: 100%; }
 .tl-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--ink2); }
@@ -1341,8 +1345,8 @@ select.finput option { background: white; color: var(--ink); }
 /* Bar chart */
 .bar-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .bar-name { font-size: 12.5px; color: var(--ink2); width: 110px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar-track { flex: 1; height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
-.bar-fill { height: 100%; background: var(--amber); border-radius: 4px; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+.bar-track { flex: 1; height: var(--bar-h); background: var(--bg2); border-radius: var(--bar-r); overflow: hidden; }
+.bar-fill { height: 100%; background: var(--amber); border-radius: var(--bar-r); transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
 /* Income bars read green, matching every other income figure in the app. */
 .bar-fill.income { background: var(--green); }
 
@@ -2885,7 +2889,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-05-03';
+const APP_VERSION = '2026-09-05-04';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
