@@ -2889,7 +2889,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-05-04';
+const APP_VERSION = '2026-09-05-05';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -5657,8 +5657,13 @@ function gotoAccount(id) {
   }, 60);
 }
 
-function setLogPersonFilterGo(name, kind, type, anchor) {
-  S.logFilter = name;
+// `by` picks which question the name answers: 'person' is who the money was
+// for (an expense) or who banked it (an income); 'paidBy' is who actually
+// paid. They are separate filters on the Log, so the other one is cleared —
+// otherwise a stale "Paid by Divya" would empty an "Earned by Edwin" drill.
+function setLogPersonFilterGo(name, kind, type, anchor, by) {
+  S.logFilter = (by === 'paidBy') ? 'All' : name;
+  S.logPaidBy = (by === 'paidBy') ? name  : 'All';
   S.logKind = kind || 'All';
   S.logType = type || 'All';
   S.logAddedBy = 'All';
@@ -6809,6 +6814,8 @@ function ownerOf(acct) { return acct ? (acct.owner || 'Joint') : null; }
 // row's share of its group total (skipped when the group total isn't positive).
 // groups[].link — when set to a log kind ('Expense' / 'Income'), each
 // person row becomes a tap target that opens the Log filtered to it.
+// groups[].linkBy — 'paidBy' when the names are who paid rather than who the
+// money was for or who banked it; omitted for the latter.
 function cardSplitHTML(groups) {
   const PCLASS = { Edwin:'p-edwin', Divya:'p-divya', AJ:'p-aj', Joint:'p-joint', Both:'p-joint' };
   let html = '';
@@ -6820,7 +6827,7 @@ function cardSplitHTML(groups) {
     rows.forEach(([name, amt]) => {
       const pct = denom > 0 ? Math.round(amt / denom * 100) : null;
       const disp = name === 'Both' ? 'Joint' : name;
-      const tap = g.link ? ` onclick="setLogPersonFilterGo('${name}','${g.link}','${g.linkType || ''}','${g.anchor || ''}')" style="cursor:pointer"` : '';
+      const tap = g.link ? ` onclick="setLogPersonFilterGo('${name}','${g.link}','${g.linkType || ''}','${g.anchor || ''}','${g.linkBy || ''}')" style="cursor:pointer"` : '';
       html += `<div class="card-split-row"${tap}>`
         + `<span class="csr-name ${PCLASS[name] || ''}">${disp}</span>`
         + `<span class="csr-val">${amt < 0 ? '−' : ''}₹${fmt(Math.abs(Math.round(amt)))}`
@@ -7163,7 +7170,7 @@ function renderDash() {
   const expByPaid   = ['Edwin','Divya'].map(n => [n, sumBy(es, 'paidBy',     n, effAmt)            - unlinkedReimbBy(n)]);
   document.getElementById('d-cf-income-split').innerHTML = cardSplitHTML([{head:'Earned By', pairs: incByPerson, link:'Income', anchor:'d-cf-income-split'}]);
   document.getElementById('d-cf-expense-split').innerHTML = cardSplitHTML([
-    {head:'Paid By', pairs: expByPaid}
+    {head:'Paid By', pairs: expByPaid, link:'Expense', linkBy:'paidBy', anchor:'d-cf-expense-split'}
   ]);
 
   // ── Settle Up ──
