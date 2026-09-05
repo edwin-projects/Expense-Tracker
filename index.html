@@ -1386,36 +1386,23 @@ select.finput option { background: white; color: var(--ink); }
   font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em;
   font-weight: 600; color: var(--ink3);
 }
-.mc-fy { font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
-/* The year's net bookends the title row: label above, figure under it, hard
-   right — the corner the eye lands on first on every other card here. */
-.mc-head-net { margin-left: auto; text-align: right; align-self: flex-start; }
-.mc-head-net .k {
-  display: block; font-size: 8px; text-transform: uppercase; letter-spacing: 0.16em;
-  font-weight: 600; color: var(--ink3);
-}
-.mc-head-net .v {
-  font-size: 17px; font-weight: 400; letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-}
-.mc-head-net .v.pos { color: var(--green); }
-.mc-head-net .v.neg { color: var(--red); }
-.mc-total { display: flex; align-items: center; gap: 5px; margin: 0 1px 15px; }
+.mc-fy { margin-left: auto; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+/* Three figures and their captions have to hold one line down to 360px, so the
+   type is sized to the widest reading the card can show, not to today's. */
+.mc-total { display: flex; align-items: center; gap: 4px; margin: 0 1px 15px; }
 .mc-amt {
-  font-weight: 300; font-size: 23px; letter-spacing: -0.02em; line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-weight: 300; font-size: 21px; letter-spacing: -0.025em; line-height: 1;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .mc-amt.inc { color: var(--green); }
 .mc-amt.exp { color: var(--red); }
-.mc-cap { font-size: 10.5px; color: var(--ink3); }
-.mc-cap + .mc-amt { margin-left: 9px; }
-/* Legend rides on the right of the totals, vertically centred to them */
-.mc-total .mc-legend { margin: 0 0 0 auto; }
-.mc-legend { display: flex; gap: 8px 11px; flex-wrap: wrap; justify-content: flex-end; }
-.mc-legend span { font-size: 10px; color: var(--ink2); display: flex; align-items: center; gap: 5px; }
-.mc-sw { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
-.mc-sw.s { background: linear-gradient(180deg, var(--green), #4d7f61); }
-.mc-sw.e { background: linear-gradient(180deg, var(--red), #9c5a54); }
+/* The net is worked out from the two beside it, so it sits a size down. */
+.mc-amt.net { margin-left: auto; font-size: 19px; font-weight: 400; }
+.mc-amt.net.pos { color: var(--green); }
+.mc-amt.net.neg { color: var(--red); }
+.mc-cap { font-size: 10.5px; color: var(--ink3); white-space: nowrap; }
+.mc-cap + .mc-amt { margin-left: 7px; }
+.mc-cap + .mc-amt.net { margin-left: auto; }
 .mc-chart { position: relative; }
 /* Diverging layout: income bars up, expense bars mirrored down from a zero line */
 .mc-row { display: flex; gap: 5px; padding: 0 1px; }
@@ -2898,7 +2885,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-05-02';
+const APP_VERSION = '2026-09-05-03';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7483,15 +7470,13 @@ function renderDash() {
   });
   document.getElementById('d-mchart').innerHTML =
       `<div class="mc-head"><span class="mc-title">Income &amp; expenses</span>`
-    + `<span class="mc-fy">FY ${fyY}–${String(fyY + 1).slice(2)}</span>`
-    + `<span class="mc-head-net"><span class="k">Net YTD</span>`
-    + `<span class="v ${mcNet >= 0 ? 'pos' : 'neg'}">`
-    + `${mcNet >= 0 ? '+' : '−'}₹${fmtShort(Math.abs(mcNet), 1)}</span></span></div>`
+    + `<span class="mc-fy">FY ${fyY}–${String(fyY + 1).slice(2)}</span></div>`
     + `<div class="mc-total"><span class="mc-amt inc">₹${fmtShort(mcInc, 1)}</span>`
     + `<span class="mc-cap">in</span>`
     + `<span class="mc-amt exp">₹${fmtShort(mcExp, 1)}</span><span class="mc-cap">out</span>`
-    + `<span class="mc-legend"><span><i class="mc-sw s"></i> Income</span>`
-    + `<span><i class="mc-sw e"></i> Expenses</span></span></div>`
+    + `<span class="mc-amt net ${mcNet >= 0 ? 'pos' : 'neg'}">`
+    + `${mcNet >= 0 ? '+' : '−'}₹${fmtShort(Math.abs(mcNet), 1)}</span>`
+    + `<span class="mc-cap">net</span></div>`
     + `<div class="mc-chart"><div class="mc-row mc-up">${mcUp.join('')}</div>`
     + `<div class="mc-zero"></div>`
     + `<div class="mc-row mc-dn">${mcDn.join('')}</div></div>`;
