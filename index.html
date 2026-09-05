@@ -633,7 +633,7 @@ select.finput option { background: white; color: var(--ink); }
 .settle-row[onclick] .sr-fig,
 .acct-row[onclick] .acct-row-bal,
 .sb-cell[onclick] .sb-amt,
-.mc-col.tappable .mc-month {
+.mc-col:not(.ghost) .mc-mn {
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--ink3) 60%, transparent);
   text-decoration-thickness: 1px;
@@ -1375,54 +1375,65 @@ select.finput option { background: white; color: var(--ink); }
 .bar-total-amt.income { color: var(--green); }
 .bar-val { font-size: 12px; color: var(--ink2); width: 56px; text-align: right; flex-shrink: 0; font-weight: 500; }
 
-/* 12-month income vs expense chart. Sized to sit alongside the stat cards:
-   a short plot, the value written above each bar (rotated so all twelve
-   months fit on a phone without scrolling), month initials underneath. */
-#d-mchart { display: flex; align-items: flex-end; gap: 2px; padding: 10px 8px 6px; }
-.mc-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  padding: 2px 0 3px; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
-.mc-col.tappable { cursor: pointer; }
-.mc-col.tappable:active { background: var(--amber-bg); }
-.mc-col.sel { background: var(--amber-bg); box-shadow: inset 0 0 0 1px var(--amber-border); }
-.mc-col.sel .mc-month { color: var(--ink); }
-.mc-plot { width: 100%; height: 104px; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
-.mc-bar { position: relative; width: 8px; border-radius: 3px 3px 0 0; }
-.mc-bar.inc { background: var(--green); }
-.mc-bar.exp { background: var(--red); }
-.mc-lbl {
-  position: absolute; bottom: 100%; left: 50%; margin-bottom: 3px;
-  /* One transform, not `rotate:` plus `transform:` — the individual rotate
-     property applies first and would leave translateX(-50%) working in the
-     rotated frame, pushing every label a full width off its bar. */
-  transform: translateX(-50%) rotate(180deg);
-  writing-mode: vertical-rl;
-  font-size: 8.5px; font-weight: 600; line-height: 1;
-  font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.mc-lbl.inc { color: var(--green); }
-.mc-lbl.exp { color: var(--red); }
-.mc-month { font-size: 9.5px; font-weight: 600; color: var(--ink3); letter-spacing: 0.02em; }
-.mc-col.current .mc-month { color: var(--ink); }
-.mc-legend {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  gap: 12px; padding: 0 10px 14px;
-}
-.mc-leg-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.mc-leg-side.exp { align-items: flex-end; text-align: right; }
-.mc-leg-lbl {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 9px; text-transform: uppercase; letter-spacing: 0.17em;
+/* 12-month income vs expense chart — the diverging pair from Comedor's
+   "Sales & expenses": income rises above a zero rule, expense hangs mirrored
+   below it, each with its own compact figure, and the month's net sits as a
+   small signed number at the top of the column. Months still to come are
+   dashed ghosts so all twelve always read across on a phone. */
+.mc-card { padding: 16px 15px 12px; }
+.mc-head { display: flex; align-items: baseline; gap: 10px; margin: 0 1px 3px; }
+.mc-head .mc-title {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.18em;
   font-weight: 600; color: var(--ink3);
 }
-.mc-leg-lbl i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
-.mc-leg-lbl i.inc { background: var(--green); }
-.mc-leg-lbl i.exp { background: var(--red); }
-.mc-leg-amt {
-  font-size: 19px; font-weight: 300; letter-spacing: -0.02em; line-height: 1;
+.mc-fy { margin-left: auto; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.mc-total { display: flex; align-items: center; gap: 5px; margin: 0 1px 15px; }
+.mc-amt {
+  font-weight: 300; font-size: 23px; letter-spacing: -0.02em; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.mc-leg-amt.inc { color: var(--green); }
-.mc-leg-amt.exp { color: var(--red); }
+.mc-amt.inc { color: var(--green); }
+.mc-amt.exp { color: var(--red); }
+.mc-cap { font-size: 10.5px; color: var(--ink3); }
+.mc-cap + .mc-amt { margin-left: 9px; }
+/* Legend rides on the right of the totals, vertically centred to them */
+.mc-total .mc-legend { margin: 0 0 0 auto; }
+.mc-legend { display: flex; gap: 8px 11px; flex-wrap: wrap; justify-content: flex-end; }
+.mc-legend span { font-size: 10px; color: var(--ink2); display: flex; align-items: center; gap: 5px; }
+.mc-sw { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.mc-sw.s { background: linear-gradient(180deg, var(--green), #4d7f61); }
+.mc-sw.e { background: linear-gradient(180deg, var(--red), #9c5a54); }
+.mc-chart { position: relative; }
+/* Diverging layout: income bars up, expense bars mirrored down from a zero line */
+.mc-row { display: flex; gap: 5px; padding: 0 1px; }
+.mc-up .mc-col { flex: 1 1 0; min-width: 0; height: 98px; display: flex; flex-direction: column;
+  justify-content: space-between; align-items: center; -webkit-tap-highlight-color: transparent; }
+.mc-net { height: 14px; line-height: 14px; margin-bottom: 2px; font-weight: 400; font-size: 8px;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em; white-space: nowrap; }
+.mc-net.pos { color: var(--green); }
+.mc-net.neg { color: var(--red); }
+.mc-barwrap { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; width: 100%; }
+.mc-val { font-weight: 600; font-size: 9.5px; color: var(--ink2); margin-bottom: 3px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mc-bar { width: 80%; max-width: 22px; min-height: 2px; }
+.mc-bar.up { border-radius: 5px 5px 0 0; background: linear-gradient(180deg, var(--green), #4d7f61); }
+.mc-bar.dn { border-radius: 0 0 5px 5px; background: linear-gradient(180deg, var(--red), #9c5a54); }
+.mc-zero { height: 1.5px; background: var(--ink3); opacity: .5; border-radius: 2px; margin: 0 1px; }
+.mc-dn .mc-col { flex: 1 1 0; min-width: 0; height: 70px; display: flex; flex-direction: column; align-items: center;
+  -webkit-tap-highlight-color: transparent; }
+.mc-mn { width: 80%; max-width: 22px; text-align: center; font-size: 8.5px; font-weight: 600;
+  color: var(--ink3); text-transform: uppercase; margin: 4px 0 3px; }
+.mc-eval { font-weight: 600; font-size: 9px; color: var(--red); margin-top: 3px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mc-col:not(.ghost) { cursor: pointer; }
+.mc-col.current .mc-bar.up { background: linear-gradient(180deg, var(--amber-light), var(--amber)); }
+.mc-col.current .mc-val, .mc-col.current .mc-mn { color: var(--amber); }
+.mc-col.ghost .mc-bar.up { background: transparent; border: 1.5px dashed var(--border2); border-bottom: none; min-height: 10px; }
+.mc-col.ghost .mc-bar.dn { background: transparent; border: 1.5px dashed var(--border2); border-top: none; min-height: 10px; }
+.mc-col.ghost .mc-val, .mc-col.ghost .mc-eval, .mc-col.ghost .mc-net { visibility: hidden; }
+.mc-col.sel .mc-bar.up { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--green); }
+.mc-col.sel.current .mc-bar.up { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--amber); }
+.mc-col.sel .mc-mn { color: var(--ink); }
 
 /* Monthly trend */
 #d-trend { max-height: 360px; overflow-y: auto; }
@@ -2376,11 +2387,7 @@ body { transition: background 0.25s ease; }
       </div>
     </div>
 
-    <div class="sec-label">Income vs Expense — 12 Months</div>
-    <div class="fcard" style="padding:14px 6px 12px">
-      <div class="mc-legend" id="d-mchart-legend"></div>
-      <div id="d-mchart"></div>
-    </div>
+    <div class="fcard mc-card" id="d-mchart"></div>
 
     <div class="sec-label">Net Worth</div>
     <div class="stat-grid">
@@ -2878,7 +2885,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-01-18';
+const APP_VERSION = '2026-09-05-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7423,42 +7430,54 @@ function renderDash() {
     t.nwPct = (t.nw != null && prev != null && prev > 0) ? (t.nw - prev) / prev * 100 : null;
   });
 
-  // ── 12-month bar chart (same FY months as the trend table) ──
-  const mcMax = Math.max(...trend.map(t => Math.max(t.inc, t.exp)), 0);
-  // The tallest bar stops at 76% of the plot so its label always has room
-  // above it inside the card; a non-zero month never renders as nothing.
-  const mcH = v => {
-    if (!mcMax || v <= 0) return 0;
-    return Math.max(3, Math.round(v / mcMax * 76));   // % of plot height
-  };
+  // ── 12-month diverging bar chart (same FY months as the trend table) ──
+  // Income rises above the zero rule, expense hangs mirrored below it, and the
+  // month's net rides at the top of the column. Each side is scaled on its own
+  // max so a light month still reads; the figures on the bars are the check.
+  const mcFuture = (t, i) => i > curIdx && t.inc === 0 && t.exp === 0;
+  const mcLive = trend.filter((t, i) => !mcFuture(t, i));
+  const mcMaxI = Math.max(1, ...mcLive.map(t => t.inc));
+  const mcMaxE = Math.max(1, ...mcLive.map(t => t.exp));
+  const MC_UP = 58, MC_DN = 40;          // px budget for the tallest bar each side
   // The twelve months, added up — the same rows the bars are drawn from, so
   // the header can never disagree with the chart under it.
   const mcInc = trend.reduce((a, t) => a + t.inc, 0);
   const mcExp = trend.reduce((a, t) => a + t.exp, 0);
-  document.getElementById('d-mchart-legend').innerHTML =
-      `<div class="mc-leg-side inc"><span class="mc-leg-lbl"><i class="inc"></i>Income</span>`
-    + `<span class="mc-leg-amt inc">₹${fmtShort(mcInc, 1)}</span></div>`
-    + `<div class="mc-leg-side exp"><span class="mc-leg-lbl"><i class="exp"></i>Expense</span>`
-    + `<span class="mc-leg-amt exp">₹${fmtShort(mcExp, 1)}</span></div>`;
-
+  const mcNetTxt = v => (v >= 0 ? '+' : '−') + fmtShort(Math.abs(v), 1);
   // A month is highlighted when the Summary is already scoped to exactly it.
   const mcSelKey = (S.dashPeriod === 'months' && (S.dashMonths || []).length === 1)
     ? S.dashMonths[0] : null;
-  document.getElementById('d-mchart').innerHTML = trend.map(t => {
-    const cur = t.key === curKey ? ' current' : '';
-    // A month with nothing in it (typically still in the future) shows an
-    // empty slot — the month keeps its place so all twelve always read across.
-    const bar = (v, cls) => v > 0
-      ? `<div class="mc-bar ${cls}" style="height:${mcH(v)}%"><span class="mc-lbl ${cls}">${fmtShort(v, 1)}</span></div>`
-      : '';
-    // Tapping a month scopes the whole Summary to it. An empty month has
-    // nothing to show, so it stays inert rather than blanking the page.
-    const live = t.inc > 0 || t.exp > 0;
-    const sel = t.key === mcSelKey ? ' sel' : '';
-    const tap = live ? ` tappable" onclick="dashMonthFromChart('${t.key}')` : '';
-    return `<div class="mc-col${cur}${sel}${tap}"><div class="mc-plot">${bar(t.inc,'inc')}${bar(t.exp,'exp')}</div>`
-      + `<div class="mc-month">${t.label.split(' ')[0]}</div></div>`;
-  }).join('');
+  const mcUp = [], mcDn = [];
+  trend.forEach((t, i) => {
+    const ghost = mcFuture(t, i);
+    const cls = 'mc-col' + (ghost ? ' ghost' : '') + (t.key === curKey ? ' current' : '')
+      + (t.key === mcSelKey ? ' sel' : '');
+    // Tapping a month scopes the whole Summary to it. A month with nothing in
+    // it has nothing to show, so it stays inert rather than blanking the page.
+    const tap = ghost ? '' : ` onclick="dashMonthFromChart('${t.key}')"`;
+    const ih = ghost ? 10 : Math.max(t.inc > 0 ? 3 : 0, Math.round(t.inc / mcMaxI * MC_UP));
+    const eh = ghost ? 10 : Math.max(t.exp > 0 ? 3 : 0, Math.round(t.exp / mcMaxE * MC_DN));
+    const mn = t.label.split(' ')[0].slice(0, 3);
+    mcUp.push(`<div class="${cls}"${tap}>`
+      + `<div class="mc-net ${t.net >= 0 ? 'pos' : 'neg'}">${ghost ? '' : mcNetTxt(t.net)}</div>`
+      + `<div class="mc-barwrap"><span class="mc-val">${ghost || !t.inc ? '' : fmtShort(t.inc, 1)}</span>`
+      + `<div class="mc-bar up" style="height:${ih}px"></div></div></div>`);
+    mcDn.push(`<div class="${cls}"${tap}>`
+      + `<div class="mc-mn">${mn}</div>`
+      + `<div class="mc-bar dn" style="height:${eh}px"></div>`
+      + `<span class="mc-eval">${ghost || !t.exp ? '' : fmtShort(t.exp, 1)}</span></div>`);
+  });
+  document.getElementById('d-mchart').innerHTML =
+      `<div class="mc-head"><span class="mc-title">Income &amp; expenses</span>`
+    + `<span class="mc-fy">FY ${fyY}–${String(fyY + 1).slice(2)}</span></div>`
+    + `<div class="mc-total"><span class="mc-amt inc">₹${fmtShort(mcInc, 1)}</span>`
+    + `<span class="mc-cap">in</span>`
+    + `<span class="mc-amt exp">₹${fmtShort(mcExp, 1)}</span><span class="mc-cap">out</span>`
+    + `<span class="mc-legend"><span><i class="mc-sw s"></i> Income</span>`
+    + `<span><i class="mc-sw e"></i> Expenses</span></span></div>`
+    + `<div class="mc-chart"><div class="mc-row mc-up">${mcUp.join('')}</div>`
+    + `<div class="mc-zero"></div>`
+    + `<div class="mc-row mc-dn">${mcDn.join('')}</div></div>`;
 
   document.getElementById('d-trend').innerHTML =
     `<div class="trend-row trend-head"><span class="trend-month">Month</span><span>In</span><span>Out</span><span>Net</span><span>Net Worth</span></div>` +
