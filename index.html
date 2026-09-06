@@ -2857,7 +2857,7 @@ body { transition: background 0.25s ease; }
      enhanced via enhanceSearchableSelect(). The active target is tracked
      in window.__pickerTarget; selection writes back to that select and
      dispatches a change event so existing onchange handlers fire. -->
-<div class="picker-overlay" id="picker-overlay" onclick="if(event.target===this) closePicker()">
+<div class="picker-overlay" id="picker-overlay">
   <div class="picker-card">
     <div class="picker-head">
       <div class="picker-search-wrap">
@@ -2889,7 +2889,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-05-06';
+const APP_VERSION = '2026-09-06-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3764,14 +3764,21 @@ const OWNER_TINTS  = { Edwin: 'transparent', Divya: 'transparent', AJ: 'transpar
 // picker (incl. iOS) renders each group label as a bold section header.
 // Account picker: grouped by category (type). Within each category the
 // logged-in person's own accounts are listed first, then alphabetical.
+// An archived account is not offered for new entries, but an entry recorded
+// against one keeps it: archiving is about tidying the list you pick from, not
+// about rewriting what already happened. So when the current value is an
+// archived account it is listed too, in its own group at the end, and editing
+// the entry can leave it exactly as it was.
 function accountOptionsHTML(placeholder, currentVal) {
+  const cur = currentVal === '' || currentVal == null ? null : Number(currentVal);
   const optEl = a =>
-    `<option value="${a.id}"${a.id === currentVal ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')} · ${acctAvailLabel(a)})</option>`;
+    `<option value="${a.id}"${a.id === cur ? ' selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.owner || 'Joint')} · ${acctAvailLabel(a)})</option>`;
   const groups = {};
   S.accounts.filter(a => !a.archived).forEach(a => {
     const t = a.type || 'Other';
     (groups[t] = groups[t] || []).push(a);
   });
+  const keptArchived = S.accounts.find(a => a.archived && a.id === cur);
   const types = [
     ...ACCOUNT_TYPE_ORDER.filter(t => groups[t]),
     ...Object.keys(groups).filter(t => !ACCOUNT_TYPE_ORDER.includes(t)).sort(),
@@ -3781,7 +3788,12 @@ function accountOptionsHTML(placeholder, currentVal) {
     const sorted = [...groups[t]].sort((a,b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
     return `<optgroup label="${escapeHtml(ACCOUNT_GROUP_LABELS[t] || t)}">` + sorted.map(optEl).join('') + `</optgroup>`;
   }).join('');
-  return `<option value="">${placeholder}</option>` + body;
+  const archivedGroup = keptArchived
+    ? `<optgroup label="Archived"><option value="${keptArchived.id}" selected>`
+      + `${escapeHtml(keptArchived.name)} (${escapeHtml(keptArchived.owner || 'Joint')} · archived)`
+      + `</option></optgroup>`
+    : '';
+  return `<option value="">${placeholder}</option>` + body + archivedGroup;
 }
 
 function buildSelects() {
@@ -8523,6 +8535,19 @@ function closePicker() {
   __pickerTarget = null;
   __pickerKbUp = false;
 }
+
+// A tap dismisses the picker only when the press *began* on the backdrop.
+// Focusing the search field repositions the card — it reserves room for the
+// keyboard — so a press that started on the input would otherwise be over the
+// backdrop by the time the click fired, and closing on the click's target
+// alone shut the picker the moment you tapped Search.
+(function guardPickerBackdrop() {
+  const ov = document.getElementById('picker-overlay');
+  if (!ov) return;
+  let fromBackdrop = false;
+  ov.addEventListener('pointerdown', e => { fromBackdrop = e.target === ov; });
+  ov.addEventListener('click', e => { if (fromBackdrop && e.target === ov) closePicker(); });
+})();
 
 // Tapping Search raises the keyboard, so re-clamp the card above it.
 function onPickerSearchFocus() {
