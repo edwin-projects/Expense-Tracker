@@ -1309,24 +1309,6 @@ select.finput option { background: white; color: var(--ink); }
 .cf-bd-amt { font-weight: 600; color: var(--ink); text-align: right; }
 .cf-bd-pct { font-weight: 700; color: var(--ink); text-align: right; }
 
-#backup-reminder {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin: 10px 16px 0; padding: 11px 2px;
-  background: none; border: none;
-  border-top: 1px solid var(--amber-border);
-  border-bottom: 1px solid var(--amber-border);
-  border-radius: 0;
-}
-#backup-reminder-text {
-  flex: 1; min-width: 150px; font-size: 12px; font-weight: 500;
-  letter-spacing: 0.01em; color: var(--amber); cursor: pointer;
-}
-#backup-reminder button {
-  flex-shrink: 0; border: 1px solid var(--amber-border); background: none;
-  color: var(--amber); font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 11.5px;
-  font-weight: 600; padding: 5px 10px; border-radius: 7px; cursor: pointer;
-}
-#backup-reminder button.br-dismiss { color: var(--ink3); border-color: var(--border2); padding: 5px 8px; }
 
 /* Per-person split inside a stat card */
 .card-split { margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--divider); }
@@ -2082,11 +2064,6 @@ body { transition: background 0.25s ease; }
     </div>
   </div>
 
-  <div id="backup-reminder" style="display:none">
-    <span id="backup-reminder-text" onclick="exportBackup()">Weekly backup due — tap to download</span>
-    <button onclick="runSave(this, shareBackup, 'Sharing…')">✉ Email</button>
-    <button class="br-dismiss" onclick="dismissBackupReminder()">✕</button>
-  </div>
 
   <!-- ADD PAGE -->
   <div id="page-add" class="page active">
@@ -2688,7 +2665,6 @@ body { transition: background 0.25s ease; }
         <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="runSave(this, exportAccountsCSV, 'Exporting…')">⬇ Export Accounts (.csv)</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
         <button class="btn-save-cfg" style="width:100%;background:var(--green);color:var(--btn-dark-text);border:none" onclick="runSave(this, exportBackup, 'Preparing…')">⬇ Download Backup (.json)</button>
-        <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--green);border:1.5px solid var(--green);margin-top:0" onclick="runSave(this, shareBackup, 'Sharing…')">✉ Email / Share Backup</button>
         <label style="width:100%;margin:0">
           <input type="file" id="backup-file-input" accept=".json" style="display:none" onchange="importBackup(this)">
           <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--red);border:1.5px solid var(--btn-del-border);cursor:pointer">⬆ Import Backup — replaces everything</span>
@@ -2698,7 +2674,20 @@ body { transition: background 0.25s ease; }
           anything added since that backup is lost. To get back a few deleted
           entries without losing anything, use <b>Recently Deleted</b> below instead.
         </div>
-        <div id="cfg-backup-status" style="font-size:11.5px;color:var(--ink3);text-align:center">No backup taken yet</div>
+      </div>
+    </div>
+
+    <!-- Daily backups: seven rolling days, held on this device -->
+    <div class="sec-label">Daily Backups</div>
+    <div class="cfg-card">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
+          A snapshot of everything is taken automatically once a day, the first time
+          the app is opened. The <b>last seven days</b> are kept here and the oldest
+          drops off. Restoring replaces all current data with that day's — anything
+          added since is lost, so use <b>Recently Deleted</b> below for a few entries.
+        </div>
+        <div id="cfg-daily-list"></div>
       </div>
     </div>
 
@@ -2721,32 +2710,6 @@ body { transition: background 0.25s ease; }
         <label style="width:100%;margin:0">
           <input type="file" id="recover-file-input" accept=".json" multiple style="display:none" onchange="scanBackupForDeleted(this)">
           <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⌕ Recover deleted entries from backups</span>
-        </label>
-      </div>
-    </div>
-
-    <!-- Entries whose account went missing (see the sync guard in syncNow) -->
-    <div class="sec-label">Entries Missing An Account</div>
-    <div class="cfg-card" id="cfg-noacct-card">
-      <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-        <div id="cfg-noacct-status" style="font-size:12.5px;color:var(--ink2);line-height:1.5"></div>
-        <button class="btn-save-cfg" id="cfg-noacct-open"
-                style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0"
-                onclick="gotoMissingAccount()">☰ List them in the Log</button>
-        <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
-        <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
-          A sync used to be able to clear the account an entry was paid from. That
-          is fixed, but it cannot un-clear what it already wiped — and the app has
-          no record of what those accounts were. <b>Your backups do.</b> Pick as many
-          backup files as you have: this reads them, finds the account each entry
-          had, and shows you the list before changing anything.
-          <br><br>
-          Only entries that have no account now are touched, and only where a
-          backup names an account that still exists. Nothing else is changed.
-        </div>
-        <label style="width:100%;margin:0">
-          <input type="file" id="acct-recover-input" accept=".json" multiple style="display:none" onchange="restoreAccountsFromBackups(this)">
-          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⌕ Recover accounts from backups</span>
         </label>
       </div>
     </div>
@@ -2915,7 +2878,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-08-03';
+const APP_VERSION = '2026-09-08-04';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3016,10 +2979,6 @@ let S = {
   logMonth: 'all',
   // Set by the Settle Up card's "settled" line: transfers marked Settlement.
   logSettleOnly: false,
-  // Diagnostic drill-down: the entries that carry no account at all. Not a
-  // filter you browse with, so like the account drill-downs it is a chip and
-  // never a row in the Filters sheet.
-  logNoAccount: false,
   logCategoryFilter: 'All',
   logSearch: '',
   logKind: 'All',
@@ -3056,7 +3015,6 @@ let S = {
 let currentUser = '';
 let pinBuffer = '';
 let pendingPin = '';
-let backupReminderDismissed = false;
 
 function loadLocal() {
   try {
@@ -3109,7 +3067,6 @@ function loadLocal() {
   if (typeof S.logPaidBy !== 'string') S.logPaidBy = 'All';
   if (typeof S.logMonth !== 'string') S.logMonth = 'all';
   if (typeof S.logSettleOnly !== 'boolean') S.logSettleOnly = false;
-  if (typeof S.logNoAccount !== 'boolean') S.logNoAccount = false;
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // The month-end net-worth snapshots are a frozen cache, and every one taken
@@ -3730,7 +3687,7 @@ function enterApp() {
   S.dashPeriod = 'month';
   document.querySelectorAll('.period-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
   document.getElementById('month-picker').style.display = 'none';
-  checkBackupReminder();
+  ensureDailySnapshot();
   syncNow();
   maybeOfferFaceIdEnrollment();
 }
@@ -4464,18 +4421,6 @@ function gotoSettleLine(paidBy, forWhom) {
   S.logPaidBy = paidBy;
   S.logFilter = forWhom;
   S.logReturnAnchor = 'd-settle';
-  goToLog();
-}
-
-// Every expense and income that carries no account, oldest first — the list
-// to work through when a sync cleared them (see the account guard in syncNow).
-// Deliberately ignores the period buttons: they are spread across whatever
-// months they were entered in, and a list you have to hunt for is no list.
-function gotoMissingAccount() {
-  clearAllLogFilters();
-  logSort = 'oldest';
-  S.logNoAccount = true;
-  S.logReturnAnchor = 'cfg-noacct-card';
   goToLog();
 }
 
@@ -5324,99 +5269,6 @@ async function scanBackupForDeleted(input) {
   renderLog();
 }
 
-// Read one or more backup files and put back the account on entries that have
-// lost it. Strictly additive: an entry that already names an account is never
-// touched, and a backup that names an account which no longer exists is
-// reported rather than applied. The list is shown before anything changes.
-async function restoreAccountsFromBackups(input) {
-  const files = [...(input.files || [])];
-  if (!files.length) return;
-  input.value = '';
-
-  const missing = entriesMissingAccount();
-  if (!missing.length) return toast('Nothing is missing an account', 'ok');
-  const need = new Map(missing.map(m => [`${m.kind}:${m.rec.id}`, m]));
-
-  // Newest backup wins for a given entry, so a later correction beats an
-  // earlier one when several files disagree.
-  const found = new Map();
-  const badFiles = [];
-  let scanned = 0, oldest = '', newest = '';
-
-  for (const file of files) {
-    let payload;
-    try { payload = JSON.parse(await file.text()); } catch { badFiles.push(file.name); continue; }
-    if (!payload || !Array.isArray(payload.entries)) { badFiles.push(file.name); continue; }
-    scanned++;
-    const when = payload.exportedAt || '';
-    const day = when.slice(0, 10);
-    if (day) {
-      if (!oldest || day < oldest) oldest = day;
-      if (!newest || day > newest) newest = day;
-    }
-    [['expense', payload.entries], ['income', Array.isArray(payload.income) ? payload.income : []]]
-      .forEach(([kind, rows]) => rows.forEach(r => {
-        if (!r || r.id == null || r.account == null) return;
-        const key = `${kind}:${r.id}`;
-        if (!need.has(key)) return;                       // not missing — leave it alone
-        const prev = found.get(key);
-        if (!prev || when > prev.when) found.set(key, { acct: Number(r.account), when });
-      }));
-  }
-
-  if (!scanned) {
-    return toast(badFiles.length > 1 ? 'None of those files are backups' : 'That file is not a backup', 'err');
-  }
-  const fileNote = scanned > 1 ? `${scanned} backups (${oldest} → ${newest})`
-                               : `the backup${oldest ? ` dated ${oldest}` : ''}`;
-  if (!found.size) {
-    return toast(`No accounts for those entries in ${fileNote}`, 'err');
-  }
-
-  // Split into what can be applied and what names an account that is gone.
-  const live = new Map(S.accounts.map(a => [a.id, a]));
-  const apply = [], orphan = [];
-  for (const [key, hit] of found) {
-    (live.has(hit.acct) ? apply : orphan).push({ ...need.get(key), acct: hit.acct });
-  }
-  apply.sort((a, b) => (a.rec.date || '').localeCompare(b.rec.date || ''));
-
-  const nameOf = id => (live.get(id) || {}).name || `#${id}`;
-  const preview = apply.slice(0, 12).map(m =>
-    `  • ${fmtDate(m.rec.date)}  ₹${fmt(Math.round(m.rec.amount))}  ${m.rec.category || m.rec.source || ''} → ${nameOf(m.acct)}`
-  ).join('\n');
-  const more = apply.length > 12 ? `\n  …and ${apply.length - 12} more` : '';
-  const orphanNote = orphan.length
-    ? `\n\n${orphan.length} more name an account that no longer exists — those are left alone.` : '';
-  const skipped = badFiles.length
-    ? `\n\n(Skipped ${badFiles.length} file${badFiles.length === 1 ? '' : 's'} that weren't backups.)` : '';
-
-  if (!apply.length) {
-    return alert(`Found accounts in ${fileNote}, but every one names an account that no longer exists.${skipped}`);
-  }
-  if (!confirm(`${fileNote} names the account for ${apply.length} `
-    + `${apply.length === 1 ? 'entry' : 'entries'}:\n\n${preview}${more}${orphanNote}${skipped}\n\nPut them back?`)) return;
-
-  apply.forEach(m => {
-    if (m.kind === 'expense') {
-      const e = S.entries.find(x => x.id === m.rec.id);
-      if (!e) return;
-      e.account = m.acct;
-      queueOp('expenses', 'PATCH', e.id, { account: e.account });
-    } else {
-      const i = S.income.find(x => x.id === m.rec.id);
-      if (!i) return;
-      i.account = m.acct;
-      queueOp('income', 'PATCH', i.id, { account: i.account });
-    }
-  });
-  saveLocal();
-  await pushChanges(`✓ Account restored on ${apply.length} ${apply.length === 1 ? 'entry' : 'entries'}`);
-  renderCfg();
-  renderLog();
-  renderDash();
-}
-
 // ══════════════════════════════════════════════════
 //  LOG
 // ══════════════════════════════════════════════════
@@ -5485,7 +5337,6 @@ function activeLogFilters() {
   if (S.logInvestedOnly)       out.push({ label: 'Money invested', clear: 'clearLogAcctTypeFilter()' });
   else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
   if (S.logSettleOnly)         out.push({ label: 'Settlements', clear: "clearOneLogFilter('settleOnly')" });
-  if (S.logNoAccount)          out.push({ label: 'No account', clear: "clearOneLogFilter('noAccount')" });
   if (S.logMonth !== 'all')    out.push({ label: logMonthLabel(S.logMonth), clear: "clearOneLogFilter('month')" });
   if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
   return out;
@@ -5557,7 +5408,6 @@ function clearOneLogFilter(which) {
   if (which === 'paidBy')   S.logPaidBy = 'All';
   if (which === 'month')    S.logMonth = 'all';
   if (which === 'settleOnly') S.logSettleOnly = false;
-  if (which === 'noAccount')  S.logNoAccount = false;
   if (which === 'type')     S.logType = 'All';
   if (which === 'category') S.logCategoryFilter = 'All';
   if (which === 'addedBy')  S.logAddedBy = 'All';
@@ -5734,7 +5584,6 @@ function clearLogPeriodFilter() {
 function clearAllLogFilters() {
   logSort = 'newest';
   S.logSettleOnly = false;
-  S.logNoAccount = false;
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logPaidBy = 'All';
@@ -6315,11 +6164,6 @@ function renderLog() {
   }
   if (S.logSettleOnly) {
     items = items.filter(x => x._kind === 'transfer' && x.isSettlement);
-  }
-  if (S.logNoAccount) {
-    // A transfer names two accounts by construction, so only expenses and
-    // income can be missing one.
-    items = items.filter(x => x._kind !== 'transfer' && x.account == null);
   }
   if (S.logMonth !== 'all') {
     items = items.filter(x => (x.date || '').slice(0, 7) === S.logMonth);
@@ -7741,8 +7585,7 @@ function renderCfg() {
     const inp = document.getElementById('pin-set-' + w);
     if (inp) inp.placeholder = S.pins[w] ? 'Tap to change' : 'Tap to set';
   });
-  const bs = document.getElementById('cfg-backup-status');
-  if (bs) bs.textContent = S.lastBackupAt ? `Last backup: ${daysAgo(S.lastBackupAt)}` : 'No backup taken yet';
+  renderDailyBackups();
   const vs = document.getElementById('cfg-version');
   if (vs) vs.textContent = 'Version ' + APP_VERSION + ' · tap to check for updates';
   const ts = document.getElementById('cfg-trash-status');
@@ -7752,43 +7595,6 @@ function renderCfg() {
       ? `${n} deleted ${n === 1 ? 'entry' : 'entries'} held and restorable. Nothing is ever purged automatically.`
       : 'Nothing deleted. Anything you delete is kept here until you remove it for good.';
   }
-  renderMissingAccountStatus();
-}
-
-// Everything that carries no account, so the Config card can say how much
-// there is to fix and the recovery pass has one definition to work from.
-function entriesMissingAccount() {
-  return [
-    ...S.entries.filter(e => e.account == null).map(e => ({ kind: 'expense', rec: e })),
-    ...S.income .filter(i => i.account == null).map(i => ({ kind: 'income',  rec: i })),
-  ].sort((a, b) => (a.rec.date || '').localeCompare(b.rec.date || ''));
-}
-
-function renderMissingAccountStatus() {
-  const el = document.getElementById('cfg-noacct-status');
-  if (!el) return;
-  const miss = entriesMissingAccount();
-  const card = document.getElementById('cfg-noacct-card');
-  const btn  = document.getElementById('cfg-noacct-open');
-  if (!miss.length) {
-    el.textContent = 'Every entry names the account it went through.';
-    if (btn) btn.style.display = 'none';
-    if (card) card.style.opacity = '0.72';
-    return;
-  }
-  if (btn) btn.style.display = '';
-  if (card) card.style.opacity = '';
-  const nExp = miss.filter(m => m.kind === 'expense').length;
-  const nInc = miss.length - nExp;
-  const total = miss.reduce((t, m) => t + Number(m.rec.amount || 0), 0);
-  const parts = [
-    nExp ? `${nExp} expense${nExp === 1 ? '' : 's'}` : '',
-    nInc ? `${nInc} income` : '',
-  ].filter(Boolean).join(' and ');
-  const from = miss[0].rec.date || '', to = miss[miss.length - 1].rec.date || '';
-  const span = from && to && from !== to ? `, ${fmtDate(from)} to ${fmtDate(to)}` : '';
-  const verb = miss.length === 1 ? 'carries' : 'carry';
-  el.innerHTML = `<b>${parts}</b> ${verb} no account — ₹${fmt(Math.round(total))} in total${span}.`;
 }
 
 function savePin(who) {
@@ -8192,6 +7998,86 @@ function exportGSheet() {
   toast('CSV downloaded — import into Google Sheets via File → Import', 'ok');
 }
 
+// ══════════════════════════════════════════════════
+//  DAILY BACKUP — seven rolling days, on the device
+// ══════════════════════════════════════════════════
+// One snapshot per calendar day, taken the first time the app is opened on a
+// new day, so it captures the previous day exactly as it was left. Seven are
+// kept; the eighth pushes the oldest out. Stored apart from the live data
+// (its own localStorage key) so nothing the app does to S can touch them, and
+// restoring goes through the same path as a file import.
+const DAILY_KEY = 'de_daily_backups_v1';
+const DAILY_KEEP = 7;
+
+function loadDailyBackups() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DAILY_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
+}
+
+function saveDailyBackups(list) {
+  // Newest first, capped. If the device is out of room, drop the oldest and
+  // retry rather than losing the lot.
+  let keep = list.slice(0, DAILY_KEEP);
+  while (keep.length) {
+    try { localStorage.setItem(DAILY_KEY, JSON.stringify(keep)); return true; }
+    catch { keep = keep.slice(0, keep.length - 1); }
+  }
+  return false;
+}
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Called on unlock and whenever the app comes back to the foreground, so the
+// day rolls over even if the app is simply left open.
+function ensureDailySnapshot() {
+  const list = loadDailyBackups();
+  const day = todayKey();
+  if (list.length && list[0].day === day) return false;
+  // Nothing worth snapshotting before the first entry exists.
+  if (!S.entries.length && !S.income.length && !S.accounts.length && !S.transfers.length) return false;
+  const payload = buildBackupPayload();
+  saveDailyBackups([{ day, at: Date.now(),
+    counts: { e: S.entries.length, i: S.income.length, a: S.accounts.length, t: S.transfers.length },
+    payload }, ...list]);
+  return true;
+}
+
+function renderDailyBackups() {
+  const el = document.getElementById('cfg-daily-list');
+  if (!el) return;
+  const list = loadDailyBackups();
+  if (!list.length) {
+    el.innerHTML = `<div style="padding:14px 0;color:var(--ink3);font-size:12.5px;text-align:center">`
+      + `The first snapshot is taken next time you open the app.</div>`;
+    return;
+  }
+  const today = todayKey();
+  el.innerHTML = list.map(b => {
+    const c = b.counts || {};
+    const when = b.day === today ? 'Today' : fmtDate(b.day);
+    return `<div class="acct-row" style="cursor:default">
+      <div style="min-width:0">
+        <div class="acct-row-name">${when}</div>
+        <div class="acct-row-sub">${c.e || 0} expenses · ${c.i || 0} income · ${c.t || 0} transfers · ${c.a || 0} accounts</div>
+      </div>
+      <button class="btn-del-entry" style="border-color:var(--btn-edit-border);color:var(--blue);flex-shrink:0"
+              onclick="runSave(this, () => restoreDailyBackup('${b.day}'), 'Restoring…')">Restore</button>
+    </div>`;
+  }).join('');
+}
+
+async function restoreDailyBackup(day) {
+  const b = loadDailyBackups().find(x => x.day === day);
+  if (!b || !b.payload) return toast('That snapshot is no longer on this device', 'err');
+  await applyBackupPayload(b.payload);
+  renderDailyBackups();
+}
+
 function buildBackupPayload() {
   return {
     app: 'D & E Finance',
@@ -8218,63 +8104,9 @@ function backupFileName() {
   return `de-finance-backup-${new Date().toISOString().slice(0,10)}.json`;
 }
 
-// Records that a backup was taken — clears the weekly reminder.
-function markBackupDone() {
-  S.lastBackupAt = Date.now();
-  saveLocal();
-  checkBackupReminder();
-  const bs = document.getElementById('cfg-backup-status');
-  if (bs) bs.textContent = 'Last backup: just now';
-}
-
 function exportBackup() {
   dl(new Blob([JSON.stringify(buildBackupPayload(), null, 2)], {type: 'application/json'}), backupFileName());
-  markBackupDone();
   toast('Backup downloaded', 'ok');
-}
-
-// Shares the backup file via the OS share sheet (Mail, Files, etc.).
-// Falls back to a plain download where the Share API isn't available.
-async function shareBackup() {
-  const json = JSON.stringify(buildBackupPayload(), null, 2);
-  const file = new File([json], backupFileName(), { type: 'application/json' });
-  const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const title = `D & E Finance backup — ${dateStr}`;
-  const text = `D & E Finance backup as of ${dateStr}. Family finance data (JSON) attached.`;
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title, text });
-      markBackupDone();
-    } catch(e) {
-      // share sheet dismissed — leave the reminder showing
-    }
-  } else {
-    dl(new Blob([json], {type:'application/json'}), backupFileName());
-    markBackupDone();
-    toast('Sharing not available — backup downloaded instead', '');
-  }
-}
-
-function daysAgo(ts) {
-  const d = Math.floor((Date.now() - ts) / 86400000);
-  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
-}
-
-// Shows the weekly backup reminder if the last backup is over 7 days old.
-function checkBackupReminder() {
-  const banner = document.getElementById('backup-reminder');
-  if (!banner) return;
-  const WEEK = 7 * 24 * 60 * 60 * 1000;
-  const due = !S.lastBackupAt || (Date.now() - S.lastBackupAt) > WEEK;
-  banner.style.display = (due && !backupReminderDismissed) ? 'flex' : 'none';
-  document.getElementById('backup-reminder-text').textContent = S.lastBackupAt
-    ? `Weekly backup due (last ${daysAgo(S.lastBackupAt)}) — tap to download`
-    : 'Back up your data — tap to download';
-}
-
-function dismissBackupReminder() {
-  backupReminderDismissed = true;
-  document.getElementById('backup-reminder').style.display = 'none';
 }
 
 function exportIncomeCSV() {
@@ -8325,6 +8157,12 @@ async function importBackup(input) {
     toast('Backup missing entries', '');
     return;
   }
+  return applyBackupPayload(payload);
+}
+
+// The restore itself, shared by the file import and the daily snapshots:
+// wipes the remote tables, re-uploads the payload, then swaps local state.
+async function applyBackupPayload(payload) {
   const incomeArr    = Array.isArray(payload.income)    ? payload.income    : [];
   const accountsArr  = Array.isArray(payload.accounts)  ? payload.accounts  : [];
   const transfersArr = Array.isArray(payload.transfers) ? payload.transfers : [];
@@ -9030,6 +8868,7 @@ function startUpdateWatch() {
     if (document.visibilityState !== 'visible') return;
     applyPendingUpdateIfSafe();
     checkForUpdate();
+    if (currentUser && ensureDailySnapshot()) renderDailyBackups();
   });
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
