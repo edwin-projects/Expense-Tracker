@@ -2915,7 +2915,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-08-02';
+const APP_VERSION = '2026-09-08-03';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3112,6 +3112,16 @@ function loadLocal() {
   if (typeof S.logNoAccount !== 'boolean') S.logNoAccount = false;
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
+  // The month-end net-worth snapshots are a frozen cache, and every one taken
+  // before accountBalance() started honouring openingDate was computed by
+  // double-counting pre-opening movements. Drop them once so the Monthly
+  // Trend recomputes against the corrected balances instead of showing a
+  // step change this month that never happened. Nothing typed is lost —
+  // these are derived figures the app fills in by itself.
+  if (S.nwSnapshotsRev !== 2) {
+    S.nwSnapshots = {};
+    S.nwSnapshotsRev = 2;
+  }
   // Per-person login PINs. Seed from the old single family PIN so nobody
   // is locked out after the upgrade — each person can change theirs in Config.
   if (!S.pins || typeof S.pins !== 'object') S.pins = {};
@@ -6941,17 +6951,28 @@ function acctAvailLabel(a) {
 // (e.g. redeeming an investment into a bank account), so those must adjust the
 // value too — otherwise the moved amount is counted in both the source and the
 // destination.
+// The opening balance is what the account HELD on its opening date, so every
+// movement before that date is already inside it. Counting those again
+// double-counts: attaching a months-old entry to an account would jump its
+// balance by the entry's amount, which is not what recording where a past
+// entry went should ever do. So only movements dated on or after the opening
+// date are applied. The opening figure is start-of-day, so the date itself
+// counts. An account with no opening date recorded keeps the old behaviour —
+// with no snapshot to double-count against, every movement it has is all the
+// information there is.
 function accountBalance(acct, asOf) {
-  const upto = d => !asOf || (d || '') <= asOf;
-  const xferIn  = S.transfers.filter(t => t.toAccount   === acct.id && upto(t.date)).reduce((s,t) => s + Number(t.amount), 0);
-  const xferOut = S.transfers.filter(t => t.fromAccount === acct.id && upto(t.date)).reduce((s,t) => s + Number(t.amount), 0);
+  const upto  = d => !asOf || (d || '') <= asOf;
+  const since = d => !acct.openingDate || (d || '') >= acct.openingDate;
+  const counts = d => since(d) && upto(d);
+  const xferIn  = S.transfers.filter(t => t.toAccount   === acct.id && counts(t.date)).reduce((s,t) => s + Number(t.amount), 0);
+  const xferOut = S.transfers.filter(t => t.fromAccount === acct.id && counts(t.date)).reduce((s,t) => s + Number(t.amount), 0);
   if (acct.type === 'Investment' || acct.type === 'Asset' || acct.type === 'Loan') {
     const base = Number(acct.currentValue ?? acct.openingBalance ?? 0);
     // Loan is a liability: drawing more (out) grows it, repaying (in) shrinks it.
     return acct.type === 'Loan' ? base + xferOut - xferIn : base + xferIn - xferOut;
   }
-  const inflow  = S.income   .filter(i => i.account     === acct.id && upto(i.date)).reduce((s,i) => s + Number(i.amount), 0);
-  const outflow = S.entries  .filter(e => e.account     === acct.id && upto(e.date)).reduce((s,e) => s + Number(e.amount), 0);
+  const inflow  = S.income   .filter(i => i.account     === acct.id && counts(i.date)).reduce((s,i) => s + Number(i.amount), 0);
+  const outflow = S.entries  .filter(e => e.account     === acct.id && counts(e.date)).reduce((s,e) => s + Number(e.amount), 0);
   if (acct.type === 'Credit Card' || acct.type === 'Payable') {
     // Outstanding grows with charges / money-out, shrinks with payments-in
     return Number(acct.openingBalance || 0) + outflow + xferOut - inflow - xferIn;
