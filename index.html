@@ -2725,6 +2725,32 @@ body { transition: background 0.25s ease; }
       </div>
     </div>
 
+    <!-- Entries whose account went missing (see the sync guard in syncNow) -->
+    <div class="sec-label">Entries Missing An Account</div>
+    <div class="cfg-card" id="cfg-noacct-card">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div id="cfg-noacct-status" style="font-size:12.5px;color:var(--ink2);line-height:1.5"></div>
+        <button class="btn-save-cfg" id="cfg-noacct-open"
+                style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0"
+                onclick="gotoMissingAccount()">☰ List them in the Log</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
+        <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
+          A sync used to be able to clear the account an entry was paid from. That
+          is fixed, but it cannot un-clear what it already wiped — and the app has
+          no record of what those accounts were. <b>Your backups do.</b> Pick as many
+          backup files as you have: this reads them, finds the account each entry
+          had, and shows you the list before changing anything.
+          <br><br>
+          Only entries that have no account now are touched, and only where a
+          backup names an account that still exists. Nothing else is changed.
+        </div>
+        <label style="width:100%;margin:0">
+          <input type="file" id="acct-recover-input" accept=".json" multiple style="display:none" onchange="restoreAccountsFromBackups(this)">
+          <span class="btn-save-cfg" style="display:block;width:100%;box-sizing:border-box;text-align:center;background:var(--bg);color:var(--green);border:1.5px solid var(--green);cursor:pointer">⌕ Recover accounts from backups</span>
+        </label>
+      </div>
+    </div>
+
     <!-- Which build am I running? Tap to check for a newer one. -->
     <div id="cfg-version" onclick="checkForUpdateNow(this)"
          style="text-align:center;font-size:11.5px;color:var(--ink3);padding:14px 0 4px;cursor:pointer;font-variant-numeric:tabular-nums"></div>
@@ -2889,7 +2915,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-08-01';
+const APP_VERSION = '2026-09-08-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -2990,6 +3016,10 @@ let S = {
   logMonth: 'all',
   // Set by the Settle Up card's "settled" line: transfers marked Settlement.
   logSettleOnly: false,
+  // Diagnostic drill-down: the entries that carry no account at all. Not a
+  // filter you browse with, so like the account drill-downs it is a chip and
+  // never a row in the Filters sheet.
+  logNoAccount: false,
   logCategoryFilter: 'All',
   logSearch: '',
   logKind: 'All',
@@ -3079,6 +3109,7 @@ function loadLocal() {
   if (typeof S.logPaidBy !== 'string') S.logPaidBy = 'All';
   if (typeof S.logMonth !== 'string') S.logMonth = 'all';
   if (typeof S.logSettleOnly !== 'boolean') S.logSettleOnly = false;
+  if (typeof S.logNoAccount !== 'boolean') S.logNoAccount = false;
   if (typeof S.configSynced !== 'boolean') S.configSynced = false;
   if (!S.nwSnapshots || typeof S.nwSnapshots !== 'object') S.nwSnapshots = {};
   // Per-person login PINs. Seed from the old single family PIN so nobody
@@ -4426,6 +4457,18 @@ function gotoSettleLine(paidBy, forWhom) {
   goToLog();
 }
 
+// Every expense and income that carries no account, oldest first — the list
+// to work through when a sync cleared them (see the account guard in syncNow).
+// Deliberately ignores the period buttons: they are spread across whatever
+// months they were entered in, and a list you have to hunt for is no list.
+function gotoMissingAccount() {
+  clearAllLogFilters();
+  logSort = 'oldest';
+  S.logNoAccount = true;
+  S.logReturnAnchor = 'cfg-noacct-card';
+  goToLog();
+}
+
 // The settlements themselves — transfers recorded with the Settlement kind.
 function gotoSettlements() {
   clearAllLogFilters();
@@ -5271,6 +5314,99 @@ async function scanBackupForDeleted(input) {
   renderLog();
 }
 
+// Read one or more backup files and put back the account on entries that have
+// lost it. Strictly additive: an entry that already names an account is never
+// touched, and a backup that names an account which no longer exists is
+// reported rather than applied. The list is shown before anything changes.
+async function restoreAccountsFromBackups(input) {
+  const files = [...(input.files || [])];
+  if (!files.length) return;
+  input.value = '';
+
+  const missing = entriesMissingAccount();
+  if (!missing.length) return toast('Nothing is missing an account', 'ok');
+  const need = new Map(missing.map(m => [`${m.kind}:${m.rec.id}`, m]));
+
+  // Newest backup wins for a given entry, so a later correction beats an
+  // earlier one when several files disagree.
+  const found = new Map();
+  const badFiles = [];
+  let scanned = 0, oldest = '', newest = '';
+
+  for (const file of files) {
+    let payload;
+    try { payload = JSON.parse(await file.text()); } catch { badFiles.push(file.name); continue; }
+    if (!payload || !Array.isArray(payload.entries)) { badFiles.push(file.name); continue; }
+    scanned++;
+    const when = payload.exportedAt || '';
+    const day = when.slice(0, 10);
+    if (day) {
+      if (!oldest || day < oldest) oldest = day;
+      if (!newest || day > newest) newest = day;
+    }
+    [['expense', payload.entries], ['income', Array.isArray(payload.income) ? payload.income : []]]
+      .forEach(([kind, rows]) => rows.forEach(r => {
+        if (!r || r.id == null || r.account == null) return;
+        const key = `${kind}:${r.id}`;
+        if (!need.has(key)) return;                       // not missing — leave it alone
+        const prev = found.get(key);
+        if (!prev || when > prev.when) found.set(key, { acct: Number(r.account), when });
+      }));
+  }
+
+  if (!scanned) {
+    return toast(badFiles.length > 1 ? 'None of those files are backups' : 'That file is not a backup', 'err');
+  }
+  const fileNote = scanned > 1 ? `${scanned} backups (${oldest} → ${newest})`
+                               : `the backup${oldest ? ` dated ${oldest}` : ''}`;
+  if (!found.size) {
+    return toast(`No accounts for those entries in ${fileNote}`, 'err');
+  }
+
+  // Split into what can be applied and what names an account that is gone.
+  const live = new Map(S.accounts.map(a => [a.id, a]));
+  const apply = [], orphan = [];
+  for (const [key, hit] of found) {
+    (live.has(hit.acct) ? apply : orphan).push({ ...need.get(key), acct: hit.acct });
+  }
+  apply.sort((a, b) => (a.rec.date || '').localeCompare(b.rec.date || ''));
+
+  const nameOf = id => (live.get(id) || {}).name || `#${id}`;
+  const preview = apply.slice(0, 12).map(m =>
+    `  • ${fmtDate(m.rec.date)}  ₹${fmt(Math.round(m.rec.amount))}  ${m.rec.category || m.rec.source || ''} → ${nameOf(m.acct)}`
+  ).join('\n');
+  const more = apply.length > 12 ? `\n  …and ${apply.length - 12} more` : '';
+  const orphanNote = orphan.length
+    ? `\n\n${orphan.length} more name an account that no longer exists — those are left alone.` : '';
+  const skipped = badFiles.length
+    ? `\n\n(Skipped ${badFiles.length} file${badFiles.length === 1 ? '' : 's'} that weren't backups.)` : '';
+
+  if (!apply.length) {
+    return alert(`Found accounts in ${fileNote}, but every one names an account that no longer exists.${skipped}`);
+  }
+  if (!confirm(`${fileNote} names the account for ${apply.length} `
+    + `${apply.length === 1 ? 'entry' : 'entries'}:\n\n${preview}${more}${orphanNote}${skipped}\n\nPut them back?`)) return;
+
+  apply.forEach(m => {
+    if (m.kind === 'expense') {
+      const e = S.entries.find(x => x.id === m.rec.id);
+      if (!e) return;
+      e.account = m.acct;
+      queueOp('expenses', 'PATCH', e.id, { account: e.account });
+    } else {
+      const i = S.income.find(x => x.id === m.rec.id);
+      if (!i) return;
+      i.account = m.acct;
+      queueOp('income', 'PATCH', i.id, { account: i.account });
+    }
+  });
+  saveLocal();
+  await pushChanges(`✓ Account restored on ${apply.length} ${apply.length === 1 ? 'entry' : 'entries'}`);
+  renderCfg();
+  renderLog();
+  renderDash();
+}
+
 // ══════════════════════════════════════════════════
 //  LOG
 // ══════════════════════════════════════════════════
@@ -5339,6 +5475,7 @@ function activeLogFilters() {
   if (S.logInvestedOnly)       out.push({ label: 'Money invested', clear: 'clearLogAcctTypeFilter()' });
   else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
   if (S.logSettleOnly)         out.push({ label: 'Settlements', clear: "clearOneLogFilter('settleOnly')" });
+  if (S.logNoAccount)          out.push({ label: 'No account', clear: "clearOneLogFilter('noAccount')" });
   if (S.logMonth !== 'all')    out.push({ label: logMonthLabel(S.logMonth), clear: "clearOneLogFilter('month')" });
   if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
   return out;
@@ -5410,6 +5547,7 @@ function clearOneLogFilter(which) {
   if (which === 'paidBy')   S.logPaidBy = 'All';
   if (which === 'month')    S.logMonth = 'all';
   if (which === 'settleOnly') S.logSettleOnly = false;
+  if (which === 'noAccount')  S.logNoAccount = false;
   if (which === 'type')     S.logType = 'All';
   if (which === 'category') S.logCategoryFilter = 'All';
   if (which === 'addedBy')  S.logAddedBy = 'All';
@@ -5586,6 +5724,7 @@ function clearLogPeriodFilter() {
 function clearAllLogFilters() {
   logSort = 'newest';
   S.logSettleOnly = false;
+  S.logNoAccount = false;
   S.logKind = 'All';
   S.logFilter = 'All';
   S.logPaidBy = 'All';
@@ -6166,6 +6305,11 @@ function renderLog() {
   }
   if (S.logSettleOnly) {
     items = items.filter(x => x._kind === 'transfer' && x.isSettlement);
+  }
+  if (S.logNoAccount) {
+    // A transfer names two accounts by construction, so only expenses and
+    // income can be missing one.
+    items = items.filter(x => x._kind !== 'transfer' && x.account == null);
   }
   if (S.logMonth !== 'all') {
     items = items.filter(x => (x.date || '').slice(0, 7) === S.logMonth);
@@ -7587,6 +7731,43 @@ function renderCfg() {
       ? `${n} deleted ${n === 1 ? 'entry' : 'entries'} held and restorable. Nothing is ever purged automatically.`
       : 'Nothing deleted. Anything you delete is kept here until you remove it for good.';
   }
+  renderMissingAccountStatus();
+}
+
+// Everything that carries no account, so the Config card can say how much
+// there is to fix and the recovery pass has one definition to work from.
+function entriesMissingAccount() {
+  return [
+    ...S.entries.filter(e => e.account == null).map(e => ({ kind: 'expense', rec: e })),
+    ...S.income .filter(i => i.account == null).map(i => ({ kind: 'income',  rec: i })),
+  ].sort((a, b) => (a.rec.date || '').localeCompare(b.rec.date || ''));
+}
+
+function renderMissingAccountStatus() {
+  const el = document.getElementById('cfg-noacct-status');
+  if (!el) return;
+  const miss = entriesMissingAccount();
+  const card = document.getElementById('cfg-noacct-card');
+  const btn  = document.getElementById('cfg-noacct-open');
+  if (!miss.length) {
+    el.textContent = 'Every entry names the account it went through.';
+    if (btn) btn.style.display = 'none';
+    if (card) card.style.opacity = '0.72';
+    return;
+  }
+  if (btn) btn.style.display = '';
+  if (card) card.style.opacity = '';
+  const nExp = miss.filter(m => m.kind === 'expense').length;
+  const nInc = miss.length - nExp;
+  const total = miss.reduce((t, m) => t + Number(m.rec.amount || 0), 0);
+  const parts = [
+    nExp ? `${nExp} expense${nExp === 1 ? '' : 's'}` : '',
+    nInc ? `${nInc} income` : '',
+  ].filter(Boolean).join(' and ');
+  const from = miss[0].rec.date || '', to = miss[miss.length - 1].rec.date || '';
+  const span = from && to && from !== to ? `, ${fmtDate(from)} to ${fmtDate(to)}` : '';
+  const verb = miss.length === 1 ? 'carries' : 'carry';
+  el.innerHTML = `<b>${parts}</b> ${verb} no account — ₹${fmt(Math.round(total))} in total${span}.`;
 }
 
 function savePin(who) {
