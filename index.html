@@ -2889,7 +2889,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-06-01';
+const APP_VERSION = '2026-09-08-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3185,6 +3185,15 @@ async function sendOp(op) {
       // table without the column loses nothing.
       if (res && (res.ok || (op.method === 'POST' && res.status === 409))) return true;
     }
+    // Same story for `account`: on a table that was never migrated, a write
+    // carrying it 400s and would wedge the queue for good. Land the row
+    // without it — the account still lives in the local record, and the pull
+    // guard above stops a column-less server from clearing it.
+    if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'account' in op.body) {
+      const { account, ...rest } = op.body;
+      res = await doFetch(rest);
+      if (res && (res.ok || (op.method === 'POST' && res.status === 409))) return true;
+    }
     if (res.status === 400 && (op.method === 'POST' || op.method === 'PATCH') && op.body && 'reimburses_entry_id' in op.body) {
       const { reimburses_entry_id, ...rest } = op.body;
       res = await doFetch(rest);
@@ -3252,7 +3261,25 @@ async function syncNow() {
   // on the other device and should be dropped here too. When offline (queue
   // not empty) we keep local-only records so unsynced creations aren't lost.
   const flushed = !S.pendingOps.length;
+  // `account` is an optional column (see the migration notes above). A row that
+  // comes back WITHOUT the key — table never migrated, or an older client —
+  // says nothing about the account; reading that as "cleared" wipes a value we
+  // already hold, on every single sync, which is how an entry silently loses
+  // the account it was paid from. And while writes are still queued, a remote
+  // null is simply stale: it predates the write we have not managed to send.
+  // So: key absent, or a write still pending for that row → keep what we hold.
+  // Key present with a real value, or present-and-null once we owe the server
+  // nothing → the server is right. Same guard the reimbursement link gets.
+  const pendingIds = table => new Set(
+    S.pendingOps.filter(o => o.table === table).map(o => Number(o.id)));
+  const resolveAccount = (r, prev, pending) => {
+    if (!('account' in r)) return prev.has(r.id) ? prev.get(r.id) : null;
+    if (r.account != null) return Number(r.account);
+    return pending.has(Number(r.id)) && prev.get(r.id) != null ? prev.get(r.id) : null;
+  };
   if (rows && Array.isArray(rows)) {
+    const prevAcct = new Map(S.entries.map(e => [e.id, e.account]));
+    const pendingExp = pendingIds('expenses');
     const remoteIds = new Set(rows.map(r => r.id));
     const localOnly = flushed ? [] : S.entries.filter(e => !remoteIds.has(e.id));
     S.entries = [...rows.map(r => ({
@@ -3261,7 +3288,7 @@ async function syncNow() {
       forWhom: r.for_whom, paidBy: r.paid_by,
       saving: r.saving, desc: r.description, month: r.month,
       addedBy: r.added_by,
-      account: r.account != null ? Number(r.account) : null
+      account: resolveAccount(r, prevAcct, pendingExp)
     })), ...localOnly];
   }
   if (acctRows && Array.isArray(acctRows)) {
@@ -3285,6 +3312,8 @@ async function syncNow() {
     // Remember every link we already hold locally, keyed by income id, so a
     // server that lacks the reimburses_entry_id column can't silently wipe it.
     const prevLink = new Map(S.income.map(i => [i.id, i.reimbursesEntryId]));
+    const prevIncAcct = new Map(S.income.map(i => [i.id, i.account]));
+    const pendingInc = pendingIds('income');
     const remoteIds = new Set(incRows.map(r => r.id));
     const localOnly = flushed ? [] : S.income.filter(i => !remoteIds.has(i.id));
     S.income = [...incRows.map(r => {
@@ -3303,7 +3332,7 @@ async function syncNow() {
       return {
         id: r.id, date: r.date, amount: Number(r.amount),
         source: r.source, receivedBy: r.received_by,
-        account: r.account != null ? Number(r.account) : null,
+        account: resolveAccount(r, prevIncAcct, pendingInc),
         // Strip the hidden marker so the UI only ever shows the real text.
         desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by,
         reimbursesEntryId: link,
