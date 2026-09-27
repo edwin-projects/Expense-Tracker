@@ -450,8 +450,7 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 .dash-allbtn.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
 
 .stat-card.collapsible .stat-head { cursor: pointer; user-select: none; }
-.stat-subrow { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; }
-.stat-card.full .stat-subrow, .stat-card.networth .stat-subrow, .stat-card.longterm .stat-subrow { justify-content: center; }
+.stat-subrow { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
 .stat-subrow .stat-sub { margin-top: 0; }
 .stat-chevron { font-size: 9px; color: var(--ink3); transition: transform .15s ease; flex: none; }
 .stat-card.collapsible.collapsed .stat-chevron { transform: rotate(-90deg); }
@@ -1196,6 +1195,9 @@ select.finput option { background: white; color: var(--ink); }
   padding: 16px 16px 17px;
   box-shadow: var(--shadow);
   position: relative;
+  /* Every card centers on its figure, the same way Settle Up does — one
+     alignment rule for the whole page instead of a per-card exception. */
+  text-align: center;
 }
 .stat-card.full { grid-column: 1/-1; }
 .stat-card.amber { background: var(--surface); }
@@ -1227,10 +1229,10 @@ select.finput option { background: white; color: var(--ink); }
 .stat-val {
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
-  /* One light, large figure per card. Contrast between the figure and
-     everything around it is what makes a number look considered. */
-  font-weight: 300;
-  font-size: 26px;
+  /* Bold headline weight, matching the Settle Up figure — every summary
+     number on the page reads at the same confident weight. */
+  font-weight: 600;
+  font-size: 24px;
   color: var(--ink);
   line-height: 1;
   letter-spacing: -0.02em;
@@ -1239,8 +1241,8 @@ select.finput option { background: white; color: var(--ink); }
 }
 .stat-sub { font-size: 11.5px; color: var(--ink3); margin-top: 6px; }
 /* The one true hero on the Summary. */
-.stat-card.networth .stat-val { font-size: 38px; font-weight: 200; letter-spacing: -0.035em; }
-.stat-card.full .stat-val { font-size: 32px; font-weight: 200; letter-spacing: -0.03em; }
+.stat-card.networth .stat-val { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.stat-card.full .stat-val { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
 
 /* Period-over-period delta chip — anchored to the top-right corner of the
    card so it's "tucked to the side" of the value without affecting flow.
@@ -2534,8 +2536,20 @@ body { transition: background 0.25s ease; }
         </div>
       </div>
     </div>
-    <div class="fcard" id="d-accounts-card" style="padding:4px 0;display:none">
-      <div id="d-accounts-list"></div>
+    <div class="sum-card collapsed" id="d-accounts-card" style="display:none">
+      <div class="sum-card-head" onclick="toggleSumCard(this)">
+        <div>
+          <span class="sec-label" style="margin:0">Account Breakdown</span>
+          <div class="sum-card-sub" id="d-accounts-sub"></div>
+        </div>
+        <div class="sum-card-right">
+          <span class="sum-card-highlight" id="d-accounts-mini" style="color:var(--green)">₹0</span>
+          <span class="sum-card-chevron">▾</span>
+        </div>
+      </div>
+      <div class="sum-card-body" style="padding:0 0 4px">
+        <div id="d-accounts-list"></div>
+      </div>
     </div>
 
     <div class="sec-label">Sources &amp; Categories</div>
@@ -3002,7 +3016,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-02';
+const APP_VERSION = '2026-09-27-03';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7485,6 +7499,9 @@ function renderDash() {
              { link: true, note: 'kept out of active net worth' })
       + rows(activeAccts.filter(a => a.isLiability), 'Liabilities');
     acctCard.style.display = 'block';
+    document.getElementById('d-accounts-mini').textContent = '₹' + fmt(Math.round(assetsTotal));
+    document.getElementById('d-accounts-sub').textContent =
+      `${active.length} account${active.length !== 1 ? 's' : ''} · assets & liabilities`;
   } else {
     acctCard.style.display = 'none';
   }
@@ -7714,10 +7731,16 @@ function renderDash() {
       const y = pad + (1 - (v - lo) / span) * (H - pad * 2);
       return [x, y];
     });
-    const lastNeg = vals[vals.length - 1] < 0;
-    sparkEl.innerHTML =
-      `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="${lastNeg ? 'var(--red)' : 'var(--green)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
-      + `<circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="2.6" fill="${lastNeg ? 'var(--red)' : 'var(--green)'}"/>`;
+    // Each segment reads as its own move: rising net is green, falling net is
+    // red — the sparkline says which months improved, not just where the
+    // line ended up.
+    const segs = pts.slice(1).map((p, i) => {
+      const rising = vals[i + 1] >= vals[i];
+      return `<line x1="${pts[i][0]}" y1="${pts[i][1]}" x2="${p[0]}" y2="${p[1]}" stroke="${rising ? 'var(--green)' : 'var(--red)'}" stroke-width="2" stroke-linecap="round"/>`;
+    }).join('');
+    const lastRising = vals.length < 2 || vals[vals.length - 1] >= vals[vals.length - 2];
+    sparkEl.innerHTML = segs
+      + `<circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="2.6" fill="${lastRising ? 'var(--green)' : 'var(--red)'}"/>`;
   } else {
     sparkEl.innerHTML = '';
   }
