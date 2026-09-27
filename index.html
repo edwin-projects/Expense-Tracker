@@ -1535,7 +1535,7 @@ select.finput option { background: white; color: var(--ink); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin-bottom: 14px;
+  margin-bottom: 8px;
   overflow: hidden;
   box-shadow: var(--shadow);
 }
@@ -2609,10 +2609,12 @@ body { transition: background 0.25s ease; }
     <div style="height:14px"></div>
 
     <!-- Supabase -->
-    <div class="cfg-card">
-      <div class="cfg-head">Database Connection</div>
+    <div class="cfg-card collapsible collapsed">
+      <div class="cfg-head" onclick="toggleCfgCard(this)">
+        <span>Database Connection <span class="cfg-count" id="cfg-sb-status"></span></span>
+        <span class="cfg-chevron">▾</span>
+      </div>
       <div class="cfg-setup-note">
-        <strong>Supabase URL:</strong> <span id="cfg-sb-status" style="color:var(--green)">Connected</span><br>
         <span style="font-size:12px">To change, tap Exit and re-enter credentials.</span>
       </div>
       <div style="padding:14px 16px">
@@ -2621,14 +2623,12 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Login PINs -->
-    <div class="sec-label">App PINs</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
         <span>Login PINs</span>
         <span class="cfg-chevron">▾</span>
       </div>
       <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
-        <div style="font-size:12px;color:var(--ink3);line-height:1.4">A separate 4-digit PIN for each person, asked at login. Stored on this device.</div>
         <div class="pin-set-row">
           <span class="flabel">Edwin's PIN</span>
           <input id="pin-set-Edwin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
@@ -2643,10 +2643,9 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Categories -->
-    <div class="sec-label">Expense Categories</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
-        <span>Categories <span class="cfg-count" id="cat-count"></span></span>
+        <span>Expense Categories <span class="cfg-count" id="cat-count"></span></span>
         <span class="cfg-chevron">▾</span>
       </div>
       <div id="cfg-cat-list"></div>
@@ -2660,10 +2659,9 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Types -->
-    <div class="sec-label">Expense Types</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
-        <span>Types</span>
+        <span>Expense Types <span class="cfg-count" id="type-count"></span></span>
         <span class="cfg-chevron">▾</span>
       </div>
       <div id="cfg-type-list"></div>
@@ -2677,10 +2675,9 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Frequencies -->
-    <div class="sec-label">Frequencies</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
-        <span>Frequencies</span>
+        <span>Frequencies <span class="cfg-count" id="freq-count"></span></span>
         <span class="cfg-chevron">▾</span>
       </div>
       <div id="cfg-freq-list"></div>
@@ -2694,10 +2691,9 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Income Sources -->
-    <div class="sec-label">Income Sources</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
-        <span>Sources <span class="cfg-count" id="src-count"></span></span>
+        <span>Income Sources <span class="cfg-count" id="src-count"></span></span>
         <span class="cfg-chevron">▾</span>
       </div>
       <div id="cfg-src-list"></div>
@@ -2711,10 +2707,9 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Accounts -->
-    <div class="sec-label">Accounts & Balances</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
-        <span>Accounts <span class="cfg-count" id="acct-count"></span></span>
+        <span>Accounts &amp; Balances <span class="cfg-count" id="acct-count"></span></span>
         <span class="cfg-chevron">▾</span>
       </div>
       <div id="cfg-acct-list"></div>
@@ -2784,7 +2779,6 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Archived -->
-    <div class="sec-label">Archived</div>
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
         <span>Archived Accounts <span class="cfg-count" id="archived-count"></span></span>
@@ -2794,8 +2788,11 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Data -->
-    <div class="sec-label">Data</div>
-    <div class="cfg-card">
+    <div class="cfg-card collapsible collapsed">
+      <div class="cfg-head" onclick="toggleCfgCard(this)">
+        <span>Data &amp; Export</span>
+        <span class="cfg-chevron">▾</span>
+      </div>
       <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
         <button class="btn-save-cfg" style="width:100%;background:var(--ink);color:var(--btn-dark-text);border:none" onclick="runSave(this, exportXLSX, 'Exporting…')">⬇ Export Expenses (.xlsx)</button>
         <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="runSave(this, exportGSheet, 'Exporting…')">↗ Expenses for Google Sheets</button>
@@ -2816,8 +2813,11 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Daily backups: seven rolling days, held on this device -->
-    <div class="sec-label">Daily Backups</div>
-    <div class="cfg-card">
+    <div class="cfg-card collapsible collapsed">
+      <div class="cfg-head" onclick="toggleCfgCard(this)">
+        <span>Daily Backups <span class="cfg-count" id="daily-count"></span></span>
+        <span class="cfg-chevron">▾</span>
+      </div>
       <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
         <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
           A snapshot of everything is taken automatically once a day, the first time
@@ -2830,10 +2830,12 @@ body { transition: background 0.25s ease; }
     </div>
 
     <!-- Recently Deleted -->
-    <div class="sec-label">Recently Deleted</div>
-    <div class="cfg-card">
+    <div class="cfg-card collapsible collapsed">
+      <div class="cfg-head" onclick="toggleCfgCard(this)">
+        <span>Recently Deleted <span class="cfg-count" id="trash-count"></span></span>
+        <span class="cfg-chevron">▾</span>
+      </div>
       <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
-        <div id="cfg-trash-status" style="font-size:12.5px;color:var(--ink2);line-height:1.5"></div>
         <button class="btn-save-cfg" style="width:100%;background:var(--bg);color:var(--ink);border:1.5px solid var(--border2);margin-top:0" onclick="gotoTrash()">🗑 Open Recently Deleted</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:2px 0">
         <div style="font-size:11.5px;color:var(--ink3);line-height:1.55">
@@ -3016,7 +3018,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-03';
+const APP_VERSION = '2026-09-27-04';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7759,6 +7761,8 @@ function renderCfg() {
   renderAccountsList();
   renderArchivedList();
   document.getElementById('cat-count').textContent = S.categories.length + ' items';
+  document.getElementById('type-count').textContent = S.types.length + ' items';
+  document.getElementById('freq-count').textContent = S.frequencies.length + ' items';
   document.getElementById('src-count').textContent = S.incomeSources.length + ' items';
   document.getElementById('acct-count').textContent = S.accounts.filter(a => !a.archived).length + ' active';
   const hasSb = !!(S.sbUrl && S.sbKey);
@@ -7771,13 +7775,7 @@ function renderCfg() {
   renderDailyBackups();
   const vs = document.getElementById('cfg-version');
   if (vs) vs.textContent = 'Version ' + APP_VERSION + ' · tap to check for updates';
-  const ts = document.getElementById('cfg-trash-status');
-  if (ts) {
-    const n = S.trash.length;
-    ts.textContent = n
-      ? `${n} deleted ${n === 1 ? 'entry' : 'entries'} held and restorable. Nothing is ever purged automatically.`
-      : 'Nothing deleted. Anything you delete is kept here until you remove it for good.';
-  }
+  document.getElementById('trash-count').textContent = S.trash.length + ' items';
 }
 
 function savePin(who) {
@@ -8262,6 +8260,8 @@ function renderDailyBackups() {
   const el = document.getElementById('cfg-daily-list');
   if (!el) return;
   const list = loadDailyBackups();
+  const dc = document.getElementById('daily-count');
+  if (dc) dc.textContent = list.length + ' kept';
   if (!list.length) {
     el.innerHTML = `<div style="padding:14px 0;color:var(--ink3);font-size:12.5px;text-align:center">`
       + `The first snapshot is taken next time you open the app.</div>`;
