@@ -433,14 +433,14 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
      print. Paired with the extra air above, it does the work the old
      card borders were doing: it separates sections. */
   letter-spacing: 0.2em;
-  margin: 28px 0 10px 3px;
+  margin: 18px 0 7px 3px;
 }
 
 /* ── Summary: every card collapses to just its headline, and expands on
    tap to exactly what's there today (same ids, same drill-down links). ── */
 .dash-allrow {
   display: flex; align-items: center; justify-content: flex-end;
-  margin: 14px 0 4px;
+  margin: 10px 0 2px;
 }
 .dash-allbtn {
   font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
@@ -450,7 +450,7 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 .dash-allbtn.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
 
 .stat-card.collapsible .stat-head { cursor: pointer; user-select: none; }
-.stat-subrow { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
+.stat-subrow { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 3px; }
 .stat-subrow .stat-sub { margin-top: 0; }
 .stat-chevron { font-size: 9px; color: var(--ink3); transition: transform .15s ease; flex: none; }
 .stat-card.collapsible.collapsed .stat-chevron { transform: rotate(-90deg); }
@@ -460,7 +460,7 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 /* Top Income / Top Expense / Monthly Trend: fcard-style collapsible cards,
    with a highlighted headline figure standing in for the bars underneath. */
 .sum-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 2px; }
-.sum-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 16px; cursor: pointer; user-select: none; }
+.sum-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; cursor: pointer; user-select: none; }
 .sum-card-head .sec-label { margin: 0; }
 .sum-card-right { display: flex; align-items: center; gap: 10px; flex: none; }
 .sum-card-highlight { font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -468,7 +468,7 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 .sum-card-chevron { font-size: 10px; color: var(--ink3); transition: transform .15s ease; }
 .sum-card.collapsed .sum-card-chevron { transform: rotate(-90deg); }
 .sum-card.collapsed .sum-card-body { display: none; }
-.sum-card-body { padding: 0 16px 16px; }
+.sum-card-body { padding: 0 16px 13px; }
 .sum-spark { display: block; }
 
 /* ── FORM CARD ── */
@@ -978,8 +978,8 @@ select.finput option { background: white; color: var(--ink); }
   background: var(--surface);
   border: none;
   border-radius: var(--radius-sm);
-  padding: 14px 16px 15px;
-  margin: 16px 0 4px;
+  padding: 11px 16px 12px;
+  margin: 10px 0 4px;
   box-shadow: var(--shadow);
   cursor: pointer;
 }
@@ -1187,12 +1187,12 @@ select.finput option { background: white; color: var(--ink); }
 }
 .month-chip.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
 
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .stat-card {
   background: var(--surface);
   border: none;
   border-radius: var(--radius-sm);
-  padding: 16px 16px 17px;
+  padding: 12px 14px 13px;
   box-shadow: var(--shadow);
   position: relative;
   /* Every card centers on its figure, the same way Settle Up does — one
@@ -1225,7 +1225,7 @@ select.finput option { background: white; color: var(--ink); }
 .stat-card.longterm { background: var(--surface); }
 .stat-card.longterm .stat-lbl, .stat-card.longterm .stat-val, .stat-card.longterm .stat-sub { color: var(--longterm-ink); }
 .stat-card.red { background: var(--surface); }
-.stat-lbl { font-size: 9.5px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.17em; margin-bottom: 8px; font-weight: 600; }
+.stat-lbl { font-size: 9.5px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.17em; margin-bottom: 5px; font-weight: 600; }
 .stat-val {
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -1239,10 +1239,10 @@ select.finput option { background: white; color: var(--ink); }
   display: inline-block;
   vertical-align: middle;
 }
-.stat-sub { font-size: 11.5px; color: var(--ink3); margin-top: 6px; }
+.stat-sub { font-size: 11.5px; color: var(--ink3); margin-top: 4px; }
 /* The one true hero on the Summary. */
-.stat-card.networth .stat-val { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; }
-.stat-card.full .stat-val { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.stat-card.networth .stat-val { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+.stat-card.full .stat-val { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 
 /* Period-over-period delta chip — anchored to the top-right corner of the
    card so it's "tucked to the side" of the value without affecting flow.
@@ -3025,7 +3025,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-06';
+const APP_VERSION = '2026-09-27-07';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
