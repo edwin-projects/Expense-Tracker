@@ -433,14 +433,14 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
      print. Paired with the extra air above, it does the work the old
      card borders were doing: it separates sections. */
   letter-spacing: 0.2em;
-  margin: 18px 0 7px 3px;
+  margin: 9px 0 3px 3px;
 }
 
 /* ── Summary: every card collapses to just its headline, and expands on
    tap to exactly what's there today (same ids, same drill-down links). ── */
 .dash-allrow {
   display: flex; align-items: center; justify-content: flex-end;
-  margin: 10px 0 2px;
+  margin: 6px 0 2px;
 }
 .dash-allbtn {
   font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
@@ -450,25 +450,31 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 .dash-allbtn.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
 
 .stat-card.collapsible .stat-head { cursor: pointer; user-select: none; }
-.stat-subrow { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 3px; }
-.stat-subrow .stat-sub { margin-top: 0; }
+/* Every stat-card head is a row: label+figure on the left, the delta chip
+   stacked above a note+chevron line on the right — the note and the
+   chevron share one line instead of each claiming a row of their own. */
+.stat-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; user-select: none; text-align: left; }
+.stat-left { min-width: 0; }
+.stat-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: none; }
+.stat-noterow { display: flex; align-items: center; gap: 4px; max-width: 170px; }
+.stat-noterow .stat-sub { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-chevron { font-size: 9px; color: var(--ink3); transition: transform .15s ease; flex: none; }
 .stat-card.collapsible.collapsed .stat-chevron { transform: rotate(-90deg); }
 .stat-card.collapsible.collapsed .stat-body { display: none; }
-.stat-card .stat-body { margin-top: 2px; }
+.stat-card .stat-body { margin-top: 2px; text-align: center; }
 
 /* Top Income / Top Expense / Monthly Trend: fcard-style collapsible cards,
    with a highlighted headline figure standing in for the bars underneath. */
 .sum-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 2px; }
-.sum-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; cursor: pointer; user-select: none; }
+.sum-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; cursor: pointer; user-select: none; }
 .sum-card-head .sec-label { margin: 0; }
-.sum-card-right { display: flex; align-items: center; gap: 10px; flex: none; }
-.sum-card-highlight { font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sum-card-sub { font-size: 10.5px; color: var(--ink3); }
-.sum-card-chevron { font-size: 10px; color: var(--ink3); transition: transform .15s ease; }
+.sum-card-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.sum-card-highlight { font-family: 'Outfit', system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sum-card-sub { font-size: 10px; color: var(--ink3); }
+.sum-card-chevron { font-size: 9px; color: var(--ink3); transition: transform .15s ease; }
 .sum-card.collapsed .sum-card-chevron { transform: rotate(-90deg); }
 .sum-card.collapsed .sum-card-body { display: none; }
-.sum-card-body { padding: 0 16px 13px; }
+.sum-card-body { padding: 0 14px 10px; }
 .sum-spark { display: block; }
 
 /* ── FORM CARD ── */
@@ -978,8 +984,8 @@ select.finput option { background: white; color: var(--ink); }
   background: var(--surface);
   border: none;
   border-radius: var(--radius-sm);
-  padding: 11px 16px 12px;
-  margin: 10px 0 4px;
+  padding: 7px 14px 8px;
+  margin: 4px 0 4px;
   box-shadow: var(--shadow);
   cursor: pointer;
 }
@@ -1187,17 +1193,14 @@ select.finput option { background: white; color: var(--ink); }
 }
 .month-chip.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
 
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px; }
 .stat-card {
   background: var(--surface);
   border: none;
   border-radius: var(--radius-sm);
-  padding: 12px 14px 13px;
+  padding: 7px 12px 8px;
   box-shadow: var(--shadow);
   position: relative;
-  /* Every card centers on its figure, the same way Settle Up does — one
-     alignment rule for the whole page instead of a per-card exception. */
-  text-align: center;
 }
 .stat-card.full { grid-column: 1/-1; }
 .stat-card.amber { background: var(--surface); }
@@ -1225,40 +1228,37 @@ select.finput option { background: white; color: var(--ink); }
 .stat-card.longterm { background: var(--surface); }
 .stat-card.longterm .stat-lbl, .stat-card.longterm .stat-val, .stat-card.longterm .stat-sub { color: var(--longterm-ink); }
 .stat-card.red { background: var(--surface); }
-.stat-lbl { font-size: 9.5px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.17em; margin-bottom: 5px; font-weight: 600; }
+.stat-lbl { font-size: 9px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1px; font-weight: 600; }
 .stat-val {
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
   /* Bold headline weight, matching the Settle Up figure — every summary
      number on the page reads at the same confident weight. */
   font-weight: 600;
-  font-size: 24px;
+  font-size: 17px;
   color: var(--ink);
-  line-height: 1;
+  line-height: 1.15;
   letter-spacing: -0.02em;
   display: inline-block;
   vertical-align: middle;
 }
-.stat-sub { font-size: 11.5px; color: var(--ink3); margin-top: 4px; }
-/* The one true hero on the Summary. */
-.stat-card.networth .stat-val { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
-.stat-card.full .stat-val { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.stat-sub { font-size: 10px; color: var(--ink3); margin-top: 0; }
+/* The one true hero on the Summary. Networth also carries .full, so its
+   rule must come after (equal specificity — later wins) to still be the
+   biggest figure on the page. */
+.stat-card.full .stat-val { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.stat-card.networth .stat-val { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
 
-/* Period-over-period delta chip — anchored to the top-right corner of the
-   card so it's "tucked to the side" of the value without affecting flow.
-   Inline placement was overflowing the half-width cards on iOS Safari,
-   making the whole page scroll sideways. Absolute placement is reliable
-   regardless of card width. Chip text is kept short (<= 6 chars: 'arrow
-   +5%' / 'new') so it never overlaps the card's top-left label. */
+/* Period-over-period delta chip — now sits inline in the stat-right column,
+   stacked above the note+chevron line, instead of pinned to the card
+   corner: with label and figure moved to the left of the card, the old
+   top-right anchor point no longer means anything. */
 .stat-chip {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
   padding: 0;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--ink3);
@@ -2380,9 +2380,14 @@ body { transition: background 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Income</div>
-          <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-cf-income-sub">0 entries</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Income</div>
+            <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-cf-income-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-cf-income-sub">0 entries</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-cf-income-split"></div>
@@ -2390,9 +2395,14 @@ body { transition: background 0.25s ease; }
       </div>
       <div class="stat-card red collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Expenses</div>
-          <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-cf-expense-sub">0 entries</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Expenses</div>
+            <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-cf-expense-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-cf-expense-sub">0 entries</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-cf-expense-split"></div>
@@ -2400,11 +2410,16 @@ body { transition: background 0.25s ease; }
       </div>
     </div>
     <div class="stat-grid">
-      <div class="stat-card full collapsible collapsed" id="d-cf-net-card" style="text-align:center">
+      <div class="stat-card full collapsible collapsed" id="d-cf-net-card">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Net (Income − Expenses)</div>
-          <div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-cf-net-sub">—</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Net (Income − Expenses)</div>
+            <div class="stat-val" id="d-cf-net">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-cf-net-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-cf-net-sub">—</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="spend-wrap" id="d-spend-wrap" style="display:none">
@@ -2430,9 +2445,14 @@ body { transition: background 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card amber full collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Total Spent</div>
-          <div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-entries-sub">0 entries</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Total Spent</div>
+            <div class="stat-val" id="d-total">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-total-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-entries-sub">0 entries</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-total-split"></div>
@@ -2442,9 +2462,14 @@ body { transition: background 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Saveable</div>
-          <div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-save-pct">0% of total</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Saveable</div>
+            <div class="stat-val" id="d-save">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-save-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-save-pct">0% of total</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-save-split"></div>
@@ -2452,9 +2477,14 @@ body { transition: background 0.25s ease; }
       </div>
       <div class="stat-card noness collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Non-Essentials</div>
-          <div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-noness-pct">0% of total</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Non-Essentials</div>
+            <div class="stat-val" id="d-noness">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-noness-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-noness-pct">0% of total</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-noness-split"></div>
@@ -2464,9 +2494,14 @@ body { transition: background 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card ess collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Essentials</div>
-          <div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-ess-pct">0% of total</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Essentials</div>
+            <div class="stat-val" id="d-ess">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-ess-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-ess-pct">0% of total</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-ess-split"></div>
@@ -2474,9 +2509,14 @@ body { transition: background 0.25s ease; }
       </div>
       <div class="stat-card fun collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Fun</div>
-          <div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-fun-pct">0% of total</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Fun</div>
+            <div class="stat-val" id="d-fun">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-fun-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-fun-pct">0% of total</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-fun-split"></div>
@@ -2486,11 +2526,16 @@ body { transition: background 0.25s ease; }
 
     <div class="sec-label">Net Worth</div>
     <div class="stat-grid">
-      <div class="stat-card full networth collapsible collapsed" id="d-networth-card" style="text-align:center">
+      <div class="stat-card full networth collapsible collapsed" id="d-networth-card">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Active Net Worth (today)</div>
-          <div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span>
-          <div class="stat-subrow"><span class="stat-sub" id="d-networth-sub">No accounts yet</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Active Net Worth (today)</div>
+            <div class="stat-val" id="d-networth">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-chip" id="d-networth-chip"></span>
+            <span class="stat-noterow"><span class="stat-sub" id="d-networth-sub">No accounts yet</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
@@ -2504,9 +2549,13 @@ body { transition: background 0.25s ease; }
     <div class="stat-grid">
       <div class="stat-card green collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Total Assets</div>
-          <div class="stat-val" id="d-assets">₹0</div>
-          <div class="stat-subrow"><span class="stat-sub" id="d-assets-sub">0 accounts</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Total Assets</div>
+            <div class="stat-val" id="d-assets">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-noterow"><span class="stat-sub" id="d-assets-sub">0 accounts</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-assets-split"></div>
@@ -2514,9 +2563,13 @@ body { transition: background 0.25s ease; }
       </div>
       <div class="stat-card liab-tint collapsible collapsed">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Total Liabilities</div>
-          <div class="stat-val" id="d-liab">₹0</div>
-          <div class="stat-subrow"><span class="stat-sub" id="d-liab-sub">0 accounts</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Total Liabilities</div>
+            <div class="stat-val" id="d-liab">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-noterow"><span class="stat-sub" id="d-liab-sub">0 accounts</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="card-split" id="d-liab-split"></div>
@@ -2524,11 +2577,15 @@ body { transition: background 0.25s ease; }
       </div>
     </div>
     <div class="stat-grid" id="d-longterm-grid" style="display:none">
-      <div class="stat-card full longterm collapsible collapsed" id="d-longterm-card" style="text-align:center">
+      <div class="stat-card full longterm collapsible collapsed" id="d-longterm-card">
         <div class="stat-head" onclick="toggleStatCard(this)">
-          <div class="stat-lbl">Long-term Holdings</div>
-          <div class="stat-val" id="d-longterm">₹0</div>
-          <div class="stat-subrow"><span class="stat-sub" id="d-longterm-sub">Tracked apart from active net worth</span><span class="stat-chevron">▾</span></div>
+          <div class="stat-left">
+            <div class="stat-lbl">Long-term Holdings</div>
+            <div class="stat-val" id="d-longterm">₹0</div>
+          </div>
+          <div class="stat-right">
+            <span class="stat-noterow"><span class="stat-sub" id="d-longterm-sub">Tracked apart from active net worth</span><span class="stat-chevron">▾</span></span>
+          </div>
         </div>
         <div class="stat-body">
           <div class="cf-breakdown" id="d-longterm-split" style="margin:10px auto 0"></div>
@@ -3025,7 +3082,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-07';
+const APP_VERSION = '2026-09-27-08';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
