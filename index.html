@@ -1555,7 +1555,10 @@ select.finput option { background: white; color: var(--ink); }
 .cfg-chevron { font-size: 11px; color: var(--ink3); transition: transform .15s ease; }
 .cfg-card.collapsed > .cfg-head { border-bottom: none; }
 .cfg-card.collapsed > .cfg-head .cfg-chevron { transform: rotate(-90deg); }
-.cfg-card.collapsed > *:not(.cfg-head) { display: none; }
+/* !important because several card bodies set their own inline
+   display:flex — without it, that inline style beats this rule and the
+   card ignores its own collapsed state. */
+.cfg-card.collapsed > *:not(.cfg-head) { display: none !important; }
 .cfg-item {
   display: flex;
   align-items: center;
@@ -3022,7 +3025,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-05';
+const APP_VERSION = '2026-09-27-06';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
