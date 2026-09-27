@@ -436,6 +436,24 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
   margin: 28px 0 10px 3px;
 }
 
+/* ── Summary sections: collapsed shows only the headline figure ── */
+.sum-sec { margin-top: 22px; }
+.sum-sec-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 0 3px; cursor: pointer; user-select: none;
+}
+.sum-sec-head .sec-label { margin: 0; }
+.sum-sec-headline {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  font-size: 15px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.sum-sec-chevron { font-size: 10px; color: var(--ink3); transition: transform .15s ease; }
+.sum-sec.collapsed .sum-sec-chevron { transform: rotate(-90deg); }
+.sum-sec.collapsed .sum-sec-body { display: none; }
+.sum-sec-body { margin-top: 10px; }
+
 /* ── FORM CARD ── */
 .fcard {
   background: var(--surface);
@@ -2331,138 +2349,179 @@ body { transition: background 0.25s ease; }
       <div class="settle-detail" id="d-settle-detail"></div>
     </div>
 
-    <div class="sec-label">Cash Flow</div>
-    <div class="stat-grid">
-      <div class="stat-card green">
-        <div class="stat-lbl">Income</div>
-        <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span>
-        <div class="stat-sub" id="d-cf-income-sub">0 entries</div>
-        <div class="card-split" id="d-cf-income-split"></div>
+    <div class="sum-sec" id="sec-cashflow">
+      <div class="sum-sec-head" onclick="toggleSumSec(this)">
+        <span class="sec-label">Cash Flow</span>
+        <span class="sum-sec-headline"><span id="d-cf-net-mini">₹0</span><span class="sum-sec-chevron">▾</span></span>
       </div>
-      <div class="stat-card red">
-        <div class="stat-lbl">Expenses</div>
-        <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span>
-        <div class="stat-sub" id="d-cf-expense-sub">0 entries</div>
-        <div class="card-split" id="d-cf-expense-split"></div>
-      </div>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
-        <div class="stat-lbl">Net (Income − Expenses)</div>
-        <div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span>
-        <div class="spend-wrap" id="d-spend-wrap" style="display:none">
-          <div class="spend-bar" id="d-spend-bar">
-            <div class="spend-fill" id="d-spend-fill"></div>
-            <div class="spend-fill" id="d-spend-fill-inv" style="display:none;background:var(--amber);border-radius:0;left:0;width:0"></div>
-            <div class="spend-fill" id="d-spend-fill-sav" style="display:none;background:var(--green);border-radius:0;left:0;width:0"></div>
-            <div class="spend-bracket"></div>
+      <div class="sum-sec-body">
+        <div class="stat-grid">
+          <div class="stat-card green">
+            <div class="stat-lbl">Income</div>
+            <div class="stat-val" id="d-cf-income" style="color:var(--green)">₹0</div><span class="stat-chip" id="d-cf-income-chip"></span>
+            <div class="stat-sub" id="d-cf-income-sub">0 entries</div>
+            <div class="card-split" id="d-cf-income-split"></div>
           </div>
-          <div class="spend-overflow" id="d-spend-over"></div>
+          <div class="stat-card red">
+            <div class="stat-lbl">Expenses</div>
+            <div class="stat-val" id="d-cf-expense" style="color:var(--red)">₹0</div><span class="stat-chip" id="d-cf-expense-chip"></span>
+            <div class="stat-sub" id="d-cf-expense-sub">0 entries</div>
+            <div class="card-split" id="d-cf-expense-split"></div>
+          </div>
         </div>
-        <div class="cf-breakdown wide" id="d-cf-breakdown" style="display:none"></div>
-        <div class="stat-sub" id="d-cf-net-sub">—</div>
-        <div id="d-typesplit" style="display:none;margin-top:16px">
-          <div class="typesplit-bar" id="d-typesplit-bar"></div>
-          <div class="typesplit-legend" id="d-typesplit-legend"></div>
+        <div class="stat-grid">
+          <div class="stat-card full" id="d-cf-net-card" style="text-align:center">
+            <div class="stat-lbl">Net (Income − Expenses)</div>
+            <div class="stat-val" id="d-cf-net">₹0</div><span class="stat-chip" id="d-cf-net-chip"></span>
+            <div class="spend-wrap" id="d-spend-wrap" style="display:none">
+              <div class="spend-bar" id="d-spend-bar">
+                <div class="spend-fill" id="d-spend-fill"></div>
+                <div class="spend-fill" id="d-spend-fill-inv" style="display:none;background:var(--amber);border-radius:0;left:0;width:0"></div>
+                <div class="spend-fill" id="d-spend-fill-sav" style="display:none;background:var(--green);border-radius:0;left:0;width:0"></div>
+                <div class="spend-bracket"></div>
+              </div>
+              <div class="spend-overflow" id="d-spend-over"></div>
+            </div>
+            <div class="cf-breakdown wide" id="d-cf-breakdown" style="display:none"></div>
+            <div class="stat-sub" id="d-cf-net-sub">—</div>
+            <div id="d-typesplit" style="display:none;margin-top:16px">
+              <div class="typesplit-bar" id="d-typesplit-bar"></div>
+              <div class="typesplit-legend" id="d-typesplit-legend"></div>
+            </div>
+          </div>
+        </div>
+        <div class="fcard mc-card" id="d-mchart"></div>
+      </div>
+    </div>
+
+    <div class="sum-sec collapsed" id="sec-expbreak">
+      <div class="sum-sec-head" onclick="toggleSumSec(this)">
+        <span class="sec-label">Expense Breakdown</span>
+        <span class="sum-sec-headline"><span id="d-total-mini">₹0</span><span class="sum-sec-chevron">▾</span></span>
+      </div>
+      <div class="sum-sec-body">
+        <div class="stat-grid">
+          <div class="stat-card amber full">
+            <div class="stat-lbl">Total Spent</div>
+            <div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span>
+            <div class="stat-sub" id="d-entries-sub">0 entries</div>
+            <div class="card-split" id="d-total-split"></div>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card green">
+            <div class="stat-lbl">Saveable</div>
+            <div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span>
+            <div class="stat-sub" id="d-save-pct">0% of total</div>
+            <div class="card-split" id="d-save-split"></div>
+          </div>
+          <div class="stat-card noness">
+            <div class="stat-lbl">Non-Essentials</div>
+            <div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span>
+            <div class="stat-sub" id="d-noness-pct">0% of total</div>
+            <div class="card-split" id="d-noness-split"></div>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card ess">
+            <div class="stat-lbl">Essentials</div>
+            <div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span>
+            <div class="stat-sub" id="d-ess-pct">0% of total</div>
+            <div class="card-split" id="d-ess-split"></div>
+          </div>
+          <div class="stat-card fun">
+            <div class="stat-lbl">Fun</div>
+            <div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span>
+            <div class="stat-sub" id="d-fun-pct">0% of total</div>
+            <div class="card-split" id="d-fun-split"></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="fcard mc-card" id="d-mchart"></div>
-
-    <div class="sec-label">Net Worth</div>
-    <div class="stat-grid">
-      <div class="stat-card full networth" id="d-networth-card" style="text-align:center">
-        <div class="stat-lbl">Active Net Worth (today)</div>
-        <div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span>
-        <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
-        <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
-        <div id="d-nw-typesplit" style="display:none;margin-top:10px">
-          <div class="typesplit-bar" id="d-nw-typebar"></div>
-          <div class="typesplit-legend" id="d-nw-typelegend"></div>
+    <div class="sum-sec collapsed" id="sec-networth">
+      <div class="sum-sec-head" onclick="toggleSumSec(this)">
+        <span class="sec-label">Net Worth</span>
+        <span class="sum-sec-headline"><span id="d-networth-mini">₹0</span><span class="sum-sec-chevron">▾</span></span>
+      </div>
+      <div class="sum-sec-body">
+        <div class="stat-grid">
+          <div class="stat-card full networth" id="d-networth-card" style="text-align:center">
+            <div class="stat-lbl">Active Net Worth (today)</div>
+            <div class="stat-val" id="d-networth">₹0</div><span class="stat-chip" id="d-networth-chip"></span>
+            <div class="stat-sub" id="d-networth-sub">No accounts yet</div>
+            <div class="cf-breakdown" id="d-networth-split" style="margin:10px auto 0"></div>
+            <div id="d-nw-typesplit" style="display:none;margin-top:10px">
+              <div class="typesplit-bar" id="d-nw-typebar"></div>
+              <div class="typesplit-legend" id="d-nw-typelegend"></div>
+            </div>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card green">
+            <div class="stat-lbl">Total Assets</div>
+            <div class="stat-val" id="d-assets">₹0</div>
+            <div class="stat-sub" id="d-assets-sub">0 accounts</div>
+            <div class="card-split" id="d-assets-split"></div>
+          </div>
+          <div class="stat-card liab-tint">
+            <div class="stat-lbl">Total Liabilities</div>
+            <div class="stat-val" id="d-liab">₹0</div>
+            <div class="stat-sub" id="d-liab-sub">0 accounts</div>
+            <div class="card-split" id="d-liab-split"></div>
+          </div>
+        </div>
+        <div class="stat-grid" id="d-longterm-grid" style="display:none">
+          <div class="stat-card full longterm" id="d-longterm-card" style="text-align:center">
+            <div class="stat-lbl">Long-term Holdings</div>
+            <div class="stat-val" id="d-longterm">₹0</div>
+            <div class="stat-sub" id="d-longterm-sub">Tracked apart from active net worth</div>
+            <div class="cf-breakdown" id="d-longterm-split" style="margin:10px auto 0"></div>
+            <div id="d-lt-typesplit" style="display:none;margin-top:10px">
+              <div class="typesplit-bar" id="d-lt-typebar"></div>
+              <div class="typesplit-legend" id="d-lt-typelegend"></div>
+            </div>
+          </div>
+        </div>
+        <div class="fcard" id="d-accounts-card" style="padding:4px 0;display:none">
+          <div id="d-accounts-list"></div>
         </div>
       </div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-card green">
-        <div class="stat-lbl">Total Assets</div>
-        <div class="stat-val" id="d-assets">₹0</div>
-        <div class="stat-sub" id="d-assets-sub">0 accounts</div>
-        <div class="card-split" id="d-assets-split"></div>
+
+    <div class="sum-sec collapsed" id="sec-incsrc">
+      <div class="sum-sec-head" onclick="toggleSumSec(this)">
+        <span class="sec-label">Top Income Sources</span>
+        <span class="sum-sec-chevron">▾</span>
       </div>
-      <div class="stat-card liab-tint">
-        <div class="stat-lbl">Total Liabilities</div>
-        <div class="stat-val" id="d-liab">₹0</div>
-        <div class="stat-sub" id="d-liab-sub">0 accounts</div>
-        <div class="card-split" id="d-liab-split"></div>
-      </div>
-    </div>
-    <div class="stat-grid" id="d-longterm-grid" style="display:none">
-      <div class="stat-card full longterm" id="d-longterm-card" style="text-align:center">
-        <div class="stat-lbl">Long-term Holdings</div>
-        <div class="stat-val" id="d-longterm">₹0</div>
-        <div class="stat-sub" id="d-longterm-sub">Tracked apart from active net worth</div>
-        <div class="cf-breakdown" id="d-longterm-split" style="margin:10px auto 0"></div>
-        <div id="d-lt-typesplit" style="display:none;margin-top:10px">
-          <div class="typesplit-bar" id="d-lt-typebar"></div>
-          <div class="typesplit-legend" id="d-lt-typelegend"></div>
+      <div class="sum-sec-body">
+        <div class="fcard" style="padding:16px">
+          <div id="d-inc-bars"></div>
         </div>
       </div>
     </div>
-    <div class="fcard" id="d-accounts-card" style="padding:4px 0;display:none">
-      <div id="d-accounts-list"></div>
-    </div>
 
-    <div class="sec-label">Expense Breakdown</div>
-    <div class="stat-grid">
-      <div class="stat-card amber full">
-        <div class="stat-lbl">Total Spent</div>
-        <div class="stat-val" id="d-total">₹0</div><span class="stat-chip" id="d-total-chip"></span>
-        <div class="stat-sub" id="d-entries-sub">0 entries</div>
-        <div class="card-split" id="d-total-split"></div>
+    <div class="sum-sec collapsed" id="sec-expcat">
+      <div class="sum-sec-head" onclick="toggleSumSec(this)">
+        <span class="sec-label">Top Expense Categories</span>
+        <span class="sum-sec-chevron">▾</span>
       </div>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-card green">
-        <div class="stat-lbl">Saveable</div>
-        <div class="stat-val" id="d-save">₹0</div><span class="stat-chip" id="d-save-chip"></span>
-        <div class="stat-sub" id="d-save-pct">0% of total</div>
-        <div class="card-split" id="d-save-split"></div>
-      </div>
-      <div class="stat-card noness">
-        <div class="stat-lbl">Non-Essentials</div>
-        <div class="stat-val" id="d-noness">₹0</div><span class="stat-chip" id="d-noness-chip"></span>
-        <div class="stat-sub" id="d-noness-pct">0% of total</div>
-        <div class="card-split" id="d-noness-split"></div>
-      </div>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-card ess">
-        <div class="stat-lbl">Essentials</div>
-        <div class="stat-val" id="d-ess">₹0</div><span class="stat-chip" id="d-ess-chip"></span>
-        <div class="stat-sub" id="d-ess-pct">0% of total</div>
-        <div class="card-split" id="d-ess-split"></div>
-      </div>
-      <div class="stat-card fun">
-        <div class="stat-lbl">Fun</div>
-        <div class="stat-val" id="d-fun">₹0</div><span class="stat-chip" id="d-fun-chip"></span>
-        <div class="stat-sub" id="d-fun-pct">0% of total</div>
-        <div class="card-split" id="d-fun-split"></div>
+      <div class="sum-sec-body">
+        <div class="fcard" style="padding:16px">
+          <div id="d-bars"></div>
+        </div>
       </div>
     </div>
 
-    <div class="sec-label">Top Income Sources</div>
-    <div class="fcard" style="padding:16px">
-      <div id="d-inc-bars"></div>
+    <div class="sum-sec collapsed" id="sec-trend">
+      <div class="sum-sec-head" onclick="toggleSumSec(this)">
+        <span class="sec-label">Monthly Trend</span>
+        <span class="sum-sec-chevron">▾</span>
+      </div>
+      <div class="sum-sec-body">
+        <div class="fcard" id="d-trend"></div>
+      </div>
     </div>
-
-    <div class="sec-label">Top Expense Categories</div>
-    <div class="fcard" style="padding:16px">
-      <div id="d-bars"></div>
-    </div>
-
-    <div class="sec-label">Monthly Trend</div>
-    <div class="fcard" id="d-trend"></div>
     <div style="height:10px"></div>
   </div>
 
@@ -2878,7 +2937,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-08-04';
+const APP_VERSION = '2026-09-27-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -7563,6 +7622,16 @@ function renderDash() {
         + `<span class="trend-net ${nc}">${t.net>=0?'+':'−'}₹${fmtShort(Math.abs(t.net))}</span>`
         + `<span class="trend-nw${nwClass}">${nwTxt}${pct}</span></div>`;
     }).join('');
+
+  // Collapsed Summary sections show just the headline figure — mirror it
+  // from the full card so there's one place that computes each number.
+  const mirror = (fromId, toId) => {
+    const from = document.getElementById(fromId), to = document.getElementById(toId);
+    if (from && to) { to.textContent = from.textContent; to.style.color = from.style.color; }
+  };
+  mirror('d-cf-net', 'd-cf-net-mini');
+  mirror('d-total', 'd-total-mini');
+  mirror('d-networth', 'd-networth-mini');
 }
 
 // ══════════════════════════════════════════════════
@@ -7678,6 +7747,12 @@ async function delCfgItem(key, i) {
   await pushChanges('Removed');
   buildSelects();
   renderCfg();
+}
+
+function toggleSumSec(head) {
+  // Independent toggles — unlike Config's accordion, opening one Summary
+  // section doesn't collapse the others.
+  head.parentElement.classList.toggle('collapsed');
 }
 
 function toggleCfgCard(head) {
