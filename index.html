@@ -433,8 +433,9 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
      print. Paired with the extra air above, it does the work the old
      card borders were doing: it separates sections. */
   letter-spacing: 0.2em;
-  margin: 9px 0 3px 3px;
+  margin: 20px 0 6px 3px;
 }
+.sec-label:first-of-type { margin-top: 6px; }
 
 /* ── Summary: every card collapses to just its headline, and expands on
    tap to exactly what's there today (same ids, same drill-down links). ── */
@@ -462,6 +463,15 @@ body:has(#page-transfer.active) { background: var(--tint-transfer); }
 .stat-card.collapsible.collapsed .stat-chevron { transform: rotate(-90deg); }
 .stat-card.collapsible.collapsed .stat-body { display: none; }
 .stat-card .stat-body { margin-top: 2px; text-align: center; }
+
+/* Full-width, single-figure cards (Net, Total Spent, Active Net Worth,
+   Long-term Holdings) go back to centered — the side-by-side split earns
+   its keep on the two-up cards, where it's saving a whole row, but on a
+   card that already has the width to itself, centering the one figure
+   reads calmer and was how these looked before. */
+.stat-card.full .stat-head { flex-direction: column; align-items: center; text-align: center; gap: 1px; }
+.stat-card.full .stat-right { flex-direction: row; align-items: center; justify-content: center; gap: 8px; max-width: none; margin-top: 2px; }
+.stat-card.full .stat-noterow { max-width: none; }
 
 /* Top Income / Top Expense / Monthly Trend: fcard-style collapsible cards,
    with a highlighted headline figure standing in for the bars underneath. */
@@ -1193,7 +1203,7 @@ select.finput option { background: white; color: var(--ink); }
 }
 .month-chip.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
 
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 7px; }
 .stat-card {
   background: var(--surface);
   border: none;
@@ -3082,7 +3092,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-08';
+const APP_VERSION = '2026-09-27-09';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
