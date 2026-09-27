@@ -2608,6 +2608,10 @@ body { transition: background 0.25s ease; }
   <div id="page-cfg" class="page">
     <div style="height:14px"></div>
 
+    <div class="dash-allrow">
+      <button class="dash-allbtn" id="cfg-all-btn" onclick="toggleAllCfgCards()">Expand all</button>
+    </div>
+
     <!-- Supabase -->
     <div class="cfg-card collapsible collapsed">
       <div class="cfg-head" onclick="toggleCfgCard(this)">
@@ -3018,7 +3022,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-09-27-04';
+const APP_VERSION = '2026-09-27-05';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4036,6 +4040,7 @@ function jumpToConfigAdd(target) {
     if (!row) return;
     // The target cfg-card starts collapsed — expand it so the add-row shows.
     row.closest('.cfg-card')?.classList.remove('collapsed');
+    syncCfgAllBtn();
     row.classList.add('show');
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const inp = document.getElementById('new-' + target);
@@ -5830,6 +5835,7 @@ function gotoAccount(id) {
     if (!row) return;
     row.closest('.cfg-card')?.classList.remove('collapsed');
     row.closest('.acct-group')?.classList.remove('collapsed');
+    syncCfgAllBtn();
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const prev = row.style.background;
     row.style.transition = 'background 0.4s';
@@ -7776,6 +7782,7 @@ function renderCfg() {
   const vs = document.getElementById('cfg-version');
   if (vs) vs.textContent = 'Version ' + APP_VERSION + ' · tap to check for updates';
   document.getElementById('trash-count').textContent = S.trash.length + ' items';
+  syncCfgAllBtn();
 }
 
 function savePin(who) {
@@ -7890,12 +7897,24 @@ function syncDashAllBtn() {
 }
 
 function toggleCfgCard(head) {
-  const card = head.parentElement;
-  // Accordion: opening a Config section collapses the others.
-  if (card.classList.contains('collapsed')) {
-    document.querySelectorAll('.cfg-card.collapsible').forEach(c => c.classList.add('collapsed'));
-  }
-  card.classList.toggle('collapsed');
+  head.parentElement.classList.toggle('collapsed');
+  syncCfgAllBtn();
+}
+
+function toggleAllCfgCards() {
+  const cards = [...document.querySelectorAll('#page-cfg .cfg-card.collapsible')];
+  const anyClosed = cards.some(c => c.classList.contains('collapsed'));
+  cards.forEach(c => c.classList.toggle('collapsed', !anyClosed));
+  syncCfgAllBtn();
+}
+
+function syncCfgAllBtn() {
+  const btn = document.getElementById('cfg-all-btn');
+  if (!btn) return;
+  const cards = [...document.querySelectorAll('#page-cfg .cfg-card.collapsible')];
+  const anyClosed = cards.some(c => c.classList.contains('collapsed'));
+  btn.textContent = anyClosed ? 'Expand all' : 'Collapse all';
+  btn.classList.toggle('on', !anyClosed);
 }
 
 function toggleAcctGroup(head) {
@@ -8014,6 +8033,7 @@ function openAccountEditor(id) {
   ed.classList.add('show');
   // The Accounts cfg-card starts collapsed — expand it so the editor shows.
   document.getElementById('cfg-acct-list')?.closest('.cfg-card')?.classList.remove('collapsed');
+  syncCfgAllBtn();
   const a = id != null ? S.accounts.find(x => x.id === id) : null;
   document.getElementById('acct-edit-id').value = a ? a.id : '';
   document.getElementById('acct-name').value         = a ? a.name : '';
