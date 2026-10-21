@@ -2053,7 +2053,7 @@ body { transition: background 0.25s ease; }
       1. Go to <strong>supabase.com</strong> → New project (free)<br>
       2. Settings → API → copy <strong>Project URL</strong> and <strong>anon public key</strong><br>
       3. Run the SQL below in Supabase SQL Editor once:<br><br>
-      <code>create table expenses (id bigint primary key, date text, amount numeric, category text, type text, freq text, for_whom text, paid_by text, saving text, description text, month text, added_by text, created_at timestamptz default now());</code>
+      <code>create table expenses (id bigint primary key, date text, amount numeric, category text, type text, freq text, for_whom text, paid_by text, saving text, description text, month text, added_by text, created_at timestamptz default now());<br>grant select, insert, update, delete on public.expenses to anon, authenticated, service_role;</code>
     </div>
   </div>
 
@@ -3092,7 +3092,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-10-17-01';
+const APP_VERSION = '2026-10-21-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
