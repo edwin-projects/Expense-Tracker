@@ -3092,7 +3092,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-10-21-01';
+const APP_VERSION = '2026-10-31-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -5553,6 +5553,7 @@ function activeLogFilters() {
   else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
   if (S.logSettleOnly)         out.push({ label: 'Settlements', clear: "clearOneLogFilter('settleOnly')" });
   if (S.logMonth !== 'all')    out.push({ label: logMonthLabel(S.logMonth), clear: "clearOneLogFilter('month')" });
+  if (S.logSearch)             out.push({ label: `Search “${S.logSearch}”`, clear: 'clearLogSearch()' });
   if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
   return out;
 }
@@ -5743,7 +5744,17 @@ function setLogAddedBy(el) {
   renderLog();
 }
 
-function goToLog() {
+function goToLog(keepSearch) {
+  // A drill-down lands on exactly the entries behind the figure. A search
+  // typed earlier would silently narrow that further (and the box can look
+  // empty), so it is dropped unless the caller just set one on purpose.
+  if (!keepSearch) {
+    S.logSearch = '';
+    const box = document.getElementById('log-search-input');
+    if (box) box.value = '';
+    const x = document.getElementById('log-search-clear');
+    if (x) x.style.display = 'none';
+  }
   // Every caller of goToLog() is a Summary-side drill-down that has just
   // populated S.logXxx with the filter it wants applied. Set the flag so
   // goPage('log') preserves those filters on this entry. Direct nav taps
@@ -5923,6 +5934,8 @@ function setLogPersonFilterGo(name, kind, type, anchor, by) {
   S.logPaidBy = (by === 'paidBy') ? name  : 'All';
   S.logKind = kind || 'All';
   S.logType = type || 'All';
+  S.logSettleOnly = false;
+  S.logMonth = 'all';
   S.logAddedBy = 'All';
   S.logCategoryFilter = 'All';
   S.logAccountFilter = null;
@@ -5943,6 +5956,9 @@ function gotoIncomeSource(src) {
   S.logSearch = src;
   S.logCategoryFilter = 'All';
   S.logFilter = 'All';
+  S.logPaidBy = 'All';
+  S.logSettleOnly = false;
+  S.logMonth = 'all';
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
@@ -5954,7 +5970,7 @@ function gotoIncomeSource(src) {
   if (box) box.value = src;
   const clear = document.getElementById('log-search-clear');
   if (clear) clear.style.display = '';
-  goToLog();
+  goToLog(true);
 }
 
 // Jump from the Long-term Holdings rows in the accounts table up to the card
@@ -5975,6 +5991,9 @@ function setLogCategoryFilterGo(cat) {
   S.logCategoryFilter = cat;
   S.logKind = 'Expense';
   S.logFilter = 'All';
+  S.logPaidBy = 'All';
+  S.logSettleOnly = false;
+  S.logMonth = 'all';
   S.logType = 'All';
   S.logAddedBy = 'All';
   S.logAccountFilter = null;
