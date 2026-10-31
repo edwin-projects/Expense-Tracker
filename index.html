@@ -1164,6 +1164,7 @@ select.finput option { background: white; color: var(--ink); }
 .entry-date { font-size: 11.5px; color: var(--ink3); margin-top: 3px; }
 /* The "gross … reimbursed" line under a netted expense. Its own class, not
    a borrowed .entry-date — it is not a date. */
+.rep-flag { display: block; margin-top: 6px; color: var(--amber); line-height: 0; }
 .entry-reimb { font-size: 11.5px; color: var(--ink3); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .entry-by { font-size: 11px; color: var(--ink3); margin-top: 4px; }
 .no-data {
@@ -3092,7 +3093,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-10-31-01';
+const APP_VERSION = '2026-10-31-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3359,6 +3360,17 @@ function queueOp(table, method, id, body) {
     S.pendingOps = S.pendingOps.filter(op => !(op.table === table && op.id === id && (op.method === 'POST' || op.method === 'PATCH')));
     if (hadPost) { saveLocal(); return; }  // POST + DELETE cancel
   }
+  // A repeated entry carries its flag inside the description, behind the same
+  // invisible marker as reimbursement / settlement, so it syncs with no schema
+  // change. Doing it here covers every write path (add, edit, restore).
+  if (body && (method === 'POST' || method === 'PATCH') && 'description' in body) {
+    const list = table === 'expenses' ? S.entries : table === 'income' ? S.income : table === 'transfers' ? S.transfers : null;
+    const rec = list && list.find(x => x.id === id);
+    if (rec && rec.repeated) {
+      const d = String(body.description == null ? '' : body.description);
+      body.description = d + (d.includes(RMB_MARK) ? ' ' : RMB_MARK) + 'rep:1';
+    }
+  }
   S.pendingOps.push({ table, method, id, body: body || null });
 }
 
@@ -3498,7 +3510,8 @@ async function syncNow() {
       id: r.id, date: r.date, amount: Number(r.amount),
       category: r.category, type: r.type, freq: r.freq,
       forWhom: r.for_whom, paidBy: r.paid_by,
-      saving: r.saving, desc: r.description, month: r.month,
+      saving: r.saving, desc: stripIncomeDesc(r.description), month: r.month,
+      repeated: parseRepeatFromDesc(r.description),
       addedBy: r.added_by,
       account: resolveAccount(r, prevAcct, pendingExp)
     })), ...localOnly];
@@ -3547,6 +3560,7 @@ async function syncNow() {
         account: resolveAccount(r, prevIncAcct, pendingInc),
         // Strip the hidden marker so the UI only ever shows the real text.
         desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by,
+        repeated: parseRepeatFromDesc(r.description),
         reimbursesEntryId: link,
       };
     }), ...localOnly];
@@ -3562,7 +3576,8 @@ async function syncNow() {
       isSettlement: r.is_settlement != null
         ? !!r.is_settlement
         : parseSettlementFromDesc(r.description),
-      desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by
+      desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by,
+      repeated: parseRepeatFromDesc(r.description)
     })), ...localOnly];
   }
   // Recently Deleted bin. Same rule as the data tables: once the queue is
@@ -6267,7 +6282,7 @@ async function repeatEntry(id) {
   const e = S.entries.find(x => x.id === id);
   if (!e) return;
   const date = new Date().toISOString().split('T')[0];
-  const clone = { ...e, id: newId(), date, month: date.slice(0,7), addedBy: currentUser };
+  const clone = { ...e, id: newId(), date, month: date.slice(0,7), addedBy: currentUser, repeated: true };
   S.entries.unshift(clone);
   queueOp('expenses', 'POST', clone.id, {
     id: clone.id, date: clone.date, amount: clone.amount,
@@ -6285,7 +6300,7 @@ async function repeatIncome(id) {
   const i = S.income.find(x => x.id === id);
   if (!i) return;
   const date = new Date().toISOString().split('T')[0];
-  const clone = { ...i, id: newId(), date, month: date.slice(0,7), addedBy: currentUser };
+  const clone = { ...i, id: newId(), date, month: date.slice(0,7), addedBy: currentUser, repeated: true };
   S.income.unshift(clone);
   queueOp('income', 'POST', clone.id, {
     id: clone.id, date: clone.date, amount: clone.amount,
@@ -6304,7 +6319,7 @@ async function repeatTransfer(id) {
   const t = S.transfers.find(x => x.id === id);
   if (!t) return;
   const date = new Date().toISOString().split('T')[0];
-  const clone = { ...t, id: newId(), date, month: date.slice(0,7), addedBy: currentUser };
+  const clone = { ...t, id: newId(), date, month: date.slice(0,7), addedBy: currentUser, repeated: true };
   S.transfers.unshift(clone);
   queueOp('transfers', 'POST', clone.id, {
     id: clone.id, date: clone.date, amount: clone.amount,
@@ -6533,6 +6548,8 @@ function balAfterLine(key) {
   }).join('');
 }
 
+const REPEAT_ICON = '<span class="rep-flag" title="Repeated entry" aria-label="Repeated entry"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg></span>';
+
 function renderExpenseCard(e, q) {
   const fc = 'for-' + (e.forWhom || 'both').toLowerCase();
   const an = (S.accounts.find(a => a.id === e.account) || {}).name;
@@ -6577,6 +6594,7 @@ function renderExpenseCard(e, q) {
         <div class="entry-date">${fmtDate(e.date)}</div>
         ${reimbSubLine}
         ${balAfterLine('e' + e.id)}
+        ${e.repeated ? REPEAT_ICON : ''}
       </div>
     </div>`;
 }
@@ -6616,6 +6634,7 @@ function renderIncomeCard(i, q) {
         <div class="entry-amount" style="color:var(--green)">+₹${Number(i.amount).toLocaleString('en-IN')}</div>
         <div class="entry-date">${fmtDate(i.date)}</div>
         ${balAfterLine('i' + i.id)}
+        ${i.repeated ? REPEAT_ICON : ''}
       </div>
     </div>`;
 }
@@ -6644,6 +6663,7 @@ function renderTransferCard(t, q) {
         <div class="entry-amount" style="color:var(--transfer-ink)">₹${Number(t.amount).toLocaleString('en-IN')}</div>
         <div class="entry-date">${fmtDate(t.date)}</div>
         ${balAfterLine('x' + t.id + ':' + t.fromAccount)}${t.toAccount !== t.fromAccount ? balAfterLine('x' + t.id + ':' + t.toAccount) : ''}
+        ${t.repeated ? REPEAT_ICON : ''}
       </div>
     </div>`;
 }
@@ -6941,6 +6961,9 @@ function stripIncomeDesc(desc) {
 function encodeXferDesc(desc, isSettlement) {
   const clean = stripIncomeDesc(desc);
   return isSettlement ? clean + RMB_MARK + 'stl:1' : clean;
+}
+function parseRepeatFromDesc(desc) {
+  return /rep:1/.test(String(desc == null ? '' : desc).split(RMB_MARK).slice(1).join(RMB_MARK));
 }
 function parseSettlementFromDesc(desc) {
   return /stl:1/.test(String(desc == null ? '' : desc));
