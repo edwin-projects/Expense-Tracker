@@ -1022,6 +1022,9 @@ select.finput option { background: white; color: var(--ink); }
 .settle-since:empty { display: none; }
 .hist-detail { display: none; padding-bottom: 6px; }
 .hist-item.open .hist-detail { display: block; }
+.hist-chev { flex-shrink: 0; margin-left: 10px; color: var(--ink3); transition: transform 0.2s; }
+.hist-item.open .hist-chev { transform: rotate(180deg); }
+.hist-item > .settle-row { align-items: center; }
 .settle-who b { color: var(--ink); font-weight: 600; }
 /* The working stays folded away until tapped. */
 .settle-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
@@ -3103,7 +3106,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-11-12-01';
+const APP_VERSION = '2026-11-12-02';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -4720,7 +4723,8 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
       html += '<div class="hist-item">'
         + `<div class="settle-row" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')">`
         + `<span class="sr-name">${a && a !== b ? a + ' – ' + b : b}<small>${ph.es.length} expense${ph.es.length === 1 ? '' : 's'} · cleared in full</small></span>`
-        + `<span class="sr-fig">${money(ph.r.settled)}</span></div>`
+        + `<span class="sr-fig">${money(ph.r.settled)}</span>`
+        + '<svg class="hist-chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>'
         + `<div class="hist-detail">${sheetHTML(ph)}${settledHTML(ph)}</div></div>`;
     });
   }
