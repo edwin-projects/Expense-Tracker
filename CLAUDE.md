@@ -79,6 +79,11 @@ rides in an optional `is_settlement` column AND behind the description's marker
 **Settle Up ignores the period buttons.** It is a running account from the first entry to
 today and clears only when a settlement is recorded — not when the calendar turns over.
 
+**Settle Up runs in phases.** A settlement that leaves the balance at zero closes a phase (`settlePhases()`);
+the card shows only the open one, with "Earlier settlements" underneath, each opening to the balance sheet it
+had when cleared. Entries are ordered by (date, id). Drill-downs carry the phase as `S.logRange`, a chip on
+the Log. Restoring a transfer from the bin must keep its Settlement flag.
+
 **Every line of the breakdown is checkable.** The card is a balance sheet: rows are whose cost
 it was, columns are who paid (`settleUp()` returns `claim`). A cell holds the other person's
 share, with the spending it came out of underneath, and taps through to the Log with the filters
