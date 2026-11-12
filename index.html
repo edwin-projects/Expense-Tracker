@@ -1018,6 +1018,10 @@ select.finput option { background: white; color: var(--ink); }
 }
 .settle-card.square .settle-amt { color: var(--ink3); }
 .settle-who { font-size: 12.5px; color: var(--ink2); line-height: 1.3; }
+.settle-since { font-size: 10.5px; color: var(--ink3); margin-top: 6px; }
+.settle-since:empty { display: none; }
+.hist-detail { display: none; padding-bottom: 6px; }
+.hist-item.open .hist-detail { display: block; }
 .settle-who b { color: var(--ink); font-weight: 600; }
 /* The working stays folded away until tapped. */
 .settle-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
@@ -2384,6 +2388,7 @@ body { transition: background 0.25s ease; }
         <div class="settle-who" id="d-settle-who"></div>
         <div class="settle-amt" id="d-settle-amt">₹0</div>
       </div>
+      <div class="settle-since" id="d-settle-since"></div>
       <div class="settle-detail" id="d-settle-detail"></div>
     </div>
 
@@ -2980,6 +2985,11 @@ body { transition: background 0.25s ease; }
         <div class="modal-label">To Account</div>
         <select class="modal-input" id="edit-to"></select>
       </div>
+      <div class="modal-field edit-only-transfer" style="display:none">
+        <label class="modal-label" style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="edit-settle"> Settlement — repays what one owes the other
+        </label>
+      </div>
       <div class="modal-field">
         <div class="modal-label">Date</div>
         <input class="modal-input" id="edit-date" type="date">
@@ -3093,7 +3103,7 @@ body { transition: background 0.25s ease; }
 // login is on the fresh build. Keep the two values identical — if version.json
 // runs ahead of the deployed APP_VERSION, clients try to update on every
 // check (the per-session guard stops the loop, but it's still wrong).
-const APP_VERSION = '2026-10-31-02';
+const APP_VERSION = '2026-11-12-01';
 
 // ══════════════════════════════════════════════════
 //  DEFAULT CONFIG — Edit categories here anytime
@@ -3194,6 +3204,7 @@ let S = {
   logMonth: 'all',
   // Set by the Settle Up card's "settled" line: transfers marked Settlement.
   logSettleOnly: false,
+  logRange: null,
   logCategoryFilter: 'All',
   logSearch: '',
   logKind: 'All',
@@ -3573,9 +3584,7 @@ async function syncNow() {
       fromAccount: r.from_account != null ? Number(r.from_account) : null,
       toAccount:   r.to_account   != null ? Number(r.to_account)   : null,
       // Column first where it exists, otherwise the marker in the description.
-      isSettlement: r.is_settlement != null
-        ? !!r.is_settlement
-        : parseSettlementFromDesc(r.description),
+      isSettlement: !!r.is_settlement || parseSettlementFromDesc(r.description),
       desc: stripIncomeDesc(r.description), month: r.month, addedBy: r.added_by,
       repeated: parseRepeatFromDesc(r.description)
     })), ...localOnly];
@@ -4556,6 +4565,60 @@ function settleUp(esList, effAmtFn, incList, xferList) {
   return { net, paid, share, recv, claim, settled, settledFrom };
 }
 
+// ── Phases ───────────────────────────────────────────────────────────
+// A settlement that brings the balance back to zero closes a phase: what came
+// before is history, and the next expense starts a fresh account. Settle Up
+// shows only the open phase; earlier ones stay one tap away underneath.
+// Entries are ordered by (date, id) so same-day rows keep the order they
+// were added in.
+const sKey = x => (x.date || '') + '|' + String(x.id);
+function sCmp(a, b) { return (a.date || '').localeCompare(b.date || '') || (Number(a.id) - Number(b.id)); }
+// from is exclusive, to is inclusive — either may be null.
+function inSettleRange(x, rg) {
+  if (!rg) return true;
+  if (rg.from && sCmp(x, rg.from) <= 0) return false;
+  if (rg.to   && sCmp(x, rg.to)   >  0) return false;
+  return true;
+}
+function parseRangeArg(from, to) {
+  const pk = k => { if (!k) return null; const [d, id] = k.split('|'); return { date: d, id: Number(id) }; };
+  return (from || to) ? { from: pk(from), to: pk(to) } : null;
+}
+const rangeArgs = rg => `'${rg && rg.from ? sKey(rg.from) : ''}','${rg && rg.to ? sKey(rg.to) : ''}'`;
+
+function settlePhases(esList, effAmtFn, incList, xferList) {
+  const ownerOf = id => (S.accounts.find(a => a.id === id) || {}).owner;
+  const isPairSettle = t => {
+    if (!t.isSettlement) return false;
+    const f = ownerOf(t.fromAccount), o = ownerOf(t.toAccount);
+    return SETTLE_PAIR.includes(f) && SETTLE_PAIR.includes(o) && f !== o;
+  };
+  const sets = (xferList || []).filter(isPairSettle).sort(sCmp);
+  const slice = rg => ({
+    es: esList.filter(e => inSettleRange(e, rg)),
+    xf: sets.filter(t => inSettleRange(t, rg)),
+  });
+  // Walk the settlements in order; one that leaves the running balance at
+  // zero is a cutoff.
+  const cuts = [];
+  let prev = null;
+  sets.forEach(t => {
+    const rg = { from: prev, to: t };
+    const sl = slice(rg);
+    const r = settleUp(sl.es, effAmtFn, incList, sl.xf);
+    if (Math.abs(r.net.Edwin) < 1) { cuts.push(t); prev = t; }
+  });
+  const bounds = [null, ...cuts];
+  const phases = bounds.map((b, k) => {
+    const rg = { from: b, to: k + 1 < bounds.length ? bounds[k + 1] : null };
+    const sl = slice(rg);
+    const dates = [...sl.es, ...sl.xf].map(x => x.date).filter(Boolean).sort();
+    return { range: rg, es: sl.es, xf: sl.xf, closedBy: rg.to, r: settleUp(sl.es, effAmtFn, incList, sl.xf),
+             first: dates[0] || '', last: dates[dates.length - 1] || '' };
+  });
+  return phases;
+}
+
 let settleExpanded = false;
 function toggleSettle() {
   settleExpanded = !settleExpanded;
@@ -4566,22 +4629,30 @@ function toggleSettle() {
 function renderSettle(esList, effAmtFn, incList, xferList) {
   const card = document.getElementById('d-settle');
   if (!card) return;
-  const r = settleUp(esList, effAmtFn, incList, xferList);
+  const phases = settlePhases(esList, effAmtFn, incList, xferList);
+  const cur = phases[phases.length - 1];
+  const closed = phases.slice(0, -1).filter(ph => ph.es.length || ph.xf.length);
+  const r = cur.r;
   const netE = Math.round(r.net.Edwin);
+  const everSettled = phases.length > 1 || r.settled > 0;
 
   // Nothing shared, nothing to settle — don't take up space saying so.
-  if (!esList.length && !r.settled) { card.style.display = 'none'; return; }
+  if (!esList.length && !everSettled) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   card.classList.toggle('open', settleExpanded);
   card.classList.toggle('square', netE === 0);
 
+  const lastCut = phases.length > 1 ? phases[phases.length - 2].closedBy : null;
   document.getElementById('d-settle-amt').textContent = '₹' + fmt(Math.abs(netE));
   document.getElementById('d-settle-who').innerHTML = netE === 0
-    ? (r.settled ? 'All square — settled in full' : 'All square — nothing to settle')
+    ? (everSettled ? 'All square — settled in full' : 'All square — nothing to settle')
     : `<b>${netE > 0 ? 'Divya' : 'Edwin'}</b> owes <b>${netE > 0 ? 'Edwin' : 'Divya'}</b>`;
+  const since = document.getElementById('d-settle-since');
+  if (since) since.textContent = lastCut
+    ? (cur.es.length ? `Since the settlement on ${fmtDate(lastCut.date)}` : `Settled on ${fmtDate(lastCut.date)} · next expense starts a new account`)
+    : '';
 
   const money = v => '₹' + fmt(Math.round(v));
-  const other = p => (p === 'Edwin' ? 'Divya' : 'Edwin');
 
   // One line of the ledger. `tap` carries the Log filter that produces it,
   // so any figure here can be checked against the entries themselves.
@@ -4595,72 +4666,87 @@ function renderSettle(esList, effAmtFn, incList, xferList) {
   // Each cell holds the amount that counts toward the balance — the other
   // person's share — with the spending it came out of underneath, so the
   // halving is on the page rather than taken on trust. Every cell with a
-  // figure opens the Log on exactly those entries.
-  const cell = (payer, forWhom, amt, gross) => {
-    if (!amt) return '<div class="sb-cell empty">—</div>';
-    return `<div class="sb-cell" onclick="event.stopPropagation();gotoSettleLine('${payer}','${forWhom}')">`
-      + `<span class="sb-amt">${money(amt)}</span>`
-      + (gross ? `<span class="sb-of">of ${money(gross)}</span>` : '')
-      + '</div>';
+  // figure opens the Log on exactly those entries (within the phase).
+  const sheetHTML = ph => {
+    const rg = rangeArgs(ph.range);
+    const cell = (payer, forWhom, amt, gross) => {
+      if (!amt) return '<div class="sb-cell empty">—</div>';
+      return `<div class="sb-cell" onclick="event.stopPropagation();gotoSettleLine('${payer}','${forWhom}',${rg})">`
+        + `<span class="sb-amt">${money(amt)}</span>`
+        + (gross ? `<span class="sb-of">of ${money(gross)}</span>` : '')
+        + '</div>';
+    };
+    const E = ph.r.claim.Edwin, D = ph.r.claim.Divya;
+    const sheetRow = (label, left, right) =>
+      `<div class="sb-row"><div class="sb-lbl">${label}</div>${left}${right}</div>`;
+    const rows = [];
+    if (E.forOther) rows.push(sheetRow('For Divya',
+      cell('Edwin', 'Divya', E.forOther), '<div class="sb-cell empty">—</div>'));
+    if (D.forOther) rows.push(sheetRow('For Edwin',
+      '<div class="sb-cell empty">—</div>', cell('Divya', 'Edwin', D.forOther)));
+    if (E.both || D.both) rows.push(sheetRow('Both <small>half each</small>',
+      cell('Edwin', 'Both', E.both, E.bothGross), cell('Divya', 'Both', D.both, D.bothGross)));
+    if (E.aj || D.aj) rows.push(sheetRow('AJ <small>half each</small>',
+      cell('Edwin', 'AJ', E.aj, E.ajGross), cell('Divya', 'AJ', D.aj, D.ajGross)));
+    if (E.otherBanked || D.otherBanked) rows.push(sheetRow('Held by the other <small>reimbursement</small>',
+      E.otherBanked ? `<div class="sb-cell"><span class="sb-amt">${money(E.otherBanked)}</span></div>` : '<div class="sb-cell empty">—</div>',
+      D.otherBanked ? `<div class="sb-cell"><span class="sb-amt">${money(D.otherBanked)}</span></div>` : '<div class="sb-cell empty">—</div>'));
+    if (!rows.length) return '';
+    return '<div class="sb">'
+      + `<div class="sb-row head"><div class="sb-lbl">Whose cost</div>`
+      + `<div class="sb-cell">Edwin<br>paid</div><div class="sb-cell">Divya<br>paid</div></div>`
+      + rows.join('')
+      + `<div class="sb-row total"><div class="sb-lbl">Owed to</div>`
+      + `<div class="sb-cell"><span class="sb-amt">${money(E.total)}</span></div>`
+      + `<div class="sb-cell"><span class="sb-amt">${money(D.total)}</span></div></div>`
+      + '</div>'
+      + ((E.netted + D.netted) ? `<div class="settle-sub-note">costs shown are already net of ${money(E.netted + D.netted)} reimbursed</div>` : '');
   };
-
-  const E = r.claim.Edwin, D = r.claim.Divya;
-  const sheetRow = (label, left, right) =>
-    `<div class="sb-row"><div class="sb-lbl">${label}</div>${left}${right}</div>`;
-
-  const rows = [];
-  if (E.forOther) rows.push(sheetRow('For Divya',
-    cell('Edwin', 'Divya', E.forOther), '<div class="sb-cell empty">—</div>'));
-  if (D.forOther) rows.push(sheetRow('For Edwin',
-    '<div class="sb-cell empty">—</div>', cell('Divya', 'Edwin', D.forOther)));
-  if (E.both || D.both) rows.push(sheetRow('Both <small>half each</small>',
-    cell('Edwin', 'Both', E.both, E.bothGross), cell('Divya', 'Both', D.both, D.bothGross)));
-  if (E.aj || D.aj) rows.push(sheetRow('AJ <small>half each</small>',
-    cell('Edwin', 'AJ', E.aj, E.ajGross), cell('Divya', 'AJ', D.aj, D.ajGross)));
-  if (E.otherBanked || D.otherBanked) rows.push(sheetRow('Held by the other <small>reimbursement</small>',
-    E.otherBanked ? `<div class="sb-cell"><span class="sb-amt">${money(E.otherBanked)}</span></div>` : '<div class="sb-cell empty">—</div>',
-    D.otherBanked ? `<div class="sb-cell"><span class="sb-amt">${money(D.otherBanked)}</span></div>` : '<div class="sb-cell empty">—</div>'));
-
-  const sheet =
-      '<div class="sb">'
-    + `<div class="sb-row head"><div class="sb-lbl">Whose cost</div>`
-    + `<div class="sb-cell">Edwin<br>paid</div><div class="sb-cell">Divya<br>paid</div></div>`
-    + rows.join('')
-    + `<div class="sb-row total"><div class="sb-lbl">Owed to</div>`
-    + `<div class="sb-cell"><span class="sb-amt">${money(E.total)}</span></div>`
-    + `<div class="sb-cell"><span class="sb-amt">${money(D.total)}</span></div></div>`
-    + '</div>'
-    + ((E.netted + D.netted) ? `<div class="settle-sub-note">costs shown are already net of ${money(E.netted + D.netted)} reimbursed</div>` : '');
-
-  const settledRow = r.settled
-    ? line(`Settled by ${r.settledFrom}`, 'transfers marked Settlement',
-        '−' + money(r.settled), 'gotoSettlements()')
+  const settledHTML = ph => ph.r.settled
+    ? line(`Settled by ${ph.r.settledFrom}`, 'transfers marked Settlement',
+        '−' + money(ph.r.settled), `gotoSettlements(${rangeArgs(ph.range)})`)
     : '';
 
-  document.getElementById('d-settle-detail').innerHTML =
-      sheet + settledRow
-    + line(netE === 0 ? 'Difference · all square' : `Difference · ${netE > 0 ? 'Divya' : 'Edwin'} owes`, '',
-        money(Math.abs(netE)), '', 'net');
+  const netLine = (label, v) => line(label, '', money(Math.abs(v)), '', 'net');
+  let html = sheetHTML(cur) + settledHTML(cur)
+    + netLine(netE === 0 ? 'Difference · all square' : `Difference · ${netE > 0 ? 'Divya' : 'Edwin'} owes`, netE);
+
+  // Earlier phases, newest first. Each opens to the same balance sheet it
+  // had the day it was cleared.
+  if (closed.length) {
+    html += '<div class="settle-block-lbl">Earlier settlements</div>';
+    closed.slice().reverse().forEach(ph => {
+      const a = ph.first ? fmtDate(ph.first) : '', b = fmtDate(ph.closedBy.date);
+      html += '<div class="hist-item">'
+        + `<div class="settle-row" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')">`
+        + `<span class="sr-name">${a && a !== b ? a + ' – ' + b : b}<small>${ph.es.length} expense${ph.es.length === 1 ? '' : 's'} · cleared in full</small></span>`
+        + `<span class="sr-fig">${money(ph.r.settled)}</span></div>`
+        + `<div class="hist-detail">${sheetHTML(ph)}${settledHTML(ph)}</div></div>`;
+    });
+  }
+  document.getElementById('d-settle-detail').innerHTML = html;
 }
 
 // Tapping a ledger line opens the Log on exactly the entries behind it:
-// the same two filters the figure was built from, over all time.
-function gotoSettleLine(paidBy, forWhom) {
+// the same filters the figure was built from, within that phase.
+function gotoSettleLine(paidBy, forWhom, from, to) {
   clearAllLogFilters();
   S.logKind = 'Expense';
   S.logPaidBy = paidBy;
   S.logFilter = forWhom;
+  S.logRange = parseRangeArg(from, to);
   S.logReturnAnchor = 'd-settle';
-  goToLog();
+  goToLog(false, true);
 }
 
 // The settlements themselves — transfers recorded with the Settlement kind.
-function gotoSettlements() {
+function gotoSettlements(from, to) {
   clearAllLogFilters();
   S.logKind = 'Transfer';
   S.logSettleOnly = true;
+  S.logRange = parseRangeArg(from, to);
   S.logReturnAnchor = 'd-settle';
-  goToLog();
+  goToLog(false, true);
 }
 
 // ══════════════════════════════════════════════════
@@ -5223,7 +5309,11 @@ async function restoreFromTrash(tid) {
       queueOp('transfers', 'POST', rec.id, {
         id: rec.id, date: rec.date, amount: rec.amount,
         from_account: rec.fromAccount, to_account: rec.toAccount,
-        description: rec.desc, month: rec.month, added_by: rec.addedBy
+        // Keep the Settlement flag — without it a restored settlement would
+        // come back as a plain transfer and the balance would jump.
+        description: encodeXferDesc(rec.desc, rec.isSettlement),
+        is_settlement: !!rec.isSettlement,
+        month: rec.month, added_by: rec.addedBy
       });
     }
   }
@@ -5567,6 +5657,10 @@ function activeLogFilters() {
   if (S.logInvestedOnly)       out.push({ label: 'Money invested', clear: 'clearLogAcctTypeFilter()' });
   else if (S.logAcctTypeFilter) out.push({ label: ACCOUNT_GROUP_LABELS[S.logAcctTypeFilter] || S.logAcctTypeFilter, clear: 'clearLogAcctTypeFilter()' });
   if (S.logSettleOnly)         out.push({ label: 'Settlements', clear: "clearOneLogFilter('settleOnly')" });
+  if (S.logRange) {
+    const rg = S.logRange;
+    out.push({ label: rg.from ? `Since ${fmtDate(rg.from.date)} settlement` : (rg.to ? `Up to ${fmtDate(rg.to.date)}` : 'Settle-up phase'), clear: "clearOneLogFilter('range')" });
+  }
   if (S.logMonth !== 'all')    out.push({ label: logMonthLabel(S.logMonth), clear: "clearOneLogFilter('month')" });
   if (S.logSearch)             out.push({ label: `Search “${S.logSearch}”`, clear: 'clearLogSearch()' });
   if (S.logPeriod !== 'all')   out.push({ label: PERIOD_LABELS[S.logPeriod] || S.logPeriod, clear: 'clearLogPeriodFilter()' });
@@ -5639,6 +5733,7 @@ function clearOneLogFilter(which) {
   if (which === 'paidBy')   S.logPaidBy = 'All';
   if (which === 'month')    S.logMonth = 'all';
   if (which === 'settleOnly') S.logSettleOnly = false;
+  if (which === 'range')      S.logRange = null;
   if (which === 'type')     S.logType = 'All';
   if (which === 'category') S.logCategoryFilter = 'All';
   if (which === 'addedBy')  S.logAddedBy = 'All';
@@ -5759,7 +5854,8 @@ function setLogAddedBy(el) {
   renderLog();
 }
 
-function goToLog(keepSearch) {
+function goToLog(keepSearch, keepRange) {
+  if (!keepRange) S.logRange = null;
   // A drill-down lands on exactly the entries behind the figure. A search
   // typed earlier would silently narrow that further (and the box can look
   // empty), so it is dropped unless the caller just set one on purpose.
@@ -5839,6 +5935,7 @@ function clearAllLogFilters() {
   S.logInvestedOnly = false;
   S.logPeriod = 'all';
   S.logSearch = '';
+  S.logRange = null;
   const search = document.getElementById('log-search-input');
   if (search) search.value = '';
   const searchClear = document.getElementById('log-search-clear');
@@ -6107,6 +6204,7 @@ function openEditTransferModal(id) {
   document.getElementById('edit-amount').value = formatIndianNumber(t.amount);
   document.getElementById('edit-date').value = t.date;
   document.getElementById('edit-desc').value = t.desc || '';
+  document.getElementById('edit-settle').checked = !!t.isSettlement;
   enhanceAllSearchableSelects(document.getElementById('edit-modal'));
   document.getElementById('edit-modal').classList.add('show');
 }
@@ -6146,6 +6244,7 @@ async function saveEdit() {
       amount,
       fromAccount: Number(fromRaw),
       toAccount:   Number(toRaw),
+      isSettlement: document.getElementById('edit-settle').checked,
       date,
       desc: document.getElementById('edit-desc').value.trim(),
       month: date.slice(0,7)
@@ -6417,6 +6516,9 @@ function renderLog() {
   }
   if (S.logSettleOnly) {
     items = items.filter(x => x._kind === 'transfer' && x.isSettlement);
+  }
+  if (S.logRange) {
+    items = items.filter(x => inSettleRange(x, S.logRange));
   }
   if (S.logMonth !== 'all') {
     items = items.filter(x => (x.date || '').slice(0, 7) === S.logMonth);
